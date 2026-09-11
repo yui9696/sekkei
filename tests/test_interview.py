@@ -88,10 +88,14 @@ def test_skip_undo_and_state_round_trip():
 
 def test_run_cli_scripted_session(tmp_path):
     script = StringIO(
-        "The controller reads temperature from four sensors every ten seconds.\n"  # requirement
-        "\n"            # accept the placement proposal
+        "The controller reads temperature from four sensors every ten seconds.\n"  # requirement (describe phase)
+        "It opens or closes the roof vents according to the setpoints.\n"          # another one
+        "\n"            # empty line: start the questions
+        "\n"            # accept the first placement proposal
+        "\n"            # accept the second
         "Rust\n"        # Q-lang
-        "skip\n"        # next question left open
+        "The grower adjusts setpoints on a touch panel.\n"  # a stray requirement typed at a question: added, question re-asked
+        "skip\n"        # that question left open
         "/status\n"
         "/design\n"
         "/done\n"
@@ -100,6 +104,8 @@ def test_run_cli_scripted_session(tmp_path):
     assert run_cli(script, out, tmp_path) == 0
     text = out.getvalue()
     assert "[placement]" in text and "owner confirmed" in text and "Rust." in (tmp_path / "requirements.md").read_text()
+    assert "reads as a requirement" in text and "touch panel" in (tmp_path / "requirements.md").read_text()
+    assert "- skip." not in (tmp_path / "requirements.md").read_text()
     assert (tmp_path / "design.json").exists() and (tmp_path / "NOTES.md").exists()
     st = json.loads((tmp_path / ".sekkei" / "interview.json").read_text())
     assert st["answers"].get("Q-lang") == "Rust." and st["skipped"]
@@ -109,11 +115,21 @@ def test_run_cli_scripted_session(tmp_path):
     assert "resumed" in out2.getvalue()
 
 
+def test_requirement_vs_answer_heuristic():
+    from sekkei.engine.interview import Prompt, looks_like_requirement
+
+    q = Prompt("question", "Q-team", "How many people?", "2")
+    assert looks_like_requirement("Customers can see delivery attempts per event and manually redeliver.", q)
+    assert not looks_like_requirement("3", q) and not looks_like_requirement("PostgreSQL and Redis", q)
+    assert not looks_like_requirement("Customers can see delivery attempts per event.", Prompt("decision", "k", "x", "1"))
+    assert canonical_bullet("Q-team", "Python 3.12 team of 3") == ("constraint", "Team of 3.")
+
+
 def test_cli_command(tmp_path, monkeypatch, capsys):
     from sekkei.cli import main
 
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "replies.txt").write_text("Users can upload photos and share them with friends.\n\n\n/done\n")
+    (tmp_path / "replies.txt").write_text("Users can upload photos and share them with friends.\n\n\n\n/done\n")
     assert main(["interview", "--script", "replies.txt", "--out-dir", "out"]) == 0
     assert (tmp_path / "out" / "design.json").exists()
     assert "status:" in capsys.readouterr().out

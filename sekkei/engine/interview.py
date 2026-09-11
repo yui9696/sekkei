@@ -58,6 +58,22 @@ def _num(raw: str) -> str:
     return m.group(0) if m else ""
 
 
+def _int(raw: str) -> str:
+    m = re.search(r"\d+", raw)
+    return m.group(0) if m else ""
+
+
+NOOP_REPLIES = {"skip", "y", "yes", "ok", "accept", "n", "no"}
+
+
+def looks_like_requirement(text: str, prompt: Optional["Prompt"]) -> bool:
+    """A long sentence with a subject and a verb typed at a question prompt is a requirement, not an answer."""
+    if prompt is not None and prompt.kind == "decision":
+        return False
+    sent = analyse_sentence(0, text, "", False)
+    return len(sent.words) >= 6 and bool(sent.actors or sent.verbs)
+
+
 def canonical_bullet(qid: str, raw: str) -> tuple[str, str]:
     """(section, bullet) for a human answer to question ``qid``."""
     r = raw.strip().rstrip(".")
@@ -69,7 +85,7 @@ def canonical_bullet(qid: str, raw: str) -> tuple[str, str]:
     if qid == "Q-deploy":
         return "constraint", f"Deployed as {r}." if not low.startswith("deploy") else f"{r}."
     if qid == "Q-team":
-        n = _num(r)
+        n = _int(r)
         return "constraint", f"Team of {n}." if n else f"Team: {r}."
     if qid == "Q-rate":
         return "nonfunctional", f"The system sustains {r}." if not low.startswith("the system") else f"{r}."
@@ -296,8 +312,9 @@ class Interview:
 # ---------------------------------------------------------------------------
 
 HELP = """\
-Type sentences to add requirements (English; one requirement per sentence).
-Answer a prompt with Enter (accept the proposal), your own answer, or 'skip'.
+Describe the system in sentences (English; one requirement per sentence). Press Enter on an
+empty line to start the questions. Answer a prompt with Enter (accept the proposal), your own
+answer, or 'skip'. A long sentence typed at a question is taken as a new requirement.
 Commands: /add <text>  /status  /pending  /design  /undo  /done  /help"""
 
 WELCOME = """\
@@ -329,15 +346,19 @@ def run_cli(inp: IO[str], out: IO[str], root: Path, base_file: Optional[Path] = 
     out_dir = out_dir or root
     out.write(WELCOME + "\n")
     current: Optional[Prompt] = None
+    mode = "describe"   # describe: every line is a requirement; ask: the engine asks, the human answers
     while True:
-        if current is None:
+        if mode == "describe":
+            out.write("status: " + iv.status() + "\n")
+            out.write("describe: type sentences; press Enter on an empty line to start the questions\n")
+        elif current is None:
             pend = iv.pending()
             out.write("status: " + iv.status() + "\n")
             if pend:
                 current = pend[0]
                 out.write(current.render() + "\n")
             else:
-                out.write("nothing to confirm. Add requirements, or /design to write the outputs, /done to finish.\n")
+                out.write("nothing to confirm. Add sentences, /design to write the outputs, /done to finish.\n")
         out.write("> ")
         out.flush()
         line = inp.readline()
@@ -370,10 +391,21 @@ def run_cli(inp: IO[str], out: IO[str], root: Path, base_file: Optional[Path] = 
                 out.write("unknown command; /help\n")
             save_state(root, iv)
             continue
+        if mode == "describe":
+            if cmd == "":
+                mode = "ask"
+            elif cmd.lower() in NOOP_REPLIES:
+                pass
+            else:
+                out.write(f"added {iv.add(cmd)} requirement(s)\n")
+            save_state(root, iv)
+            continue
         if current is None:
-            if cmd:
-                n = iv.add(cmd)
-                out.write(f"added {n} requirement(s)\n")
+            if cmd and cmd.lower() not in NOOP_REPLIES:
+                out.write(f"added {iv.add(cmd)} requirement(s)\n")
+        elif looks_like_requirement(cmd, current):
+            out.write(f"that reads as a requirement; added {iv.add(cmd)} and I will ask again\n")
+            current = None
         else:
             out.write(iv.reply(current, line) + "\n")
             current = None
