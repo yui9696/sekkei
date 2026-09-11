@@ -218,19 +218,19 @@ graph LR
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
 | `offer_location` | `location`: Location \| id | Location \| None | ValidationError, NotFound | — |
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
-| `accept_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | — |
+| `accept_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `decline_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | — |
+| `decline_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `offer_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | — |
+| `offer_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `request_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | — |
+| `request_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `send_position` | `position`: Position \| id | Position \| None | ValidationError, NotFound | — |
+| `send_position` | `position`: Position \| id | Position \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `get_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | — |
+| `get_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `assign_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | — |
+| `assign_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `compute_fare` | `fare`: Fare \| id | Fare \| None | ValidationError, NotFound | — |
 | | from R-4: The system computes the fare from distance and time at the end of the trip and charges the | | | |
@@ -242,15 +242,15 @@ graph LR
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `get_trips` | `trips`: Trips \| id | Trips \| None | ValidationError, NotFound | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
-| `receive_alert` | `alert`: Alert \| id | Alert \| None | ValidationError, NotFound | — |
+| `receive_alert` | `alert`: Alert \| id | Alert \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `accept_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | — |
+| `accept_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `request_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | — |
+| `request_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
 | | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | — |
+| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
 | | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-4 — Observability interface
@@ -336,15 +336,15 @@ graph LR
 |---|---|---|---|---|
 | `POST /rides/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
-| `POST /drivers/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /drivers/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `POST /drivers/{id}/decline` | `id`: str | 202 decline accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /drivers/{id}/decline` | `id`: str | 202 decline accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `POST /batchs/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /batchs/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `GET /drivers/{id}` | `id`: str | 200 driver | 401 unauthenticated, 404 unknown id | — |
+| `GET /drivers/{id}` | `id`: str | 200 driver | 401 unauthenticated, 404 unknown id | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `POST /drivers/{id}/assign` | `id`: str | 202 assign accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /drivers/{id}/assign` | `id`: str | 202 assign accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `POST /trips/{id}/rate` | `id`: str | 202 rate accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
@@ -352,7 +352,7 @@ graph LR
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `GET /trips/{id}` | `id`: str | 200 trips | 401 unauthenticated, 404 unknown id | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
-| `POST /drivers/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /drivers/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 
 ### I-12 — Push gateway interface
@@ -686,57 +686,92 @@ _Affects:_ C-9
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Store + Observability + Event bus (M)"]
-  WP_2["WP-2 Authentication + Scheduler + Geospatial index (M)"]
-  WP_3["WP-3 Payments (S)"]
-  WP_4["WP-4 Domain core (S)"]
-  WP_5["WP-5 Batch job + Public HTTP API + Push gateway (M)"]
-  WP_1 --> WP_2
+  WP_1["WP-1 Store + Observability (M)"]
+  WP_2["WP-2 Event bus (S)"]
+  WP_3["WP-3 Geospatial index (S)"]
+  WP_4["WP-4 Authentication + Scheduler (M)"]
+  WP_5["WP-5 Payments (S)"]
+  WP_6["WP-6 Domain core (S)"]
+  WP_7["WP-7 Batch job (S)"]
+  WP_8["WP-8 Public HTTP API (S)"]
+  WP_9["WP-9 Push gateway (S)"]
   WP_1 --> WP_3
   WP_1 --> WP_4
-  WP_2 --> WP_4
-  WP_3 --> WP_4
   WP_1 --> WP_5
-  WP_2 --> WP_5
-  WP_4 --> WP_5
+  WP_1 --> WP_6
+  WP_2 --> WP_6
+  WP_3 --> WP_6
+  WP_5 --> WP_6
+  WP_1 --> WP_7
+  WP_4 --> WP_7
+  WP_6 --> WP_7
+  WP_1 --> WP_8
+  WP_4 --> WP_8
+  WP_6 --> WP_8
+  WP_1 --> WP_9
+  WP_2 --> WP_9
+  WP_4 --> WP_9
+  WP_6 --> WP_9
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
-1. WP-1
-2. WP-2, WP-3
-3. WP-4
-4. WP-5
+1. WP-1, WP-2
+2. WP-3, WP-4, WP-5
+3. WP-6
+4. WP-7, WP-8, WP-9
 
-_Critical path (weight 7):_ WP-1 → WP-2 → WP-4 → WP-5
+_Critical path (weight 5):_ WP-1 → WP-5 → WP-6 → WP-9
 
-### WP-1 — Store + Observability + Event bus (M)
+### WP-1 — Store + Observability (M)
 
-Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Event bus: Publishes domain events to subscribers inside the system.
+Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
-- **components**: C-1, C-4, C-8 · **implements**: I-1, I-4, I-8
-- **depends on**: — · **satisfies**: R-3, R-7, R-8, R-10, R-15, R-17
-- **write scope**: `internal/store/store.go`, `internal/store/store_test.go`, `internal/observability/observability.go`, `internal/observability/observability_test.go`, `internal/bus/bus.go`, `internal/bus/bus_test.go`
+- **components**: C-1, C-4 · **implements**: I-1, I-4
+- **depends on**: — · **satisfies**: R-7, R-8, R-10, R-15, R-17
+- **write scope**: `internal/store/store.go`, `internal/store/store_test.go`, `internal/observability/observability.go`, `internal/observability/observability_test.go`
 - **acceptance**:
-  - A-1 (test) unit tests of Store, Observability, Event bus pass — `go test ./internal/store/`
+  - A-1 (test) unit tests of Store, Observability pass — `go test ./internal/store/`
   - A-2 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
   - A-3 (metric) R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-8
   - A-4 (metric) R-15: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-15
   - A-5 (metric) R-17: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-17
-- **notes**: family: auth
+- **notes**: family: infra
 
-### WP-2 — Authentication + Scheduler + Geospatial index (M)
+### WP-2 — Event bus (S)
 
-Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work; Geospatial index: Keeps current positions and answers nearest-neighbour queries within a radius.
+Implement Event bus: Publishes domain events to subscribers inside the system.
 
-- **components**: C-5, C-9, C-6 · **implements**: I-5, I-9, I-6
-- **depends on**: WP-1 · **satisfies**: R-1, R-2, R-11, R-12
-- **write scope**: `internal/auth/auth.go`, `internal/auth/auth_test.go`, `internal/scheduler/scheduler.go`, `internal/scheduler/scheduler_test.go`, `internal/geo/geo.go`, `internal/geo/geo_test.go`
+- **components**: C-8 · **implements**: I-8
+- **depends on**: — · **satisfies**: R-3
+- **write scope**: `internal/bus/bus.go`, `internal/bus/bus_test.go`
 - **acceptance**:
-  - A-6 (test) unit tests of Authentication, Scheduler, Geospatial index pass — `go test ./internal/auth/`
-- **notes**: family: auth
+  - A-6 (test) unit tests of Event bus pass — `go test ./internal/bus/`
+- **notes**: family: realtime
 
-### WP-3 — Payments (S)
+### WP-3 — Geospatial index (S)
+
+Implement Geospatial index: Keeps current positions and answers nearest-neighbour queries within a radius.
+
+- **components**: C-6 · **implements**: I-6
+- **depends on**: WP-1 · **satisfies**: R-1
+- **write scope**: `internal/geo/geo.go`, `internal/geo/geo_test.go`
+- **acceptance**:
+  - A-7 (test) unit tests of Geospatial index pass — `go test ./internal/geo/`
+- **notes**: family: geo
+
+### WP-4 — Authentication + Scheduler (M)
+
+Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
+
+- **components**: C-5, C-9 · **implements**: I-5, I-9
+- **depends on**: WP-1 · **satisfies**: R-2, R-11, R-12
+- **write scope**: `internal/auth/auth.go`, `internal/auth/auth_test.go`, `internal/scheduler/scheduler.go`, `internal/scheduler/scheduler_test.go`
+- **acceptance**:
+  - A-8 (test) unit tests of Authentication, Scheduler pass — `go test ./internal/auth/`
+- **notes**: family: infra
+
+### WP-5 — Payments (S)
 
 Implement Payments: Creates charges/invoices through the payment provider and reconciles their webhooks.
 
@@ -744,60 +779,82 @@ Implement Payments: Creates charges/invoices through the payment provider and re
 - **depends on**: WP-1 · **satisfies**: R-4
 - **write scope**: `internal/payments/payments.go`, `internal/payments/payments_test.go`
 - **acceptance**:
-  - A-7 (test) unit tests of Payments pass — `go test ./internal/payments/`
+  - A-9 (test) unit tests of Payments pass — `go test ./internal/payments/`
 - **notes**: family: payments
 
-### WP-4 — Domain core (S)
+### WP-6 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-3 · **implements**: I-3
-- **depends on**: WP-1, WP-2, WP-3 · **satisfies**: R-1, R-3, R-5, R-6, R-7, R-10, R-18, R-19
+- **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-5, R-6, R-7, R-10, R-18, R-19
 - **write scope**: `internal/core/core.go`, `internal/core/core_test.go`
 - **acceptance**:
-  - A-8 (test) unit tests of Domain core pass — `go test ./internal/core/`
-  - A-9 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+  - A-10 (test) unit tests of Domain core pass — `go test ./internal/core/`
+  - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
 - **notes**: family: geo
 
-### WP-5 — Batch job + Public HTTP API + Push gateway (M)
+### WP-7 — Batch job (S)
 
-Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results; Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON; Push gateway: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.
+Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
-- **components**: C-10, C-11, C-12 · **implements**: I-10, I-11, I-12
-- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-2, R-3, R-5, R-6, R-7, R-9, R-10, R-12, R-13, R-14, R-16
-- **write scope**: `internal/batch/batch.go`, `internal/batch/batch_test.go`, `internal/surface_api/surface_api.go`, `internal/surface_api/surface_api_test.go`, `internal/push/push.go`, `internal/push/push_test.go`
+- **components**: C-10 · **implements**: I-10
+- **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-2, R-12
+- **write scope**: `internal/batch/batch.go`, `internal/batch/batch_test.go`
 - **acceptance**:
-  - A-10 (test) unit tests of Batch job, Public HTTP API, Push gateway pass — `go test ./internal/batch/`
-  - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
-  - A-12 (metric) R-9: time 30 days days — metric R-9
-  - A-13 (metric) R-13: sustained rate at 2,000, 5 s 4000 updates /s updates /s — load test at the stated rate; the stated percentile must meet the target — metric R-13
-  - A-14 (metric) R-14: size at 2 KB <= 256 kb kb — metric R-14
-  - A-15 (metric) R-16: time at 4 h 24 h h — metric R-16
+  - A-12 (test) unit tests of Batch job pass — `go test ./internal/batch/`
 - **notes**: family: batch_pipeline
+
+### WP-8 — Public HTTP API (S)
+
+Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+
+- **components**: C-11 · **implements**: I-11
+- **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-5, R-6, R-7, R-9, R-10, R-13, R-14, R-16
+- **write scope**: `internal/surface_api/surface_api.go`, `internal/surface_api/surface_api_test.go`
+- **acceptance**:
+  - A-13 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
+  - A-14 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+  - A-15 (metric) R-9: time 30 days days — metric R-9
+  - A-16 (metric) R-13: sustained rate at 2,000, 5 s 4000 updates /s updates /s — load test at the stated rate; the stated percentile must meet the target — metric R-13
+  - A-17 (metric) R-14: size at 2 KB <= 256 kb kb — metric R-14
+  - A-18 (metric) R-16: time at 4 h 24 h h — metric R-16
+- **notes**: family: infra
+
+### WP-9 — Push gateway (S)
+
+Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.
+
+- **components**: C-12 · **implements**: I-12
+- **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-10
+- **write scope**: `internal/push/push.go`, `internal/push/push_test.go`
+- **acceptance**:
+  - A-19 (test) unit tests of Push gateway pass — `go test ./internal/push/`
+- **notes**: family: realtime
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-6 | WP-2, WP-4 | A-6, A-8, A-9 |
-| R-2 | must | C-9, C-10 | WP-2, WP-5 | A-6, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-3 | must | C-3, C-8, C-12 | WP-1, WP-4, WP-5 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-4 | must | C-2, C-7 | WP-3 | A-7 |
-| R-5 | must | C-3, C-11 | WP-4, WP-5 | A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-6 | must | C-3, C-11 | WP-4, WP-5 | A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-7 | must | C-1, C-3, C-11 | WP-1, WP-4, WP-5 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15 |
+| R-1 | must | C-3, C-6 | WP-3, WP-6 | A-7, A-10, A-11 |
+| R-2 | must | C-9, C-10 | WP-4, WP-7 | A-8, A-12 |
+| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-6, A-10, A-11, A-19 |
+| R-4 | must | C-2, C-7 | WP-5 | A-9 |
+| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
+| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
+| R-7 | must | C-1, C-3, C-11 | WP-1, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
 | R-8 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-9 | should | C-11 | WP-5 | A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-4, WP-5 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-11 | must | C-5 | WP-2 | A-6 |
-| R-12 | must | C-9, C-10 | WP-2, WP-5 | A-6, A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-13 | should | C-11 | WP-5 | A-10, A-11, A-12, A-13, A-14, A-15 |
-| R-14 | should | C-11 | WP-5 | A-10, A-11, A-12, A-13, A-14, A-15 |
+| R-9 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
+| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-11 | must | C-5 | WP-4 | A-8 |
+| R-12 | must | C-9, C-10 | WP-4, WP-7 | A-8, A-12 |
+| R-13 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
+| R-14 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
 | R-15 | must | C-1, C-4 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-16 | should | C-11 | WP-5 | A-10, A-11, A-12, A-13, A-14, A-15 |
+| R-16 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
 | R-17 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-18 | must | C-3 | WP-4 | A-8, A-9 |
-| R-19 | must | C-3 | WP-4 | A-8, A-9 |
+| R-18 | must | C-3 | WP-6 | A-10, A-11 |
+| R-19 | must | C-3 | WP-6 | A-10, A-11 |
 
 ## Conventions
 

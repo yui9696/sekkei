@@ -204,7 +204,13 @@ class Interview:
         return Overrides(dict(self.owners), dict(self.decisions))
 
     def result(self):
-        return design(self.text(), assume=True, overrides=self.overrides())
+        key = (self.text(), json.dumps(self.owners, sort_keys=True), json.dumps(self.decisions, sort_keys=True))
+        cached = getattr(self, "_cache", None)
+        if cached and cached[0] == key:
+            return cached[1]
+        res = design(self.text(), assume=True, overrides=self.overrides())
+        self._cache = (key, res)
+        return res
 
     def has_requirements(self) -> bool:
         return any(self.bullets.values()) or bool(analyse(self.base).requirements)

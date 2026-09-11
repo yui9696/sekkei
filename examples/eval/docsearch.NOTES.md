@@ -43,11 +43,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **24 person-days**; critical path **17 days**; with a team of 3: **about 17 working days** (4 weeks).
-- Wave 1: WP-1, WP-2
-- Wave 2: WP-3, WP-4
-- Wave 3: WP-5
-- Wave 4: WP-6
+- Total effort: **26 person-days**; critical path **12 days**; with a team of 3: **about 12 working days** (3 weeks).
+- Wave 1: WP-1, WP-2, WP-3, WP-4
+- Wave 2: WP-5, WP-6, WP-7
+- Wave 3: WP-8
+- Wave 4: WP-10, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 3; packages in one wave run in parallel up to the team size.
 
@@ -86,15 +86,16 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-4 Caching: **Read-through cache with TTL and explicit invalidation on write**
 - D-5 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
-- D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
-- D-7 Assumed answer: stack (Q-deploy): **containers behind an ingress**
-- D-8 Assumed answer: quality (Q-availability): **99.9 %**
-- D-9 Assumed answer: data (Q-retention): **90 days / 1 year**
-- D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-11 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-12 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
-- D-13 Assumed answer: cost (Q-budget): **existing only**
-- D-14 Assumed answer: data (Q-migration): **greenfield**
+- D-6 Vector index for semantic search: **pgvector in PostgreSQL**
+- D-7 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
+- D-8 Assumed answer: stack (Q-deploy): **containers behind an ingress**
+- D-9 Assumed answer: quality (Q-availability): **99.9 %**
+- D-10 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-11 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-12 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-13 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-14 Assumed answer: cost (Q-budget): **existing only**
+- D-15 Assumed answer: data (Q-migration): **greenfield**
 
 ### Notes
 
@@ -104,7 +105,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: crud_api, notification, auth, rate_limiting, cache, search, file_storage, batch_pipeline, ml_inference
 - Quality attributes (weight): durability 1.0, performance 0.8, isolation 0.7, availability 0.9, scalability 0.7, simplicity 0.8
-- Constraint tokens: containers, idp, multi_instance, object_storage, postgres; languages: python; team: 3
+- Constraint tokens: containers, idp, multi_instance, object_storage, postgres, vector_db; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -112,7 +113,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-2 | functional | must | file_storage | — | — |
 | R-3 | functional | must | search, ml_inference | — | — |
 | R-4 | functional | must | search | — | — |
-| R-5 | functional | must | cache | — | — |
+| R-5 | functional | must | cache, ml_inference | — | — |
 | R-6 | functional | must | search | — | — |
 | R-7 | functional | must | notification, search, batch_pipeline | — | — |
 | R-8 | nonfunctional | should | search | performance | p95 latency at 50,000 <= 800 ms ms |

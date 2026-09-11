@@ -202,7 +202,7 @@ graph LR
 
 ### C-15 — MQTT consumer
 
-- **kind**: service · **path**: `src/main/java/app/MqttConsumer.java`
+- **kind**: job · **path**: `src/main/java/app/MqttConsumer.java`
 - **responsibility**: Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence.
 - **provides**: I-15
 - **requires**: I-7, I-2, I-4, I-9
@@ -295,7 +295,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `publish_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | — |
+| `publish_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | stated values: 30 seconds (R-1) |
 | | from R-1: Each truck publishes a batch of sensor readings (speed, fuel level, engine temperature, po | | | |
 | `validate_readings` | `readings`: Readings \| id | Readings \| None | ValidationError, NotFound | — |
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
@@ -307,15 +307,15 @@ graph LR
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
 | `get_truck` | `truck`: Truck \| id | Truck \| None | ValidationError, NotFound | — |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
-| `notify_manager` | `manager`: Manager \| id | Manager \| None | ValidationError, NotFound | — |
+| `notify_manager` | `manager`: Manager \| id | Manager \| None | ValidationError, NotFound | stated values: 5 minutes (R-4) |
 | | from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n | | | |
 | `aggregate_readings` | `readings`: Readings \| id | Readings \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 | `export_sftp` | `sftp`: Sftp \| id | Sftp \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
 | | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | — |
+| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
 | | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-8 — Notifier interface
@@ -408,9 +408,9 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `validate_readings` | `readings`: … | … | … | — |
+| `validate_readings` | `readings`: list[Reading] | list[Reading] (validated) | … | — |
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
-| `drop_duplicates` | `duplicates`: … | … | … | — |
+| `drop_duplicates` | `duplicates`: list[Duplicate] | … | … | — |
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
 | `store` | `input`: … | … | … | — |
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
@@ -604,7 +604,31 @@ _Affects:_ C-10
 
 _Affects:_ C-14, C-12
 
-### D-5 — Redundancy for the availability target (accepted)
+### D-5 — Time-series storage (accepted)
+
+**Context.** High-rate readings must be written continuously and queried by time window.
+
+- ✔ **TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)**
+  - + one database
+  - + retention by policy
+  - + fast window queries
+  - − an extension to operate
+- ✘ **Plain PostgreSQL tables partitioned by day**
+  - + no extension
+  - − manual partition management
+  - − slower window queries
+- ✘ **ClickHouse**
+  - + columnar, very fast aggregation
+  - − a second database
+  - − eventual consistency
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.29; Plain PostgreSQL tables partitioned by day: 2.23; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints
+
+**Consequences.** Not choosing 'Plain PostgreSQL tables partitioned by day' gives up: no extension.
+
+_Affects:_ C-1
+
+### D-6 — Redundancy for the availability target (accepted)
 
 **Context.** The availability target must be met through instance failures and deploys.
 
@@ -628,7 +652,7 @@ _Affects:_ C-14, C-12
 
 _Affects:_ C-14
 
-### D-6 — Assumed answer: load (Q-payload) (proposed)
+### D-7 — Assumed answer: load (Q-payload) (proposed)
 
 **Context.** The requirements do not say. Question: Q-payload. No evidence in the text; engine default.
 
@@ -642,7 +666,7 @@ _Affects:_ C-14
 
 _Affects:_ C-14
 
-### D-7 — Assumed answer: quality (Q-availability) (proposed)
+### D-8 — Assumed answer: quality (Q-availability) (proposed)
 
 **Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
 
@@ -656,7 +680,7 @@ _Affects:_ C-14
 
 _Affects:_ C-2, C-9
 
-### D-8 — Assumed answer: data (Q-retention) (proposed)
+### D-9 — Assumed answer: data (Q-retention) (proposed)
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
@@ -670,7 +694,7 @@ _Affects:_ C-2, C-9
 
 _Affects:_ C-13, C-1
 
-### D-9 — Assumed answer: data (Q-backup) (proposed)
+### D-10 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -684,7 +708,7 @@ _Affects:_ C-13, C-1
 
 _Affects:_ C-1
 
-### D-10 — Assumed answer: security (Q-auth) (proposed)
+### D-11 — Assumed answer: security (Q-auth) (proposed)
 
 **Context.** The requirements do not say. Question: Q-auth. Evidence: staff/employees mentioned.
 
@@ -698,7 +722,7 @@ _Affects:_ C-1
 
 _Affects:_ C-10
 
-### D-11 — Assumed answer: cost (Q-budget) (proposed)
+### D-12 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -710,7 +734,7 @@ _Affects:_ C-10
 
 **Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
-### D-12 — Assumed answer: data (Q-migration) (proposed)
+### D-13 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
 
@@ -722,7 +746,7 @@ _Affects:_ C-10
 
 **Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
 
-### D-13 — Assumed answer: security (Q-authz) (proposed)
+### D-14 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -736,7 +760,7 @@ _Affects:_ C-10
 
 _Affects:_ C-7, C-10
 
-### D-14 — Assumed answer: resilience (Q-external) (proposed)
+### D-15 — Assumed answer: resilience (Q-external) (proposed)
 
 **Context.** The requirements do not say. Question: Q-external. No evidence in the text; engine default.
 
@@ -778,33 +802,42 @@ _Affects:_ C-12, C-2
 ```mermaid
 graph LR
   WP_1["WP-1 Store + Work queue + Observability (M)"]
-  WP_2["WP-2 Authentication + Scheduler + Readings processor (M)"]
+  WP_2["WP-2 Authentication + Scheduler (M)"]
   WP_3["WP-3 Notifier (S)"]
-  WP_4["WP-4 Domain core (S)"]
-  WP_5["WP-5 MQTT consumer + Import/export (M)"]
-  WP_6["WP-6 Batch job + Public HTTP API (M)"]
+  WP_4["WP-4 Readings processor (S)"]
+  WP_5["WP-5 Domain core (S)"]
+  WP_6["WP-6 MQTT consumer (S)"]
+  WP_7["WP-7 Import/export (S)"]
+  WP_8["WP-8 Batch job (S)"]
+  WP_9["WP-9 Public HTTP API (S)"]
   WP_1 --> WP_2
   WP_1 --> WP_3
   WP_1 --> WP_4
-  WP_2 --> WP_4
-  WP_3 --> WP_4
   WP_1 --> WP_5
+  WP_3 --> WP_5
   WP_4 --> WP_5
   WP_1 --> WP_6
-  WP_2 --> WP_6
-  WP_4 --> WP_6
   WP_5 --> WP_6
+  WP_5 --> WP_7
+  WP_1 --> WP_8
+  WP_2 --> WP_8
+  WP_5 --> WP_8
+  WP_7 --> WP_8
+  WP_1 --> WP_9
+  WP_2 --> WP_9
+  WP_5 --> WP_9
+  WP_7 --> WP_9
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1
-2. WP-2, WP-3
-3. WP-4
-4. WP-5
-5. WP-6
+2. WP-2, WP-3, WP-4
+3. WP-5
+4. WP-6, WP-7
+5. WP-8, WP-9
 
-_Critical path (weight 9):_ WP-1 → WP-2 → WP-4 → WP-5 → WP-6
+_Critical path (weight 6):_ WP-1 → WP-4 → WP-5 → WP-7 → WP-9
 
 ### WP-1 — Store + Work queue + Observability (M)
 
@@ -818,18 +851,18 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-2 (metric) R-7: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-7
   - A-3 (metric) R-14: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-14
   - A-4 (metric) R-16: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-16
-- **notes**: family: event_ingest
+- **notes**: family: infra
 
-### WP-2 — Authentication + Scheduler + Readings processor (M)
+### WP-2 — Authentication + Scheduler (M)
 
-Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work; Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.
+Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
-- **components**: C-10, C-12, C-16 · **implements**: I-10, I-12, I-16
-- **depends on**: WP-1 · **satisfies**: R-1, R-2, R-5, R-11, R-12, R-17
-- **write scope**: `src/main/java/app/Auth.java`, `src/test/java/app/AuthTest.java`, `src/main/java/app/Scheduler.java`, `src/test/java/app/SchedulerTest.java`, `src/main/java/app/ReadingsProcessor.java`, `src/test/java/app/ReadingsProcessorTest.java`
+- **components**: C-10, C-12 · **implements**: I-10, I-12
+- **depends on**: WP-1 · **satisfies**: R-1, R-5, R-11, R-12, R-17
+- **write scope**: `src/main/java/app/Auth.java`, `src/test/java/app/AuthTest.java`, `src/main/java/app/Scheduler.java`, `src/test/java/app/SchedulerTest.java`
 - **acceptance**:
-  - A-5 (test) unit tests of Authentication, Scheduler, Readings processor pass — `./gradlew test --tests app.AuthTest`
-- **notes**: family: auth
+  - A-5 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
+- **notes**: family: infra
 
 ### WP-3 — Notifier (S)
 
@@ -842,66 +875,99 @@ Implement Notifier: Sends operator/customer notifications through the configured
   - A-6 (test) unit tests of Notifier pass — `./gradlew test --tests app.NotifierTest`
 - **notes**: family: notification
 
-### WP-4 — Domain core (S)
+### WP-4 — Readings processor (S)
+
+Implement Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.
+
+- **components**: C-16 · **implements**: I-16
+- **depends on**: WP-1 · **satisfies**: R-2
+- **write scope**: `src/main/java/app/ReadingsProcessor.java`, `src/test/java/app/ReadingsProcessorTest.java`
+- **acceptance**:
+  - A-7 (test) unit tests of Readings processor pass — `./gradlew test --tests app.Readings_processorTest`
+- **notes**: family: synthesised:readings_processor
+
+### WP-5 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-7 · **implements**: I-7
-- **depends on**: WP-1, WP-2, WP-3 · **satisfies**: R-1, R-3, R-5, R-9, R-10, R-18, R-19
+- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-9, R-10, R-18, R-19
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
-  - A-7 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
+  - A-8 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
 - **notes**: family: event_ingest
 
-### WP-5 — MQTT consumer + Import/export (M)
+### WP-6 — MQTT consumer (S)
 
-Implement MQTT consumer: Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence; Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.
+Implement MQTT consumer: Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence.
 
-- **components**: C-15, C-11 · **implements**: I-15, I-11
-- **depends on**: WP-1, WP-4 · **satisfies**: R-1, R-5
-- **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`, `src/main/java/app/Exporter.java`, `src/test/java/app/ExporterTest.java`
+- **components**: C-15 · **implements**: I-15
+- **depends on**: WP-1, WP-5 · **satisfies**: R-1
+- **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`
 - **acceptance**:
-  - A-8 (test) unit tests of MQTT consumer, Import/export pass — `./gradlew test --tests app.Mqtt_consumerTest`
+  - A-9 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.Mqtt_consumerTest`
 - **notes**: family: mqtt_ingest
 
-### WP-6 — Batch job + Public HTTP API (M)
+### WP-7 — Import/export (S)
 
-Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results; Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.
 
-- **components**: C-13, C-14 · **implements**: I-13, I-14
-- **depends on**: WP-1, WP-2, WP-4, WP-5 · **satisfies**: R-1, R-3, R-5, R-6, R-8, R-9, R-11, R-13, R-15
-- **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`, `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
+- **components**: C-11 · **implements**: I-11
+- **depends on**: WP-5 · **satisfies**: R-5
+- **write scope**: `src/main/java/app/Exporter.java`, `src/test/java/app/ExporterTest.java`
 - **acceptance**:
-  - A-9 (test) unit tests of Batch job, Public HTTP API pass — `./gradlew test --tests app.BatchTest`
-  - A-10 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s s — load test at the stated rate; the stated percentile must meet the target — metric R-6
-  - A-11 (metric) R-8: time at 5 years 90 days days — metric R-8
-  - A-12 (metric) R-13: size at 2 KB <= 256 kb kb — metric R-13
-  - A-13 (metric) R-15: time at 4 h 24 h h — metric R-15
+  - A-10 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
+- **notes**: family: sftp_export
+
+### WP-8 — Batch job (S)
+
+Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
+
+- **components**: C-13 · **implements**: I-13
+- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-11
+- **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`
+- **acceptance**:
+  - A-11 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
 - **notes**: family: batch_pipeline
+
+### WP-9 — Public HTTP API (S)
+
+Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+
+- **components**: C-14 · **implements**: I-14
+- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-8, R-9, R-13, R-15
+- **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
+- **acceptance**:
+  - A-12 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
+  - A-13 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s s — load test at the stated rate; the stated percentile must meet the target — metric R-6
+  - A-14 (metric) R-8: time at 5 years 90 days days — metric R-8
+  - A-15 (metric) R-13: size at 2 KB <= 256 kb kb — metric R-13
+  - A-16 (metric) R-15: time at 4 h 24 h h — metric R-15
+- **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-4, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-7, A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-2 | must | C-16 | WP-2 | A-5 |
-| R-3 | must | C-7, C-14 | WP-4, WP-6 | A-7, A-9, A-10, A-11, A-12, A-13 |
+| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-11 |
+| R-2 | must | C-16 | WP-4 | A-7 |
+| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-12, A-13, A-14, A-15, A-16 |
 | R-4 | must | C-3, C-6, C-8 | WP-3 | A-6 |
-| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-4, WP-5, WP-6 | A-5, A-7, A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-6 | should | C-14 | WP-6 | A-9, A-10, A-11, A-12, A-13 |
+| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-5, A-8, A-10, A-11 |
+| R-6 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
 | R-7 | must | C-1, C-2 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-8 | should | C-14 | WP-6 | A-9, A-10, A-11, A-12, A-13 |
-| R-9 | must | C-1, C-7, C-14 | WP-1, WP-4, WP-6 | A-1, A-2, A-3, A-4, A-7, A-9, A-10, A-11, A-12, A-13 |
-| R-10 | must | C-7 | WP-4 | A-7 |
-| R-11 | must | C-12, C-13 | WP-2, WP-6 | A-5, A-9, A-10, A-11, A-12, A-13 |
+| R-8 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
+| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-4, A-8, A-12, A-13, A-14, A-15, A-16 |
+| R-10 | must | C-7 | WP-5 | A-8 |
+| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-5, A-11 |
 | R-12 | could | C-10 | WP-2 | A-5 |
-| R-13 | should | C-14 | WP-6 | A-9, A-10, A-11, A-12, A-13 |
+| R-13 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
 | R-14 | must | C-1, C-2, C-9 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-15 | should | C-14 | WP-6 | A-9, A-10, A-11, A-12, A-13 |
+| R-15 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
 | R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3, A-4 |
 | R-17 | must | C-10 | WP-2 | A-5 |
-| R-18 | must | C-7 | WP-4 | A-7 |
-| R-19 | must | C-7 | WP-4 | A-7 |
+| R-18 | must | C-7 | WP-5 | A-8 |
+| R-19 | must | C-7 | WP-5 | A-8 |
 
 ## Conventions
 

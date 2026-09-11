@@ -983,37 +983,73 @@
     "WP-2": {
       "sentences": [],
       "rules": [
-        "package:layer0:observability"
+        "package:layer0:infra"
       ]
     },
     "WP-3": {
       "sentences": [],
       "rules": [
-        "package:layer1:admin_api"
+        "package:layer0:infra"
       ]
     },
     "WP-4": {
       "sentences": [],
       "rules": [
-        "package:layer1:notification"
+        "package:layer1:async_delivery"
       ]
     },
     "WP-5": {
       "sentences": [],
       "rules": [
-        "package:layer2:crud_api"
+        "package:layer1:infra"
       ]
     },
     "WP-6": {
       "sentences": [],
       "rules": [
-        "package:layer3:admin_api"
+        "package:layer1:notification"
       ]
     },
     "WP-7": {
       "sentences": [],
       "rules": [
+        "package:layer1:signing"
+      ]
+    },
+    "WP-8": {
+      "sentences": [],
+      "rules": [
+        "package:layer2:crud_api"
+      ]
+    },
+    "WP-9": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:admin_api"
+      ]
+    },
+    "WP-10": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:async_delivery"
+      ]
+    },
+    "WP-11": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:batch_pipeline"
+      ]
+    },
+    "WP-12": {
+      "sentences": [],
+      "rules": [
         "package:layer3:event_ingest"
+      ]
+    },
+    "WP-13": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:health_policy"
       ]
     },
     "D-12": {

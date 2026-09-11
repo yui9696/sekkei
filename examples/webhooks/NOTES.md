@@ -39,11 +39,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **32 person-days**; critical path **17 days**; with a team of 3: **about 17 working days** (4 weeks).
-- Wave 1: WP-1, WP-2
-- Wave 2: WP-3, WP-4
-- Wave 3: WP-5
-- Wave 4: WP-6, WP-7
+- Total effort: **32 person-days**; critical path **12 days**; with a team of 3: **about 12 working days** (3 weeks).
+- Wave 1: WP-1, WP-2, WP-3
+- Wave 2: WP-4, WP-5, WP-6, WP-7
+- Wave 3: WP-8
+- Wave 4: WP-10, WP-11, WP-12, WP-13, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 3; packages in one wave run in parallel up to the team size.
 

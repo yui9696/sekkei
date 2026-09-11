@@ -44,12 +44,12 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **24 person-days**; critical path **22 days**; with a team of 5: **about 22 working days** (5 weeks).
+- Total effort: **24 person-days**; critical path **13 days**; with a team of 5: **about 13 working days** (3 weeks).
 - Wave 1: WP-1
-- Wave 2: WP-2, WP-3
-- Wave 3: WP-4
-- Wave 4: WP-5
-- Wave 5: WP-6
+- Wave 2: WP-2, WP-3, WP-4
+- Wave 3: WP-5
+- Wave 4: WP-6, WP-7
+- Wave 5: WP-8, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 5; packages in one wave run in parallel up to the team size.
 
@@ -86,22 +86,23 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-2 Primary store: **PostgreSQL**
 - D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-4 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
-- D-5 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
-- D-6 Assumed answer: load (Q-payload): **2 KB / 256 KB**
-- D-7 Assumed answer: quality (Q-availability): **99.9 %**
-- D-8 Assumed answer: data (Q-retention): **90 days / 1 year**
-- D-9 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-10 Assumed answer: security (Q-auth): **OIDC**
-- D-11 Assumed answer: cost (Q-budget): **existing only**
-- D-12 Assumed answer: data (Q-migration): **greenfield**
-- D-13 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-14 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-5 Time-series storage: **TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)**
+- D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
+- D-7 Assumed answer: load (Q-payload): **2 KB / 256 KB**
+- D-8 Assumed answer: quality (Q-availability): **99.9 %**
+- D-9 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-11 Assumed answer: security (Q-auth): **OIDC**
+- D-12 Assumed answer: cost (Q-budget): **existing only**
+- D-13 Assumed answer: data (Q-migration): **greenfield**
+- D-14 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-15 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 
 ## 6. How the text was read
 
 - Patterns recognised: event_ingest, notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
 - Quality attributes (weight): durability 1.0, performance 0.9, availability 0.9, simplicity 0.7
-- Constraint tokens: broker, containers, idp, on_prem, postgres; languages: java; team: 5
+- Constraint tokens: broker, containers, idp, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|

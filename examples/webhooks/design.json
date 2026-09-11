@@ -1243,7 +1243,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 3 days (R-7)",
           "post": "",
           "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
         },
@@ -1261,7 +1261,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 3 days (R-7)",
           "post": "",
           "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
         },
@@ -1279,7 +1279,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
           "post": "",
           "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
         },
@@ -1297,7 +1297,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
           "post": "",
           "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
         }
@@ -3514,21 +3514,52 @@
   "work_packages": [
     {
       "id": "WP-1",
-      "title": "Audit log + Store + Work queue",
-      "goal": "Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor; Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.",
+      "title": "Audit log",
+      "goal": "Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.",
       "components": [
-        "C-6",
-        "C-1",
-        "C-2"
+        "C-6"
       ],
       "implements": [
-        "I-6",
+        "I-6"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-15"
+      ],
+      "files": [
+        "app/audit.py",
+        "tests/test_audit.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Audit log pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_audit.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: audit_log"
+    },
+    {
+      "id": "WP-2",
+      "title": "Store + Work queue + Secret store",
+      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
+      "components": [
+        "C-1",
+        "C-2",
+        "C-3"
+      ],
+      "implements": [
         "I-1",
-        "I-2"
+        "I-2",
+        "I-3"
       ],
       "depends_on": [],
       "satisfies": [
         "R-1",
+        "R-2",
         "R-3",
         "R-4",
         "R-5",
@@ -3537,74 +3568,68 @@
         "R-9",
         "R-10",
         "R-12",
-        "R-15",
         "R-17"
       ],
       "files": [
-        "app/audit.py",
-        "tests/test_audit.py",
         "app/store.py",
         "tests/test_store.py",
         "app/queue.py",
-        "tests/test_queue.py"
+        "tests/test_queue.py",
+        "app/secrets.py",
+        "tests/test_secrets.py"
       ],
       "size": "M",
       "acceptance": [
         {
-          "id": "A-1",
-          "description": "unit tests of Audit log, Store, Work queue pass",
+          "id": "A-2",
+          "description": "unit tests of Store, Work queue, Secret store pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_audit.py tests/test_store.py tests/test_queue.py",
+          "command": "python -m pytest -q tests/test_store.py tests/test_queue.py tests/test_secrets.py",
           "metric": ""
         },
         {
-          "id": "A-2",
+          "id": "A-3",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-3",
+          "id": "A-4",
           "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-4",
+          "id": "A-5",
           "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
         },
         {
-          "id": "A-5",
+          "id": "A-6",
           "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-17"
         }
       ],
-      "notes": "family: audit_log"
+      "notes": "family: infra"
     },
     {
-      "id": "WP-2",
-      "title": "Observability + Secret store",
-      "goal": "Implement Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
+      "id": "WP-3",
+      "title": "Observability",
+      "goal": "Implement Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "components": [
-        "C-11",
-        "C-3"
+        "C-11"
       ],
       "implements": [
-        "I-11",
-        "I-3"
+        "I-11"
       ],
       "depends_on": [],
       "satisfies": [
-        "R-1",
-        "R-2",
-        "R-5",
         "R-8",
         "R-11",
         "R-17",
@@ -3612,67 +3637,98 @@
       ],
       "files": [
         "app/observability.py",
-        "tests/test_observability.py",
-        "app/secrets.py",
-        "tests/test_secrets.py"
+        "tests/test_observability.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-6",
-          "description": "unit tests of Observability, Secret store pass",
+          "id": "A-7",
+          "description": "unit tests of Observability pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_observability.py tests/test_secrets.py",
+          "command": "python -m pytest -q tests/test_observability.py",
           "metric": ""
         },
         {
-          "id": "A-7",
+          "id": "A-8",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-8",
+          "id": "A-9",
           "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
         },
         {
-          "id": "A-9",
+          "id": "A-10",
           "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-17"
         },
         {
-          "id": "A-10",
+          "id": "A-11",
           "description": "R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
           "metric": "R-19"
         }
       ],
-      "notes": "family: observability"
+      "notes": "family: infra"
     },
     {
-      "id": "WP-3",
-      "title": "Authentication + Outbound HTTP client + Scheduler",
-      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Outbound HTTP client: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "id": "WP-4",
+      "title": "Outbound HTTP client",
+      "goal": "Implement Outbound HTTP client: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome.",
+      "components": [
+        "C-8"
+      ],
+      "implements": [
+        "I-8"
+      ],
+      "depends_on": [
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6"
+      ],
+      "files": [
+        "app/dispatcher.py",
+        "tests/test_dispatcher.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-12",
+          "description": "unit tests of Outbound HTTP client pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_dispatcher.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: async_delivery"
+    },
+    {
+      "id": "WP-5",
+      "title": "Authentication + Scheduler",
+      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
         "C-12",
-        "C-8",
         "C-14"
       ],
       "implements": [
         "I-12",
-        "I-8",
         "I-14"
       ],
       "depends_on": [
-        "WP-1",
-        "WP-2"
+        "WP-2",
+        "WP-3"
       ],
       "satisfies": [
         "R-1",
@@ -3686,33 +3742,61 @@
       "files": [
         "app/auth.py",
         "tests/test_auth.py",
-        "app/dispatcher.py",
-        "tests/test_dispatcher.py",
         "app/scheduler.py",
         "tests/test_scheduler.py"
       ],
       "size": "M",
       "acceptance": [
         {
-          "id": "A-11",
-          "description": "unit tests of Authentication, Outbound HTTP client, Scheduler pass",
+          "id": "A-13",
+          "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_auth.py tests/test_dispatcher.py tests/test_scheduler.py",
+          "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
           "metric": ""
         }
       ],
-      "notes": "family: admin_api"
+      "notes": "family: infra"
     },
     {
-      "id": "WP-4",
-      "title": "Notifier + Signer",
-      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting; Signer: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
+      "id": "WP-6",
+      "title": "Notifier",
+      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
-        "C-10",
+        "C-10"
+      ],
+      "implements": [
+        "I-10"
+      ],
+      "depends_on": [
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-7"
+      ],
+      "files": [
+        "app/notifier.py",
+        "tests/test_notifier.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-14",
+          "description": "unit tests of Notifier pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_notifier.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: notification"
+    },
+    {
+      "id": "WP-7",
+      "title": "Signer",
+      "goal": "Implement Signer: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
+      "components": [
         "C-9"
       ],
       "implements": [
-        "I-10",
         "I-9"
       ],
       "depends_on": [
@@ -3721,29 +3805,26 @@
       "satisfies": [
         "R-1",
         "R-2",
-        "R-5",
-        "R-7"
+        "R-5"
       ],
       "files": [
-        "app/notifier.py",
-        "tests/test_notifier.py",
         "app/signer.py",
         "tests/test_signer.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
-          "description": "unit tests of Notifier, Signer pass",
+          "id": "A-15",
+          "description": "unit tests of Signer pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_notifier.py tests/test_signer.py",
+          "command": "python -m pytest -q tests/test_signer.py",
           "metric": ""
         }
       ],
-      "notes": "family: notification"
+      "notes": "family: signing"
     },
     {
-      "id": "WP-5",
+      "id": "WP-8",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -3755,7 +3836,8 @@
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-4"
+        "WP-3",
+        "WP-6"
       ],
       "satisfies": [
         "R-1",
@@ -3776,7 +3858,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-16",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -3786,87 +3868,67 @@
       "notes": "family: crud_api"
     },
     {
-      "id": "WP-6",
-      "title": "Admin HTTP API + Worker + Batch job",
-      "goal": "Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "id": "WP-9",
+      "title": "Admin HTTP API",
+      "goal": "Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated.",
       "components": [
-        "C-17",
-        "C-13",
-        "C-16"
+        "C-17"
       ],
       "implements": [
-        "I-17",
-        "I-13",
-        "I-16"
+        "I-17"
       ],
       "depends_on": [
-        "WP-1",
         "WP-2",
         "WP-3",
-        "WP-4",
-        "WP-5"
+        "WP-5",
+        "WP-8"
       ],
       "satisfies": [
         "R-1",
         "R-2",
-        "R-4",
-        "R-5",
         "R-6",
         "R-8",
-        "R-10",
         "R-11",
         "R-13",
-        "R-14",
         "R-16",
         "R-18"
       ],
       "files": [
         "app/admin_api.py",
-        "tests/test_admin_api.py",
-        "app/worker.py",
-        "tests/test_worker.py",
-        "app/batch.py",
-        "tests/test_batch.py"
+        "tests/test_admin_api.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-14",
-          "description": "unit tests of Admin HTTP API, Worker, Batch job pass",
+          "id": "A-17",
+          "description": "unit tests of Admin HTTP API pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_batch.py",
+          "command": "python -m pytest -q tests/test_admin_api.py",
           "metric": ""
         },
         {
-          "id": "A-15",
+          "id": "A-18",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-16",
-          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-10"
-        },
-        {
-          "id": "A-17",
+          "id": "A-19",
           "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
         },
         {
-          "id": "A-18",
+          "id": "A-20",
           "description": "R-16: size at 2 KB <= 256 kb kb",
           "kind": "metric",
           "command": "",
           "metric": "R-16"
         },
         {
-          "id": "A-19",
+          "id": "A-21",
           "description": "R-18: time at 4 h 24 h h",
           "kind": "metric",
           "command": "",
@@ -3876,27 +3938,123 @@
       "notes": "family: admin_api"
     },
     {
-      "id": "WP-7",
-      "title": "Ingest API + Health policy",
-      "goal": "Implement Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence; Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.",
+      "id": "WP-10",
+      "title": "Worker",
+      "goal": "Implement Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.",
       "components": [
-        "C-18",
-        "C-15"
+        "C-13"
       ],
       "implements": [
-        "I-18",
-        "I-15"
+        "I-13"
       ],
       "depends_on": [
-        "WP-1",
         "WP-2",
         "WP-3",
         "WP-4",
-        "WP-5"
+        "WP-5",
+        "WP-7",
+        "WP-8"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-10",
+        "R-11",
+        "R-13"
+      ],
+      "files": [
+        "app/worker.py",
+        "tests/test_worker.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-22",
+          "description": "unit tests of Worker pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_worker.py",
+          "metric": ""
+        },
+        {
+          "id": "A-23",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-24",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        },
+        {
+          "id": "A-25",
+          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
+        }
+      ],
+      "notes": "family: async_delivery"
+    },
+    {
+      "id": "WP-11",
+      "title": "Batch job",
+      "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "components": [
+        "C-16"
+      ],
+      "implements": [
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-2",
+        "WP-3",
+        "WP-5",
+        "WP-8"
+      ],
+      "satisfies": [
+        "R-14"
+      ],
+      "files": [
+        "app/batch.py",
+        "tests/test_batch.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-26",
+          "description": "unit tests of Batch job pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_batch.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: batch_pipeline"
+    },
+    {
+      "id": "WP-12",
+      "title": "Ingest API",
+      "goal": "Implement Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.",
+      "components": [
+        "C-18"
+      ],
+      "implements": [
+        "I-18"
+      ],
+      "depends_on": [
+        "WP-2",
+        "WP-3",
+        "WP-5",
+        "WP-8"
       ],
       "satisfies": [
         "R-3",
-        "R-7",
         "R-8",
         "R-9",
         "R-11",
@@ -3905,42 +4063,40 @@
       ],
       "files": [
         "app/ingest_api.py",
-        "tests/test_ingest_api.py",
-        "app/policy.py",
-        "tests/test_policy.py"
+        "tests/test_ingest_api.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-20",
-          "description": "unit tests of Ingest API, Health policy pass",
+          "id": "A-27",
+          "description": "unit tests of Ingest API pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_ingest_api.py tests/test_policy.py",
+          "command": "python -m pytest -q tests/test_ingest_api.py",
           "metric": ""
         },
         {
-          "id": "A-21",
+          "id": "A-28",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-22",
+          "id": "A-29",
           "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-23",
+          "id": "A-30",
           "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
         },
         {
-          "id": "A-24",
+          "id": "A-31",
           "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
@@ -3948,6 +4104,40 @@
         }
       ],
       "notes": "family: event_ingest"
+    },
+    {
+      "id": "WP-13",
+      "title": "Health policy",
+      "goal": "Implement Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.",
+      "components": [
+        "C-15"
+      ],
+      "implements": [
+        "I-15"
+      ],
+      "depends_on": [
+        "WP-3",
+        "WP-6",
+        "WP-8"
+      ],
+      "satisfies": [
+        "R-7"
+      ],
+      "files": [
+        "app/policy.py",
+        "tests/test_policy.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-32",
+          "description": "unit tests of Health policy pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_policy.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: health_policy"
     }
   ]
 }

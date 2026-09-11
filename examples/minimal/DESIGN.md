@@ -210,9 +210,9 @@ graph LR
 | | from R-2: Admins can export the subscriber list as CSV. | | | |
 | `list_subscriber` | `subscriber`: Subscriber \| id | Subscriber \| None | ValidationError, NotFound | — |
 | | from R-2: Admins can export the subscriber list as CSV. | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-4); 1 year (R-4) |
 | | from R-4: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | — |
+| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-4); 1 year (R-4) |
 | | from R-4: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-5 — Notifier interface
@@ -678,116 +678,158 @@ _Affects:_ C-10, C-1
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Audit log + Store + Observability (M)"]
-  WP_2["WP-2 Authentication + Scheduler + Notifier (M)"]
-  WP_3["WP-3 Domain core (S)"]
-  WP_4["WP-4 Import/export (S)"]
-  WP_5["WP-5 Batch job + Public HTTP API (M)"]
-  WP_1 --> WP_2
-  WP_1 --> WP_3
+  WP_1["WP-1 Audit log (S)"]
+  WP_2["WP-2 Store + Observability (M)"]
+  WP_3["WP-3 Authentication + Scheduler (M)"]
+  WP_4["WP-4 Notifier (S)"]
+  WP_5["WP-5 Domain core (S)"]
+  WP_6["WP-6 Import/export (S)"]
+  WP_7["WP-7 Batch job (S)"]
+  WP_8["WP-8 Public HTTP API (S)"]
   WP_2 --> WP_3
-  WP_3 --> WP_4
+  WP_2 --> WP_4
   WP_1 --> WP_5
   WP_2 --> WP_5
-  WP_3 --> WP_5
   WP_4 --> WP_5
+  WP_5 --> WP_6
+  WP_2 --> WP_7
+  WP_3 --> WP_7
+  WP_5 --> WP_7
+  WP_6 --> WP_7
+  WP_2 --> WP_8
+  WP_3 --> WP_8
+  WP_5 --> WP_8
+  WP_6 --> WP_8
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
-1. WP-1
-2. WP-2
-3. WP-3
-4. WP-4
-5. WP-5
+1. WP-1, WP-2
+2. WP-3, WP-4
+3. WP-5
+4. WP-6
+5. WP-7, WP-8
 
-_Critical path (weight 8):_ WP-1 → WP-2 → WP-3 → WP-4 → WP-5
+_Critical path (weight 6):_ WP-2 → WP-4 → WP-5 → WP-6 → WP-8
 
-### WP-1 — Audit log + Store + Observability (M)
+### WP-1 — Audit log (S)
 
-Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor; Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
+Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.
 
-- **components**: C-3, C-1, C-6 · **implements**: I-3, I-1, I-6
-- **depends on**: — · **satisfies**: R-3, R-8, R-9, R-11, R-13
-- **write scope**: `app/audit.py`, `tests/test_audit.py`, `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
+- **components**: C-3 · **implements**: I-3
+- **depends on**: — · **satisfies**: R-3
+- **write scope**: `app/audit.py`, `tests/test_audit.py`
 - **acceptance**:
-  - A-1 (test) unit tests of Audit log, Store, Observability pass — `python -m pytest -q tests/test_audit.py tests/test_store.py tests/test_observability.py`
-  - A-2 (metric) R-8: p95 latency at 1 s <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-3 (metric) R-9: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-4 (metric) R-11: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-11
+  - A-1 (test) unit tests of Audit log pass — `python -m pytest -q tests/test_audit.py`
 - **notes**: family: audit_log
 
-### WP-2 — Authentication + Scheduler + Notifier (M)
+### WP-2 — Store + Observability (M)
 
-Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work; Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
+Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
-- **components**: C-7, C-9, C-5 · **implements**: I-7, I-9, I-5
-- **depends on**: WP-1 · **satisfies**: R-1, R-4, R-16
-- **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`, `app/notifier.py`, `tests/test_notifier.py`
+- **components**: C-1, C-6 · **implements**: I-1, I-6
+- **depends on**: — · **satisfies**: R-8, R-9, R-11, R-13
+- **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
 - **acceptance**:
-  - A-5 (test) unit tests of Authentication, Scheduler, Notifier pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py tests/test_notifier.py`
-- **notes**: family: auth
+  - A-2 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
+  - A-3 (metric) R-8: p95 latency at 1 s <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-4 (metric) R-9: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-5 (metric) R-11: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-11
+- **notes**: family: infra
 
-### WP-3 — Domain core (S)
+### WP-3 — Authentication + Scheduler (M)
+
+Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
+
+- **components**: C-7, C-9 · **implements**: I-7, I-9
+- **depends on**: WP-2 · **satisfies**: R-4, R-16
+- **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
+- **acceptance**:
+  - A-6 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+- **notes**: family: infra
+
+### WP-4 — Notifier (S)
+
+Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
+
+- **components**: C-5 · **implements**: I-5
+- **depends on**: WP-2 · **satisfies**: R-1
+- **write scope**: `app/notifier.py`, `tests/test_notifier.py`
+- **acceptance**:
+  - A-7 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+- **notes**: family: notification
+
+### WP-5 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2 · **satisfies**: R-2, R-12, R-15, R-17, R-18
+- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-2, R-12, R-15, R-17, R-18
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-6 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-8 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: import_export
 
-### WP-4 — Import/export (S)
+### WP-6 — Import/export (S)
 
 Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.
 
 - **components**: C-8 · **implements**: I-8
-- **depends on**: WP-3 · **satisfies**: R-2
+- **depends on**: WP-5 · **satisfies**: R-2
 - **write scope**: `app/exporter.py`, `tests/test_exporter.py`
 - **acceptance**:
-  - A-7 (test) unit tests of Import/export pass — `python -m pytest -q tests/test_exporter.py`
+  - A-9 (test) unit tests of Import/export pass — `python -m pytest -q tests/test_exporter.py`
 - **notes**: family: import_export
 
-### WP-5 — Batch job + Public HTTP API (M)
+### WP-7 — Batch job (S)
 
-Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results; Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
-- **components**: C-10, C-11 · **implements**: I-10, I-11
-- **depends on**: WP-1, WP-2, WP-3, WP-4 · **satisfies**: R-4, R-5, R-6, R-7, R-8, R-10, R-14
-- **write scope**: `app/batch.py`, `tests/test_batch.py`, `app/surface_api.py`, `tests/test_surface_api.py`
+- **components**: C-10 · **implements**: I-10
+- **depends on**: WP-2, WP-3, WP-5, WP-6 · **satisfies**: R-4
+- **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-8 (test) unit tests of Batch job, Public HTTP API pass — `python -m pytest -q tests/test_batch.py tests/test_surface_api.py`
-  - A-9 (metric) R-5: sustained rate at 1,000 100 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target — metric R-5
-  - A-10 (metric) R-6: number of records at 1,000 10000 records records — metric R-6
-  - A-11 (metric) R-7: size at 2 KB <= 256 kb kb — metric R-7
-  - A-12 (metric) R-8: p95 latency at 1 s <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-13 (metric) R-10: time at 4 h 24 h h — metric R-10
+  - A-10 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
+
+### WP-8 — Public HTTP API (S)
+
+Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+
+- **components**: C-11 · **implements**: I-11
+- **depends on**: WP-2, WP-3, WP-5, WP-6 · **satisfies**: R-5, R-6, R-7, R-8, R-10, R-14
+- **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
+- **acceptance**:
+  - A-11 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-12 (metric) R-5: sustained rate at 1,000 100 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target — metric R-5
+  - A-13 (metric) R-6: number of records at 1,000 10000 records records — metric R-6
+  - A-14 (metric) R-7: size at 2 KB <= 256 kb kb — metric R-7
+  - A-15 (metric) R-8: p95 latency at 1 s <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-16 (metric) R-10: time at 4 h 24 h h — metric R-10
+- **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-5 | WP-2 | A-5 |
-| R-2 | must | C-4, C-8 | WP-3, WP-4 | A-6, A-7 |
-| R-3 | must | C-3 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-4 | must | C-9, C-10 | WP-2, WP-5 | A-5, A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-5 | should | C-11 | WP-5 | A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-6 | should | C-11 | WP-5 | A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-7 | should | C-11 | WP-5 | A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-8 | should | C-6, C-11 | WP-1, WP-5 | A-1, A-2, A-3, A-4, A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-9 | must | C-1, C-6 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-10 | should | C-11 | WP-5 | A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-11 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-12 | must | C-4 | WP-3 | A-6 |
-| R-13 | must | C-1 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-14 | must | C-11 | WP-5 | A-8, A-9, A-10, A-11, A-12, A-13 |
-| R-15 | must | C-4 | WP-3 | A-6 |
-| R-16 | must | C-7 | WP-2 | A-5 |
-| R-17 | must | C-4 | WP-3 | A-6 |
-| R-18 | must | C-4 | WP-3 | A-6 |
+| R-1 | must | C-2, C-5 | WP-4 | A-7 |
+| R-2 | must | C-4, C-8 | WP-5, WP-6 | A-8, A-9 |
+| R-3 | must | C-3 | WP-1 | A-1 |
+| R-4 | must | C-9, C-10 | WP-3, WP-7 | A-6, A-10 |
+| R-5 | should | C-11 | WP-8 | A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-6 | should | C-11 | WP-8 | A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-7 | should | C-11 | WP-8 | A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-8 | should | C-6, C-11 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-9 | must | C-1, C-6 | WP-2 | A-2, A-3, A-4, A-5 |
+| R-10 | should | C-11 | WP-8 | A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-11 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
+| R-12 | must | C-4 | WP-5 | A-8 |
+| R-13 | must | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
+| R-14 | must | C-11 | WP-8 | A-11, A-12, A-13, A-14, A-15, A-16 |
+| R-15 | must | C-4 | WP-5 | A-8 |
+| R-16 | must | C-7 | WP-3 | A-6 |
+| R-17 | must | C-4 | WP-5 | A-8 |
+| R-18 | must | C-4 | WP-5 | A-8 |
 
 ## Conventions
 

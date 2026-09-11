@@ -442,8 +442,8 @@ def _v008(d: Design) -> Iterator[_Yield]:
     used |= {s.via for f in d.flows for s in f.steps}
     for i in d.interfaces:
         owner = d.component(i.owner)
-        if owner is not None and owner.kind == "job":
-            continue  # a job's interface is an entry point invoked by the runtime, not by a component
+        if owner is not None and owner.kind in ("job", "ui", "cli"):
+            continue  # an entry point (job, screen, command line) is invoked by the runtime or a person, not by a component
         if i.id not in used and i.kind not in ("cli", "http", "file"):
             yield i.id, "interface is required by no component and used in no flow"
 

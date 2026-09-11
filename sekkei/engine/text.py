@@ -177,7 +177,7 @@ class Sentence:
 # Segmentation
 # ---------------------------------------------------------------------------
 
-_BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_BULLET_RE = re.compile(r"^\s*(?:[-*•](?=\s|[A-Za-z])|\d+[.)]\s)\s*")
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s*(.+?)\s*#*\s*$")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"'])")
 

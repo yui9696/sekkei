@@ -49,10 +49,32 @@ def _root(args: argparse.Namespace) -> Path:
 
 def _out(text: str, path: Optional[str]) -> None:
     if path:
-        Path(path).write_text(text, encoding="utf-8")
+        _write(path, text)
         print(f"wrote {path}")
     else:
         sys.stdout.write(text)
+
+
+def _read(path: str) -> str:
+    """Read a text file or exit with a one-line error (no traceback for a missing or non-UTF-8 file)."""
+    p = Path(path)
+    if not p.exists():
+        sys.exit(f"error: {path} not found")
+    try:
+        return p.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        sys.exit(f"error: {path} is not UTF-8 text ({exc.reason} at byte {exc.start})")
+    except OSError as exc:
+        sys.exit(f"error: cannot read {path}: {exc}")
+
+
+def _write(path: str, text: str) -> None:
+    p = Path(path)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+    except OSError as exc:
+        sys.exit(f"error: cannot write {path}: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -278,23 +300,26 @@ def cmd_design(args: argparse.Namespace) -> int:
     """requirements text -> complete, lint-clean design, with no model: the engine."""
     from .engine import design as run_engine
 
-    text = Path(args.input).read_text(encoding="utf-8")
+    text = _read(args.input)
     result = run_engine(text, assume=not args.no_assume)
-    M.dump(result.design, args.output)
+    if not result.ok and not result.design.requirements:
+        sys.stdout.write(R.format_text(result.diagnostics))
+        return 1
+    _write(args.output, M.dumps(result.design))
     if args.augmented:
-        Path(args.augmented).write_text(result.augmented_text, encoding="utf-8")
+        _write(args.augmented, result.augmented_text)
         print(f"wrote {args.augmented}")
     print(f"wrote {args.output}: {len(result.design.requirements)} requirements, {len(result.design.components)} components, "
           f"{len(result.design.interfaces)} interfaces, {len(result.design.decisions)} decisions, "
           f"{len(result.design.work_packages)} work packages")
     if args.render:
-        Path(args.render).write_text(RD.render_markdown(result.design), encoding="utf-8")
+        _write(args.render, RD.render_markdown(result.design))
         print(f"wrote {args.render}")
     if args.review:
-        Path(args.review).write_text(result.notes.to_markdown(), encoding="utf-8")
+        _write(args.review, result.notes.to_markdown())
         print(f"wrote {args.review}")
     if args.trace:
-        Path(args.trace).write_text(json.dumps(result.trace_json(), indent=2, ensure_ascii=False), encoding="utf-8")
+        _write(args.trace, json.dumps(result.trace_json(), indent=2, ensure_ascii=False))
         print(f"wrote {args.trace}")
     for line in result.log:
         print("  repair: " + line)
@@ -324,6 +349,10 @@ def cmd_interview(args: argparse.Namespace) -> int:
     from .engine.interview import run_cli
 
     root = Path(args.root) if args.root else Path.cwd()
+    if args.script and not Path(args.script).exists():
+        sys.exit(f"error: {args.script} not found")
+    if args.input and not Path(args.input).exists():
+        sys.exit(f"error: {args.input} not found")
     inp = open(args.script, encoding="utf-8") if args.script else sys.stdin
     try:
         return run_cli(inp, sys.stdout, root, Path(args.input) if args.input else None,
@@ -338,7 +367,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
     from .engine import ask
     from .engine.gaps import questions_markdown
 
-    qs = ask(Path(args.input).read_text(encoding="utf-8"))
+    qs = ask(_read(args.input))
     if args.json:
         print(json.dumps([q.__dict__ for q in qs], indent=2, ensure_ascii=False))
     else:
@@ -358,7 +387,7 @@ def cmd_draft_model(args: argparse.Namespace) -> int:
     from .llm import design as llm_design
     from .llm import draft
 
-    text = Path(args.input).read_text(encoding="utf-8")
+    text = _read(args.input)
     backend = _backend(args)
     sys.stderr.write(f"backend: {backend.name}\n")
     try:

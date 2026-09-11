@@ -117,3 +117,28 @@ engine produces the skeleton a senior architect would draw, with the decisions r
 the stated constraints and the honest gaps listed. It does not replace the architect's
 reading of consequences and timing; it makes that reading a review of a finished draft
 instead of a blank page. Deterministic, 0.1–0.5 s per design.
+
+## Debugging pass (same day, after the evaluation)
+
+A stress harness ran 221 synthetic and deliberately malformed documents through the
+engine and every downstream tool (lint, JSON round-trip, DESIGN.md, every brief, plan,
+diff, drift check, interview): no exception, no lint error, byte-identical output across
+runs and across three `PYTHONHASHSEED` values. What it found and what changed:
+
+- An empty or title-only input produced a full design made of assumptions. Now refused
+  (`S008: no requirements in the input`).
+- The CLI raised tracebacks on a missing file, a non-UTF-8 file and an output path in a
+  missing directory. Now one-line errors; parent directories are created.
+- Work packages batched unrelated components of one layer (authentication + scheduler +
+  a domain processor). Only infrastructure may share a package now; domain and
+  synthesised components get their own.
+- Entry-point interfaces (jobs, screens, command lines, the MQTT consumer) were reported
+  as orphans. Exempted.
+- Synthesised contracts had every type as `…`; parameters whose name matches an entity
+  now carry the entity type.
+- Timing rules inside a use case ("accept within 15 seconds") reach the derived
+  operation's precondition.
+- TimescaleDB and pgvector are recognised; a time-series storage decision and a vector
+  index decision exist.
+- The interview ran the engine three times per turn; the result is memoised.
+- A bullet without a space after the dash is still a bullet.

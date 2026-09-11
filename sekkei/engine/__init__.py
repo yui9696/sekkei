@@ -84,6 +84,13 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
     an = analyse(text)
     ans: list[Answer] = []
     full = text
+    if not an.requirements:
+        # nothing to design: refuse rather than produce a design made only of assumptions
+        empty = Design(name=an.title and an.title.lower().replace(" ", "-") or "empty")
+        diags = [R.Diagnostic("S008", "error", "no requirements in the input: write at least one bullet or a sentence with must/should/may", "$",
+                              "See `sekkei template` for the expected shape.")]
+        rv = Review(assumptions=["No requirements found; nothing was designed."])
+        return EngineResult(empty, an, rv, notes(empty, an, rv), diags, {}, [], [], [], text)
     if assume:
         for _ in range(3):  # answers can raise new questions (e.g. records -> retention); converge
             new = [a for a in _answers(questions(an), an) if a.question_id not in {x.question_id for x in ans}]

@@ -112,7 +112,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
 - **requires**: I-1, I-6, I-9, I-3, I-11, I-5
-- **satisfies**: R-1, R-10, R-2, R-3, R-11, R-12, R-20, R-21
+- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-20, R-21
 
 ### C-5 — Notifier
 
@@ -168,7 +168,7 @@ graph LR
 - **responsibility**: Loads the model, serves predictions with batching and timeouts, versions the model.
 - **provides**: I-11
 - **requires**: —
-- **satisfies**: R-3
+- **satisfies**: R-3, R-5
 
 ### C-12 — Scheduler
 
@@ -245,9 +245,9 @@ graph LR
 | | from R-1: Employees must find internal documents quickly and get a short summary without opening the | | | |
 | `open_summary` | `summary`: Summary \| id | Summary \| None | ValidationError, NotFound | — |
 | | from R-1: Employees must find internal documents quickly and get a short summary without opening the | | | |
-| `upload_pdf` | `pdf`: Pdf \| id | Pdf \| None | ValidationError, NotFound | — |
+| `upload_pdf` | `pdf`: Pdf \| id | Pdf \| None | ValidationError, NotFound | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
-| `tag_team` | `team`: Team \| id | Team \| None | ValidationError, NotFound | — |
+| `tag_team` | `team`: Team \| id | Team \| None | ValidationError, NotFound | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
 | `extract_text` | `text`: Text \| id | Text \| None | ValidationError, NotFound | — |
 | | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
@@ -275,9 +275,9 @@ graph LR
 | | from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is | | | |
 | `query_employee` | `employee`: Employee \| id | Employee \| None | ValidationError, NotFound | — |
 | | from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
 | | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | — |
+| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
 | | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-5 — Notifier interface
@@ -381,9 +381,9 @@ graph LR
 |---|---|---|---|---|
 | `GET /summaries/{id}` | `id`: str | 200 summary | 401 unauthenticated, 404 unknown id | — |
 | | from R-1: Employees must find internal documents quickly and get a short summary without opening the | | | |
-| `POST /pdfs` | `body`: pdf fields | 201 {pdf id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
+| `POST /pdfs` | `body`: pdf fields | 201 {pdf id} | 400 invalid body, 401 unauthenticated, 409 conflict | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
-| `POST /teams/{id}/tag` | `id`: str | 202 tag accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /teams/{id}/tag` | `id`: str | 202 tag accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
 | `GET /natural-languages` | `filter`: query, `page`: cursor | 200 [natural-language], next cursor | 401 unauthenticated | — |
 | | from R-4: Employees search with a natural-language query and get the ten best passages with links to | | | |
@@ -597,7 +597,31 @@ _Affects:_ C-9
 
 _Affects:_ C-14, C-12
 
-### D-6 — Redundancy for the availability target (accepted)
+### D-6 — Vector index for semantic search (accepted)
+
+**Context.** Embeddings must be stored and searched by similarity.
+
+- ✔ **pgvector in PostgreSQL**
+  - + one database
+  - + transactional with the documents
+  - − ANN performance limits at tens of millions of vectors
+- ✘ **Dedicated vector database**
+  - + scales to hundreds of millions of vectors
+  - − a new service to operate
+  - − sync with the source of truth
+- ✘ **In-process index (FAISS/HNSW) rebuilt from the store**
+  - + fast
+  - + no service
+  - − memory bound
+  - − rebuild on restart
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.49; In-process index: 1.49; Dedicated vector database: 1.33. stated in the constraints
+
+**Consequences.** Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.
+
+_Affects:_ C-10, C-1
+
+### D-7 — Redundancy for the availability target (accepted)
 
 **Context.** The availability target must be met through instance failures and deploys.
 
@@ -621,7 +645,7 @@ _Affects:_ C-14, C-12
 
 _Affects:_ C-14
 
-### D-7 — Assumed answer: stack (Q-deploy) (proposed)
+### D-8 — Assumed answer: stack (Q-deploy) (proposed)
 
 **Context.** The requirements do not say. Question: Q-deploy. No evidence in the text; engine default.
 
@@ -635,7 +659,7 @@ _Affects:_ C-14
 
 _Affects:_ C-14
 
-### D-8 — Assumed answer: quality (Q-availability) (proposed)
+### D-9 — Assumed answer: quality (Q-availability) (proposed)
 
 **Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
 
@@ -649,7 +673,7 @@ _Affects:_ C-14
 
 _Affects:_ C-6
 
-### D-9 — Assumed answer: data (Q-retention) (proposed)
+### D-10 — Assumed answer: data (Q-retention) (proposed)
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
@@ -663,7 +687,7 @@ _Affects:_ C-6
 
 _Affects:_ C-13, C-1
 
-### D-10 — Assumed answer: data (Q-backup) (proposed)
+### D-11 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -677,7 +701,7 @@ _Affects:_ C-13, C-1
 
 _Affects:_ C-1
 
-### D-11 — Assumed answer: security (Q-authz) (proposed)
+### D-12 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -691,7 +715,7 @@ _Affects:_ C-1
 
 _Affects:_ C-4, C-7
 
-### D-12 — Assumed answer: resilience (Q-external) (proposed)
+### D-13 — Assumed answer: resilience (Q-external) (proposed)
 
 **Context.** The requirements do not say. Question: Q-external. No evidence in the text; engine default.
 
@@ -705,7 +729,7 @@ _Affects:_ C-4, C-7
 
 _Affects:_ C-12
 
-### D-13 — Assumed answer: cost (Q-budget) (proposed)
+### D-14 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -717,7 +741,7 @@ _Affects:_ C-12
 
 **Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
-### D-14 — Assumed answer: data (Q-migration) (proposed)
+### D-15 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
 
@@ -755,135 +779,187 @@ _Affects:_ C-12
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Cache + Store + File storage (M)"]
-  WP_2["WP-2 Observability + Model server + Rate limiter (M)"]
-  WP_3["WP-3 Authentication + Scheduler + Notifier (M)"]
-  WP_4["WP-4 Search index (S)"]
-  WP_5["WP-5 Domain core (S)"]
-  WP_6["WP-6 Batch job + Public HTTP API (M)"]
-  WP_1 --> WP_3
-  WP_2 --> WP_3
-  WP_1 --> WP_4
-  WP_1 --> WP_5
+  WP_1["WP-1 File storage (S)"]
+  WP_2["WP-2 Store + Observability + Rate limiter (M)"]
+  WP_3["WP-3 Cache (S)"]
+  WP_4["WP-4 Model server (S)"]
+  WP_5["WP-5 Authentication + Scheduler (M)"]
+  WP_6["WP-6 Notifier (S)"]
+  WP_7["WP-7 Search index (S)"]
+  WP_8["WP-8 Domain core (S)"]
+  WP_9["WP-9 Batch job (S)"]
+  WP_10["WP-10 Public HTTP API (S)"]
   WP_2 --> WP_5
-  WP_3 --> WP_5
-  WP_1 --> WP_6
   WP_2 --> WP_6
-  WP_3 --> WP_6
-  WP_4 --> WP_6
-  WP_5 --> WP_6
+  WP_2 --> WP_7
+  WP_1 --> WP_8
+  WP_2 --> WP_8
+  WP_3 --> WP_8
+  WP_4 --> WP_8
+  WP_6 --> WP_8
+  WP_2 --> WP_9
+  WP_5 --> WP_9
+  WP_8 --> WP_9
+  WP_2 --> WP_10
+  WP_5 --> WP_10
+  WP_7 --> WP_10
+  WP_8 --> WP_10
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
-1. WP-1, WP-2
-2. WP-3, WP-4
-3. WP-5
-4. WP-6
+1. WP-1, WP-2, WP-3, WP-4
+2. WP-5, WP-6, WP-7
+3. WP-8
+4. WP-10, WP-9
 
-_Critical path (weight 7):_ WP-2 → WP-3 → WP-5 → WP-6
+_Critical path (weight 5):_ WP-2 → WP-6 → WP-8 → WP-9
 
-### WP-1 — Cache + Store + File storage (M)
+### WP-1 — File storage (S)
 
-Implement Cache: Read-through cache with TTL and explicit invalidation; Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; File storage: Stores and serves uploaded files/blobs with content-type and size limits.
+Implement File storage: Stores and serves uploaded files/blobs with content-type and size limits.
 
-- **components**: C-9, C-1, C-3 · **implements**: I-9, I-1, I-3
-- **depends on**: — · **satisfies**: R-2, R-5, R-8, R-9, R-11, R-16, R-18
-- **write scope**: `app/cache.py`, `tests/test_cache.py`, `app/store.py`, `tests/test_store.py`, `app/files.py`, `tests/test_files.py`
+- **components**: C-3 · **implements**: I-3
+- **depends on**: — · **satisfies**: R-2
+- **write scope**: `app/files.py`, `tests/test_files.py`
 - **acceptance**:
-  - A-1 (test) unit tests of Cache, Store, File storage pass — `python -m pytest -q tests/test_cache.py tests/test_store.py tests/test_files.py`
-  - A-2 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-1 (test) unit tests of File storage pass — `python -m pytest -q tests/test_files.py`
+- **notes**: family: file_storage
+
+### WP-2 — Store + Observability + Rate limiter (M)
+
+Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Rate limiter: Per-principal or per-key request budgets with a sliding window.
+
+- **components**: C-1, C-6, C-8 · **implements**: I-1, I-6, I-8
+- **depends on**: — · **satisfies**: R-9, R-11, R-16, R-18
+- **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`, `app/ratelimit.py`, `tests/test_ratelimit.py`
+- **acceptance**:
+  - A-2 (test) unit tests of Store, Observability, Rate limiter pass — `python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py`
   - A-3 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
   - A-4 (metric) R-16: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-16
   - A-5 (metric) R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-18
-- **notes**: family: cache
-
-### WP-2 — Observability + Model server + Rate limiter (M)
-
-Implement Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Model server: Loads the model, serves predictions with batching and timeouts, versions the model; Rate limiter: Per-principal or per-key request budgets with a sliding window.
-
-- **components**: C-6, C-11, C-8 · **implements**: I-6, I-11, I-8
-- **depends on**: — · **satisfies**: R-3, R-16
-- **write scope**: `app/observability.py`, `tests/test_observability.py`, `app/model.py`, `tests/test_model.py`, `app/ratelimit.py`, `tests/test_ratelimit.py`
-- **acceptance**:
-  - A-6 (test) unit tests of Observability, Model server, Rate limiter pass — `python -m pytest -q tests/test_observability.py tests/test_model.py tests/test_ratelimit.py`
-  - A-7 (metric) R-16: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-16
 - **notes**: family: infra
 
-### WP-3 — Authentication + Scheduler + Notifier (M)
+### WP-3 — Cache (S)
 
-Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work; Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
+Implement Cache: Read-through cache with TTL and explicit invalidation.
 
-- **components**: C-7, C-12, C-5 · **implements**: I-7, I-12, I-5
-- **depends on**: WP-1, WP-2 · **satisfies**: R-7, R-13, R-14, R-15
-- **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`, `app/notifier.py`, `tests/test_notifier.py`
+- **components**: C-9 · **implements**: I-9
+- **depends on**: — · **satisfies**: R-5, R-8, R-9
+- **write scope**: `app/cache.py`, `tests/test_cache.py`
 - **acceptance**:
-  - A-8 (test) unit tests of Authentication, Scheduler, Notifier pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py tests/test_notifier.py`
-- **notes**: family: auth
+  - A-6 (test) unit tests of Cache pass — `python -m pytest -q tests/test_cache.py`
+  - A-7 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-8 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+- **notes**: family: infra
 
-### WP-4 — Search index (S)
+### WP-4 — Model server (S)
+
+Implement Model server: Loads the model, serves predictions with batching and timeouts, versions the model.
+
+- **components**: C-11 · **implements**: I-11
+- **depends on**: — · **satisfies**: R-3, R-5
+- **write scope**: `app/model.py`, `tests/test_model.py`
+- **acceptance**:
+  - A-9 (test) unit tests of Model server pass — `python -m pytest -q tests/test_model.py`
+- **notes**: family: ml_inference
+
+### WP-5 — Authentication + Scheduler (M)
+
+Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
+
+- **components**: C-7, C-12 · **implements**: I-7, I-12
+- **depends on**: WP-2 · **satisfies**: R-7, R-13, R-14, R-15
+- **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
+- **acceptance**:
+  - A-10 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+- **notes**: family: infra
+
+### WP-6 — Notifier (S)
+
+Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
+
+- **components**: C-5 · **implements**: I-5
+- **depends on**: WP-2 · **satisfies**: R-7
+- **write scope**: `app/notifier.py`, `tests/test_notifier.py`
+- **acceptance**:
+  - A-11 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+- **notes**: family: notification
+
+### WP-7 — Search index (S)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
 - **components**: C-10 · **implements**: I-10
-- **depends on**: WP-1 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
+- **depends on**: WP-2 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-10 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-11 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-12 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
+  - A-13 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-14 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
 - **notes**: family: search
 
-### WP-5 — Domain core (S)
+### WP-8 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-3 · **satisfies**: R-1, R-2, R-3, R-10, R-11, R-12, R-20, R-21
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-20, R-21
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-12 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-15 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: crud_api
 
-### WP-6 — Batch job + Public HTTP API (M)
+### WP-9 — Batch job (S)
 
-Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results; Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
-- **components**: C-13, C-14 · **implements**: I-13, I-14
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5 · **satisfies**: R-1, R-7, R-8, R-9, R-10, R-14, R-17, R-19
-- **write scope**: `app/batch.py`, `tests/test_batch.py`, `app/surface_api.py`, `tests/test_surface_api.py`
+- **components**: C-13 · **implements**: I-13
+- **depends on**: WP-2, WP-5, WP-8 · **satisfies**: R-7, R-14
+- **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-13 (test) unit tests of Batch job, Public HTTP API pass — `python -m pytest -q tests/test_batch.py tests/test_surface_api.py`
-  - A-14 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-15 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-16 (metric) R-17: time at 4 h 24 h h — metric R-17
+  - A-16 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
+
+### WP-10 — Public HTTP API (S)
+
+Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
+
+- **components**: C-14 · **implements**: I-14
+- **depends on**: WP-2, WP-5, WP-7, WP-8 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-19
+- **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
+- **acceptance**:
+  - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-18 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-19 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-20 (metric) R-17: time at 4 h 24 h h — metric R-17
+- **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-14 | WP-5, WP-6 | A-12, A-13, A-14, A-15, A-16 |
-| R-2 | must | C-3, C-4 | WP-1, WP-5 | A-1, A-2, A-3, A-4, A-5, A-12 |
-| R-3 | must | C-4, C-10, C-11 | WP-2, WP-4, WP-5 | A-6, A-7, A-9, A-10, A-11, A-12 |
-| R-4 | must | C-10 | WP-4 | A-9, A-10, A-11 |
-| R-5 | must | C-9 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-6 | must | C-10 | WP-4 | A-9, A-10, A-11 |
-| R-7 | must | C-2, C-5, C-10, C-12, C-13 | WP-3, WP-4, WP-6 | A-8, A-9, A-10, A-11, A-13, A-14, A-15, A-16 |
-| R-8 | should | C-9, C-10, C-14 | WP-1, WP-4, WP-6 | A-1, A-2, A-3, A-4, A-5, A-9, A-10, A-11, A-13, A-14, A-15, A-16 |
-| R-9 | must | C-1, C-9, C-10, C-14 | WP-1, WP-4, WP-6 | A-1, A-2, A-3, A-4, A-5, A-9, A-10, A-11, A-13, A-14, A-15, A-16 |
-| R-10 | must | C-4, C-14 | WP-5, WP-6 | A-12, A-13, A-14, A-15, A-16 |
-| R-11 | must | C-1, C-4, C-8 | WP-1, WP-5 | A-1, A-2, A-3, A-4, A-5, A-12 |
-| R-12 | must | C-4 | WP-5 | A-12 |
-| R-13 | must | C-7 | WP-3 | A-8 |
-| R-14 | must | C-12, C-13 | WP-3, WP-6 | A-8, A-13, A-14, A-15, A-16 |
-| R-15 | could | C-7 | WP-3 | A-8 |
-| R-16 | must | C-1, C-6 | WP-1, WP-2 | A-1, A-2, A-3, A-4, A-5, A-6, A-7 |
-| R-17 | should | C-14 | WP-6 | A-13, A-14, A-15, A-16 |
-| R-18 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-19 | must | C-14 | WP-6 | A-13, A-14, A-15, A-16 |
-| R-20 | must | C-4 | WP-5 | A-12 |
-| R-21 | must | C-4 | WP-5 | A-12 |
+| R-1 | must | C-4, C-14 | WP-8, WP-10 | A-15, A-17, A-18, A-19, A-20 |
+| R-2 | must | C-3, C-4 | WP-1, WP-8 | A-1, A-15 |
+| R-3 | must | C-4, C-10, C-11 | WP-4, WP-7, WP-8 | A-9, A-12, A-13, A-14, A-15 |
+| R-4 | must | C-10 | WP-7 | A-12, A-13, A-14 |
+| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15 |
+| R-6 | must | C-10 | WP-7 | A-12, A-13, A-14 |
+| R-7 | must | C-2, C-5, C-10, C-12, C-13 | WP-5, WP-6, WP-7, WP-9 | A-10, A-11, A-12, A-13, A-14, A-16 |
+| R-8 | should | C-9, C-10, C-14 | WP-3, WP-7, WP-10 | A-6, A-7, A-8, A-12, A-13, A-14, A-17, A-18, A-19, A-20 |
+| R-9 | must | C-1, C-9, C-10, C-14 | WP-2, WP-3, WP-7, WP-10 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-12, A-13, A-14, A-17, A-18, A-19, A-20 |
+| R-10 | must | C-4, C-14 | WP-8, WP-10 | A-15, A-17, A-18, A-19, A-20 |
+| R-11 | must | C-1, C-4, C-8 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-15 |
+| R-12 | must | C-4 | WP-8 | A-15 |
+| R-13 | must | C-7 | WP-5 | A-10 |
+| R-14 | must | C-12, C-13 | WP-5, WP-9 | A-10, A-16 |
+| R-15 | could | C-7 | WP-5 | A-10 |
+| R-16 | must | C-1, C-6 | WP-2 | A-2, A-3, A-4, A-5 |
+| R-17 | should | C-14 | WP-10 | A-17, A-18, A-19, A-20 |
+| R-18 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
+| R-19 | must | C-14 | WP-10 | A-17, A-18, A-19, A-20 |
+| R-20 | must | C-4 | WP-8 | A-15 |
+| R-21 | must | C-4 | WP-8 | A-15 |
 
 ## Conventions
 

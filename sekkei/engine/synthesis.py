@@ -76,6 +76,8 @@ QUALITY_CARRIERS = {
     "usability": ["surface_api", "cli"],
 }
 
+#: archetypes that are infrastructure: they may share a work package with each other
+_INFRA = {"store", "queue", "observability", "config", "auth", "scheduler", "cache", "ratelimit", "secrets"}
 _HTTP_SURFACES = ("surface_api", "admin_api", "ingest_api")
 _ALL_SURFACES = (*_HTTP_SURFACES, "cli", "push", "ui")
 _HUMAN_SURFACES = ("surface_api", "admin_api", "cli", "ui")   # where a person's use case enters
@@ -324,7 +326,9 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
             else:
                 name, inputs, out, errs = f"{iverb}_{obj}", [(obj, f"{obj.capitalize()} | id")], f"{obj.capitalize()} | None", ["ValidationError", "NotFound"]
             if name not in seen:
-                seen[name] = Operation(name, [Param(n, t) for n, t in inputs], out, errs,
+                stated = [q for q in u.sentence.quantities if q.kind not in ("code", "number")]
+                pre = ("stated values: " + "; ".join(f"{q.raw}{(' ' + q.noun) if q.kind == 'count' and q.noun and q.noun not in q.raw else ''} ({u.id})" for q in stated)) if stated else ""
+                seen[name] = Operation(name, [Param(n, t) for n, t in inputs], out, errs, pre=pre,
                                        description=f"from {u.id}: {u.sentence.text[:90].rstrip()}")
     return list(seen.values())
 
@@ -507,6 +511,21 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             d.entities.append(Entity(f"E-{n}", base.capitalize(), cid["store"], fds, f"Domain entity named in the requirements ('{base}'); confirm the fields."))
             trace[f"E-{n}"] = {"sentences": [], "rules": ["entity:from-text"]}
 
+    # synthesised contracts: give parameters the entity type when the name matches an entity
+    ent_by_name = {e.name.lower(): e.name for e in d.entities}
+    for c in d.components:
+        if "synthesised" not in c.tags:
+            continue
+        for i in d.provided_by(c.id):
+            for o in i.operations:
+                for p in o.inputs:
+                    if p.type == "…":
+                        base = p.name[:-1] if p.name.endswith("s") and not p.name.endswith("ss") else p.name
+                        if base in ent_by_name:
+                            p.type = f"list[{ent_by_name[base]}]" if p.name.endswith("s") else ent_by_name[base]
+                if o.output == "…" and o.inputs and o.inputs[0].type != "…":
+                    o.output = o.inputs[0].type + " (validated)" if "valid" in o.name else o.output
+
     # --- flows -----------------------------------------------------------------
     fkeys: list[str] = []
     for p in K.PATTERNS:
@@ -540,7 +559,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         if t.quality in an.qualities:
             dkeys += [x for x in t.decisions if x not in dkeys]
     for dk, dp in K.DECISIONS.items():
-        if "*" in dp.trigger and dk not in dkeys:
+        if dk not in dkeys and ("*" in dp.trigger or any(t in an.constraints for t in dp.trigger)):
             dkeys.append(dk)
     n = 0
     chosen: dict[str, str] = {}
@@ -610,14 +629,23 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
     family_of: dict[str, str] = {}
     for c in internal:
         key = c.tags[1].split(":")[1]
-        fam = next((p.id for p in K.PATTERNS if p.id in an.patterns and key in p.archetypes), "infra")
+        if key in _INFRA:
+            fam = "infra"
+        elif "synthesised" in c.tags:
+            fam = "synthesised:" + key
+        else:
+            fam = next((p.id for p in K.PATTERNS if p.id in an.patterns and key in p.archetypes), "infra")
         family_of[c.id] = fam
     groups: list[list[str]] = []
     for layer in layers:
         ids = [c for c in layer if d.component(c).kind != "external"]
-        ids.sort(key=lambda c: (family_of[c], int(c.split("-")[1])))
-        for i in range(0, len(ids), 3):
-            groups.append(ids[i:i + 3])
+        by_family: "OrderedDict[str, list[str]]" = OrderedDict()
+        for c in sorted(ids, key=lambda c: (family_of[c], int(c.split("-")[1]))):
+            by_family.setdefault(family_of[c], []).append(c)
+        # infrastructure of one layer may be batched; domain families stay separate
+        for fam, members in by_family.items():
+            for i in range(0, len(members), 3):
+                groups.append(members[i:i + 3])
     implementer: dict[str, str] = {}
     for n, ids in enumerate(groups, 1):
         for c in ids:
