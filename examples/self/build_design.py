@@ -61,13 +61,24 @@ b.requirement("R-8", "Linting and drift-checking this repository's own design fi
               metric=("wall time of `sekkei lint` plus `sekkei check` on examples/self on a laptop", "<= 1", "s"))
 b.requirement("R-9", "A human can author a design in a small Python DSL that yields the same model as the JSON.",
               priority="should")
-b.requirement("R-10", "An optional command drafts a design from free text with Claude, lints it, and feeds the "
-                      "diagnostics back until the design is clean or the round limit is reached.", priority="could")
+b.requirement("R-10", "sekkei designs from a requirements text: it drafts a design with a model, feeds lint "
+                      "diagnostics back until clean, has the model review the design against a senior-architect "
+                      "checklist, revises, and lints again; the model runs through the local Claude Code CLI "
+                      "(no API key) or the anthropic SDK.", priority="should")
 b.requirement("R-11", "A command line exposes every operation with a default design file, JSON output where an "
                       "orchestrator would consume it, and exit code 1 on errors.")
 b.requirement("R-12", "Two versions of a design can be compared, listing added, removed and changed elements and "
                       "the work packages whose briefs became stale; a completion report against a stale brief is "
                       "rejected unless forced.")
+b.requirement("R-13", "sekkei designs a system from a requirements text without any model: it segments the text into "
+                      "requirement units with their numbers, recognises capability patterns and quality attributes from a "
+                      "catalogue, synthesises components, interfaces with operations, entities, flows, decisions, risks and "
+                      "work packages, scores every decision against the active qualities and constraints, repairs and lints "
+                      "the result, and reviews its own gaps.")
+b.requirement("R-14", "The design engine is deterministic: the same requirements text yields byte-identical output.",
+              kind="nonfunctional", priority="must", metric=("designs from two runs on the same text that differ", "= 0", "designs"))
+b.requirement("R-15", "Every element of a generated design traces to the input sentences and the catalogue rules that "
+                      "produced it, and the engine states which requirements it did not recognise instead of hiding them.")
 
 # --- components -------------------------------------------------------------
 b.component("C-1", "Model", "Dataclasses for the design, tolerant JSON loading, serialisation and the JSON Schema.",
@@ -86,15 +97,35 @@ b.component("C-7", "State", "Progress state in .sekkei/state.json, brief fingerp
             path="sekkei/state.py", requires=["I-1", "I-3"], satisfies=["R-6", "R-12"])
 b.component("C-8", "DSL", "Python builder for authoring designs by hand.",
             path="sekkei/dsl.py", requires=["I-1"], satisfies=["R-9"])
-b.component("C-9", "LLM", "Optional Claude drafting loop and the architect prompt.",
+b.component("C-9", "Design engine", "Model backends (Claude Code CLI, anthropic SDK, fake), the architect and "
+            "review prompts, and the draft/review/revise pipeline.",
             path="sekkei/llm.py", requires=["I-1", "I-2"], satisfies=["R-10"])
 b.component("C-10", "CLI", "argparse front end over every module.", kind="cli",
-            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12"],
+            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12", "I-19"],
             satisfies=["R-11", "R-8"])
 b.component("C-11", "Starter", "The example design written by `sekkei init`.",
             path="sekkei/examples.py", requires=["I-1", "I-8"], satisfies=["R-11"])
 b.component("C-12", "Diff", "Element-level comparison of two design versions and the packages they affect.",
             path="sekkei/diff.py", requires=["I-1"], satisfies=["R-12"])
+b.component("C-13", "Text analysis", "Sentence segmentation, sections, modality, the quantity grammar, actors, verbs and nouns.",
+            path="sekkei/engine/text.py", satisfies=["R-13"])
+b.component("C-14", "Catalogue", "The knowledge base: archetypes, entity and flow templates, decision points with scored options, "
+            "risks, capability patterns with signals, quality tactics, constraint tokens and language layouts.",
+            path="sekkei/engine/catalog.py", satisfies=["R-13"])
+b.component("C-15", "Requirements analysis", "Turns sentences into requirement units (kind, priority, metric), matches patterns and "
+            "qualities, extracts constraints, and lists what was not recognised.",
+            path="sekkei/engine/analysis.py", requires=["I-13", "I-14"], satisfies=["R-13", "R-15"])
+b.component("C-16", "Synthesis", "Instantiates and merges archetypes into components and interfaces, derives operations from "
+            "verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and "
+            "work packages; records the trace.", path="sekkei/engine/synthesis.py",
+            requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-17"], satisfies=["R-13", "R-15"])
+b.component("C-17", "Evaluation", "Scores decision options against the active qualities and constraints (utility with "
+            "availability rules and stated-technology bonus) and writes the engine's review of its own gaps.",
+            path="sekkei/engine/evaluate.py", requires=["I-1", "I-14", "I-15"], satisfies=["R-13", "R-15"])
+b.component("C-18", "Repair", "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
+            path="sekkei/engine/repair.py", requires=["I-1", "I-2"], satisfies=["R-13"])
+b.component("C-19", "Engine facade", "design(text): analyse, synthesise, repair, review; returns the design, diagnostics, review and trace.",
+            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18"], satisfies=["R-13", "R-14", "R-15"])
 
 # --- interfaces (operation names are the real function names; sekkei check verifies them) ---
 b.interface("I-1", "Model API", owner="C-1", kind="module", stability="stable", operations=[
@@ -160,11 +191,47 @@ b.interface("I-8", "DSL", owner="C-8", kind="module", operations=[
     op("option", [("name", "str"), ("pros", "Sequence[str]"), ("cons", "Sequence[str]")], "Option"),
     op("load_python", [("path", "str | Path")], "Design", ["ValueError if the file defines neither `design` nor `build()`"]),
 ])
-b.interface("I-9", "LLM API", owner="C-9", kind="module", operations=[
+b.interface("I-9", "Model drafting API", owner="C-9", kind="module", operations=[
+    op("get_backend", [("name", "str | None"), ("model", "str | None")], "Backend (claude-code | anthropic)", ["RuntimeError if none is available"]),
     op("architect_prompt", [("include_schema", "bool"), ("include_rules", "bool")], "str"),
-    op("draft", [("requirements_text", "str"), ("client", "Any"), ("model", "str"), ("rounds", "int")], "DraftResult",
-       ["RuntimeError if the anthropic package is missing or the model refuses"]),
+    op("draft", [("requirements_text", "str"), ("backend", "Backend"), ("rounds", "int")], "DraftResult", ["RuntimeError from the backend"]),
+    op("review", [("design", "Design"), ("requirements_text", "str"), ("backend", "Backend")], "list[ReviewFinding]"),
+    op("revise", [("design", "Design"), ("findings", "list[ReviewFinding]"), ("requirements_text", "str"), ("backend", "Backend"), ("rounds", "int")], "DraftResult"),
+    op("design", [("requirements_text", "str"), ("backend", "Backend"), ("rounds", "int"), ("review_rounds", "int")], "DesignResult"),
     op("extract_json", [("text", "str")], "dict", ["DesignError if no JSON object"]),
+])
+b.interface("I-13", "Text analysis API", owner="C-13", kind="module", stability="stable", operations=[
+    op("segment", [("text", "str")], "list[Sentence] with section, modality, quantities, actors, verbs, nouns"),
+    op("quantities", [("text", "str")], "list[Quantity] (rate | latency | duration | count | size | percent | factor | code | number)"),
+    op("modality", [("text", "str")], "'must' | 'should' | 'could' | ''"),
+    op("tokens", [("text", "str")], "list[str]"),
+    op("verb_of", [("word", "str")], "lexicon verb or ''"),
+    op("title_of", [("text", "str")], "str"),
+    op("slug", [("text", "str")], "str"),
+])
+b.interface("I-14", "Catalogue", owner="C-14", kind="module", stability="stable", operations=[
+    op("Archetype", [], "class: key, name, responsibility, kind, layer, needs, ops, iface_kind"),
+    op("Pattern", [], "class: id, signals, archetypes, entities, flows, decisions, risks"),
+    op("DecisionPoint", [], "class: options with fit per quality, needs/excludes/bonus_when constraint tokens"),
+    op("Tactic", [], "class: quality signals, archetypes, decisions, acceptance template, convention"),
+    op("Layout", [], "class: module/test path templates and commands per language"),
+])
+b.interface("I-15", "Analysis API", owner="C-15", kind="module", operations=[
+    op("analyse", [("text", "str")], "Analysis: requirements (ReqUnit), patterns, qualities, constraints, languages, team size, unrecognised, assumptions"),
+])
+b.interface("I-16", "Synthesis API", owner="C-16", kind="module", operations=[
+    op("synthesise", [("an", "Analysis")], "Synthesis: design, trace, generic component ids, log"),
+])
+b.interface("I-17", "Evaluation API", owner="C-17", kind="module", operations=[
+    op("score_option", [("opt", "Option"), ("qualities", "dict"), ("constraints", "set")], "Scored(score, available, reason)"),
+    op("decide", [("dp", "DecisionPoint"), ("qualities", "dict"), ("constraints", "set")], "(best, ranked, rationale, consequences)"),
+    op("review", [("design", "Design"), ("an", "Analysis"), ("generic_components", "list[str]")], "Review (unrecognised, unaddressed, generic, assumptions, notes)"),
+])
+b.interface("I-18", "Repair API", owner="C-18", kind="module", operations=[
+    op("repair", [("design", "Design"), ("max_passes", "int")], "(design, remaining diagnostics, repairs applied)"),
+])
+b.interface("I-19", "Engine API", owner="C-19", kind="module", stability="stable", operations=[
+    op("design", [("text", "str")], "EngineResult: design, analysis, review, diagnostics, trace; ok when no lint error"),
 ])
 b.interface("I-10", "Command line", owner="C-10", kind="cli", operations=[
     op("sekkei init [dir]", output="starter design.json"),
@@ -174,7 +241,9 @@ b.interface("I-10", "Command line", owner="C-10", kind="cli", operations=[
     op("sekkei check [--root DIR] / scope WP FILES", output="drift findings; out-of-scope files"),
     op("sekkei accept REPORT [--force] / status / next / start WP", output="state transitions; stale briefs are refused"),
     op("sekkei diff OLD [-d NEW]", output="element changes and the affected packages; exit 1 if any"),
-    op("sekkei schema / rules / prompt / draft FILE", output="JSON Schema; rule table; architect prompt; drafted design"),
+    op("sekkei schema / rules / prompt", output="JSON Schema; rule table; architect prompt"),
+    op("sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review REVIEW.md] [--trace TRACE.json]", output="a complete, lint-clean design without any model"),
+    op("sekkei draft REQ.md [--review] [--backend claude-code|anthropic]", output="optional model-based draft"),
 ])
 b.interface("I-11", "Starter", owner="C-11", kind="module", operations=[
     op("starter_design", [("name", "str")], "Design that lints clean"),
@@ -221,6 +290,16 @@ b.flow("F-5", "Design changed after a brief was issued", trigger="sekkei diff ol
     ("C-10", "C-5", "I-5", "recompute the brief fingerprint"),
     ("C-10", "C-7", "I-7", "accept compares it with the recorded one and refuses a stale brief"),
 ])
+b.flow("F-6", "Design from a requirements text", trigger="sekkei design REQ.md", steps=[
+    ("C-10", "C-19", "I-19", "run the engine"),
+    ("C-19", "C-15", "I-15", "analyse the text"),
+    ("C-15", "C-13", "I-13", "segment sentences, quantities, modality"),
+    ("C-15", "C-14", "I-14", "match patterns, qualities, constraints"),
+    ("C-19", "C-16", "I-16", "synthesise the design"),
+    ("C-16", "C-17", "I-17", "score every decision point"),
+    ("C-19", "C-18", "I-18", "lint and repair"),
+    ("C-19", "C-17", "I-17", "review the gaps"),
+])
 b.flow("F-4", "Drift check", trigger="sekkei check", steps=[
     ("C-10", "C-6", "I-6", "walk component paths"),
     ("C-6", "C-3", "I-3", "prefix matching of files to components"),
@@ -249,6 +328,15 @@ b.decision("D-4", "Python-only symbol and import checks",
            options=[option("stdlib ast, Python only", pros=["zero dependencies", "exact"], cons=["other languages get presence checks only"]),
                     option("tree-sitter", pros=["many languages"], cons=["native dependency", "grammar drift"])],
            choice="stdlib ast, Python only", rationale="Honest partial coverage beats a dependency the user cannot install.", affects=["C-6"])
+b.decision("D-6", "A deterministic engine rather than a model as the design engine",
+           context="The engine must produce complete designs; a model would be more fluent but not reproducible or explainable.",
+           options=[option("rule-based engine over a catalogue", pros=["deterministic", "every element traced to sentences and rules", "offline, no cost", "says what it did not recognise"],
+                           cons=["no understanding of prose", "finite catalogue; novel domains get a generic decomposition"]),
+                    option("model-based drafting only", pros=["fluent on any domain"], cons=["not reproducible", "invents requirements", "needs credentials"]),
+                    option("model drafting checked by the linter", pros=["fluent and structurally checked"], cons=["semantic errors pass the linter"])],
+           choice="rule-based engine over a catalogue", rationale="The harness exists to hold a line a model cannot hold for itself; the engine keeps that property. Model drafting stays as an optional extra.",
+           consequences="Domains outside the catalogue are handled by the layered fallback and flagged in the review; growing the catalogue is the improvement path.",
+           affects=["C-14", "C-16", "C-19"])
 b.decision("D-5", "No orchestration",
            context="Agent runtimes change monthly.",
            options=[option("export a JSON plan", pros=["stable contract", "works with any runner"], cons=["user wires the loop"]),
@@ -262,6 +350,10 @@ b.risk("K-2", "Dynamic or aliased imports escape the drift check, hiding an unde
        mitigation="Documented limitation; the check is ast-based and reports only what it can prove.", affects=["C-6"])
 b.risk("K-3", "A model emits keys or values outside the schema.", likelihood="high", impact="low",
        mitigation="Tolerant loader records unknown keys (S006) and invalid values (S005) instead of failing to load.", affects=["C-1", "C-9"])
+b.risk("K-4", "The catalogue does not cover a domain, so the engine produces a generic decomposition that looks complete.", likelihood="high", impact="medium",
+       mitigation="Unrecognised requirements and generic components are listed in the review and as a risk in the design; the fixtures include a novel domain to keep this honest.", affects=["C-14", "C-17"])
+b.risk("K-5", "The verb/object heuristics derive a wrong operation name from an unusual sentence.", likelihood="medium", impact="low",
+       mitigation="Operations carry the sentence they came from in their description; the fixtures assert the expected operations.", affects=["C-16"])
 
 # --- work packages ----------------------------------------------------------------------
 T = "python -m pytest -q "
@@ -297,16 +389,29 @@ b.work_package("WP-8", "DSL and starter", goal="Provide the Python builder and t
                components=["C-8", "C-11"], implements=["I-8", "I-11"], depends_on=["WP-3"], satisfies=["R-9", "R-11"], size="S",
                files=["sekkei/dsl.py", "sekkei/examples.py", "tests/test_dsl.py"],
                acceptance=[check("A-8", "DSL tests pass and the starter design has zero diagnostics", command=T + "tests/test_dsl.py")])
-b.work_package("WP-9", "LLM drafting", goal="Implement the architect prompt and the draft-lint-feedback loop with an injectable client so it is testable offline.",
-               components=["C-9"], implements=["I-9"], depends_on=["WP-3"], satisfies=["R-10"], size="S",
+b.work_package("WP-9", "Design engine", goal="Implement the model backends, the architect and review prompts, and the draft/review/revise pipeline with lint feedback, testable offline through a fake backend.",
+               components=["C-9"], implements=["I-9"], depends_on=["WP-3"], satisfies=["R-10"], size="M",
                files=["sekkei/llm.py", "tests/test_llm.py"],
-               acceptance=[check("A-9", "llm tests pass with a fake client", command=T + "tests/test_llm.py")])
+               acceptance=[check("A-9", "design-engine tests pass with the fake backend, including the full draft/review/revise pipeline", command=T + "tests/test_llm.py")])
+b.work_package("WP-12", "Engine: text and catalogue", goal="Implement the requirements-text analysis (segmentation, quantity grammar, modality, verbs) and the knowledge base of patterns, archetypes, decisions, tactics and layouts.",
+               components=["C-13", "C-14"], implements=["I-13", "I-14"], depends_on=["WP-1"], satisfies=["R-13"], size="L",
+               files=["sekkei/engine/text.py", "sekkei/engine/catalog.py", "tests/test_engine.py", "tests/fixtures"],
+               acceptance=[check("A-14", "text tests pass: quantities, sections, modality, verb inflection", command=T + "tests/test_engine.py -k 'quantities or segmentation'")])
+b.work_package("WP-13", "Engine: analysis and evaluation", goal="Implement requirement-unit analysis with pattern/quality/constraint matching, decision scoring and the self-review.",
+               components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12"], satisfies=["R-13", "R-15"], size="M",
+               files=["sekkei/engine/analysis.py", "sekkei/engine/evaluate.py"],
+               acceptance=[check("A-15", "analysis tests pass on the fixtures", command=T + "tests/test_engine.py -k analysis")])
+b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
+               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13"], satisfies=["R-13", "R-14", "R-15"], size="L",
+               files=["sekkei/engine/synthesis.py", "sekkei/engine/repair.py", "sekkei/engine/__init__.py"],
+               acceptance=[check("A-16", "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture", command=T + "tests/test_engine.py"),
+                           check("A-17", "R-14: two runs on the same text produce identical JSON", kind="metric", metric="R-14")])
 b.work_package("WP-11", "Diff", goal="Compare two design versions element by element and map the changes to the work packages whose briefs are stale.",
                components=["C-12"], implements=["I-12"], depends_on=["WP-1"], satisfies=["R-12"], size="S",
                files=["sekkei/diff.py", "tests/test_diff.py"],
                acceptance=[check("A-13", "diff tests pass, including that a stale brief blocks acceptance", command=T + "tests/test_diff.py")])
 b.work_package("WP-10", "CLI", goal="Expose every operation on the command line with exit codes and JSON output, and prove the whole loop end to end.",
-               components=["C-10"], implements=["I-10"], depends_on=["WP-6", "WP-7", "WP-8", "WP-9", "WP-11"], satisfies=["R-11", "R-8", "R-12"], size="M",
+               components=["C-10"], implements=["I-10"], depends_on=["WP-6", "WP-7", "WP-8", "WP-9", "WP-11", "WP-14"], satisfies=["R-11", "R-8", "R-12"], size="M",
                files=["sekkei/cli.py", "sekkei/__main__.py", "tests/test_cli.py", "tests/test_self.py"],
                acceptance=[check("A-10", "CLI round-trip test passes: init, lint, render, plan, brief, accept, next", command=T + "tests/test_cli.py"),
                            check("A-11", "self design lints clean and drift check on the repository reports no error", command=T + "tests/test_self.py"),

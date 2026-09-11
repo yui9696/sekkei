@@ -101,9 +101,9 @@
     },
     {
       "id": "R-10",
-      "statement": "An optional command drafts a design from free text with Claude, lints it, and feeds the diagnostics back until the design is clean or the round limit is reached.",
+      "statement": "sekkei designs from a requirements text: it drafts a design with a model, feeds lint diagnostics back until clean, has the model review the design against a senior-architect checklist, revises, and lints again; the model runs through the local Claude Code CLI (no API key) or the anthropic SDK.",
       "kind": "functional",
-      "priority": "could",
+      "priority": "should",
       "rationale": ""
     },
     {
@@ -116,6 +116,32 @@
     {
       "id": "R-12",
       "statement": "Two versions of a design can be compared, listing added, removed and changed elements and the work packages whose briefs became stale; a completion report against a stale brief is rejected unless forced.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-13",
+      "statement": "sekkei designs a system from a requirements text without any model: it segments the text into requirement units with their numbers, recognises capability patterns and quality attributes from a catalogue, synthesises components, interfaces with operations, entities, flows, decisions, risks and work packages, scores every decision against the active qualities and constraints, repairs and lints the result, and reviews its own gaps.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-14",
+      "statement": "The design engine is deterministic: the same requirements text yields byte-identical output.",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "designs from two runs on the same text that differ",
+        "target": "= 0",
+        "unit": "designs"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-15",
+      "statement": "Every element of a generated design traces to the input sentences and the catalogue rules that produced it, and the engine states which requirements it did not recognise instead of hiding them.",
       "kind": "functional",
       "priority": "must",
       "rationale": ""
@@ -243,8 +269,8 @@
     },
     {
       "id": "C-9",
-      "name": "LLM",
-      "responsibility": "Optional Claude drafting loop and the architect prompt.",
+      "name": "Design engine",
+      "responsibility": "Model backends (Claude Code CLI, anthropic SDK, fake), the architect and review prompts, and the draft/review/revise pipeline.",
       "kind": "module",
       "path": "sekkei/llm.py",
       "requires": [
@@ -272,7 +298,8 @@
         "I-7",
         "I-9",
         "I-11",
-        "I-12"
+        "I-12",
+        "I-19"
       ],
       "satisfies": [
         "R-11",
@@ -306,6 +333,119 @@
       ],
       "satisfies": [
         "R-12"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-13",
+      "name": "Text analysis",
+      "responsibility": "Sentence segmentation, sections, modality, the quantity grammar, actors, verbs and nouns.",
+      "kind": "module",
+      "path": "sekkei/engine/text.py",
+      "requires": [],
+      "satisfies": [
+        "R-13"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-14",
+      "name": "Catalogue",
+      "responsibility": "The knowledge base: archetypes, entity and flow templates, decision points with scored options, risks, capability patterns with signals, quality tactics, constraint tokens and language layouts.",
+      "kind": "module",
+      "path": "sekkei/engine/catalog.py",
+      "requires": [],
+      "satisfies": [
+        "R-13"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-15",
+      "name": "Requirements analysis",
+      "responsibility": "Turns sentences into requirement units (kind, priority, metric), matches patterns and qualities, extracts constraints, and lists what was not recognised.",
+      "kind": "module",
+      "path": "sekkei/engine/analysis.py",
+      "requires": [
+        "I-13",
+        "I-14"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-16",
+      "name": "Synthesis",
+      "responsibility": "Instantiates and merges archetypes into components and interfaces, derives operations from verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and work packages; records the trace.",
+      "kind": "module",
+      "path": "sekkei/engine/synthesis.py",
+      "requires": [
+        "I-1",
+        "I-3",
+        "I-13",
+        "I-14",
+        "I-15",
+        "I-17"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-17",
+      "name": "Evaluation",
+      "responsibility": "Scores decision options against the active qualities and constraints (utility with availability rules and stated-technology bonus) and writes the engine's review of its own gaps.",
+      "kind": "module",
+      "path": "sekkei/engine/evaluate.py",
+      "requires": [
+        "I-1",
+        "I-14",
+        "I-15"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-18",
+      "name": "Repair",
+      "responsibility": "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
+      "kind": "module",
+      "path": "sekkei/engine/repair.py",
+      "requires": [
+        "I-1",
+        "I-2"
+      ],
+      "satisfies": [
+        "R-13"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-19",
+      "name": "Engine facade",
+      "responsibility": "design(text): analyse, synthesise, repair, review; returns the design, diagnostics, review and trace.",
+      "kind": "module",
+      "path": "sekkei/engine/__init__.py",
+      "requires": [
+        "I-1",
+        "I-2",
+        "I-15",
+        "I-16",
+        "I-17",
+        "I-18"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-14",
+        "R-15"
       ],
       "tags": []
     }
@@ -1217,10 +1357,32 @@
     },
     {
       "id": "I-9",
-      "name": "LLM API",
+      "name": "Model drafting API",
       "owner": "C-9",
       "kind": "module",
       "operations": [
+        {
+          "name": "get_backend",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "model",
+              "type": "str | None",
+              "description": ""
+            }
+          ],
+          "output": "Backend (claude-code | anthropic)",
+          "errors": [
+            "RuntimeError if none is available"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
         {
           "name": "architect_prompt",
           "inputs": [
@@ -1250,13 +1412,8 @@
               "description": ""
             },
             {
-              "name": "client",
-              "type": "Any",
-              "description": ""
-            },
-            {
-              "name": "model",
-              "type": "str",
+              "name": "backend",
+              "type": "Backend",
               "description": ""
             },
             {
@@ -1267,8 +1424,98 @@
           ],
           "output": "DraftResult",
           "errors": [
-            "RuntimeError if the anthropic package is missing or the model refuses"
+            "RuntimeError from the backend"
           ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "review",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "requirements_text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "backend",
+              "type": "Backend",
+              "description": ""
+            }
+          ],
+          "output": "list[ReviewFinding]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "revise",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "findings",
+              "type": "list[ReviewFinding]",
+              "description": ""
+            },
+            {
+              "name": "requirements_text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "backend",
+              "type": "Backend",
+              "description": ""
+            },
+            {
+              "name": "rounds",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "DraftResult",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "design",
+          "inputs": [
+            {
+              "name": "requirements_text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "backend",
+              "type": "Backend",
+              "description": ""
+            },
+            {
+              "name": "rounds",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "review_rounds",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "DesignResult",
+          "errors": [],
           "pre": "",
           "post": "",
           "description": ""
@@ -1292,6 +1539,366 @@
         }
       ],
       "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-13",
+      "name": "Text analysis API",
+      "owner": "C-13",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "segment",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[Sentence] with section, modality, quantities, actors, verbs, nouns",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "quantities",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[Quantity] (rate | latency | duration | count | size | percent | factor | code | number)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "modality",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "'must' | 'should' | 'could' | ''",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "tokens",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[str]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "verb_of",
+          "inputs": [
+            {
+              "name": "word",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "lexicon verb or ''",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "title_of",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "slug",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-14",
+      "name": "Catalogue",
+      "owner": "C-14",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "Archetype",
+          "inputs": [],
+          "output": "class: key, name, responsibility, kind, layer, needs, ops, iface_kind",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "Pattern",
+          "inputs": [],
+          "output": "class: id, signals, archetypes, entities, flows, decisions, risks",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "DecisionPoint",
+          "inputs": [],
+          "output": "class: options with fit per quality, needs/excludes/bonus_when constraint tokens",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "Tactic",
+          "inputs": [],
+          "output": "class: quality signals, archetypes, decisions, acceptance template, convention",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "Layout",
+          "inputs": [],
+          "output": "class: module/test path templates and commands per language",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-15",
+      "name": "Analysis API",
+      "owner": "C-15",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "analyse",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Analysis: requirements (ReqUnit), patterns, qualities, constraints, languages, team size, unrecognised, assumptions",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-16",
+      "name": "Synthesis API",
+      "owner": "C-16",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "synthesise",
+          "inputs": [
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "Synthesis: design, trace, generic component ids, log",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-17",
+      "name": "Evaluation API",
+      "owner": "C-17",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "score_option",
+          "inputs": [
+            {
+              "name": "opt",
+              "type": "Option",
+              "description": ""
+            },
+            {
+              "name": "qualities",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "constraints",
+              "type": "set",
+              "description": ""
+            }
+          ],
+          "output": "Scored(score, available, reason)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "decide",
+          "inputs": [
+            {
+              "name": "dp",
+              "type": "DecisionPoint",
+              "description": ""
+            },
+            {
+              "name": "qualities",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "constraints",
+              "type": "set",
+              "description": ""
+            }
+          ],
+          "output": "(best, ranked, rationale, consequences)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "review",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            },
+            {
+              "name": "generic_components",
+              "type": "list[str]",
+              "description": ""
+            }
+          ],
+          "output": "Review (unrecognised, unaddressed, generic, assumptions, notes)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-18",
+      "name": "Repair API",
+      "owner": "C-18",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "repair",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "max_passes",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "(design, remaining diagnostics, repairs applied)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-19",
+      "name": "Engine API",
+      "owner": "C-19",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "design",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "EngineResult: design, analysis, review, diagnostics, trace; ok when no lint error",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
       "description": ""
     },
     {
@@ -1364,9 +1971,27 @@
           "description": ""
         },
         {
-          "name": "sekkei schema / rules / prompt / draft FILE",
+          "name": "sekkei schema / rules / prompt",
           "inputs": [],
-          "output": "JSON Schema; rule table; architect prompt; drafted design",
+          "output": "JSON Schema; rule table; architect prompt",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review REVIEW.md] [--trace TRACE.json]",
+          "inputs": [],
+          "output": "a complete, lint-clean design without any model",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei draft REQ.md [--review] [--backend claude-code|anthropic]",
+          "inputs": [],
+          "output": "optional model-based draft",
           "errors": [],
           "pre": "",
           "post": "",
@@ -1690,6 +2315,61 @@
       ]
     },
     {
+      "id": "F-6",
+      "name": "Design from a requirements text",
+      "trigger": "sekkei design REQ.md",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-19",
+          "via": "I-19",
+          "description": "run the engine"
+        },
+        {
+          "from": "C-19",
+          "to": "C-15",
+          "via": "I-15",
+          "description": "analyse the text"
+        },
+        {
+          "from": "C-15",
+          "to": "C-13",
+          "via": "I-13",
+          "description": "segment sentences, quantities, modality"
+        },
+        {
+          "from": "C-15",
+          "to": "C-14",
+          "via": "I-14",
+          "description": "match patterns, qualities, constraints"
+        },
+        {
+          "from": "C-19",
+          "to": "C-16",
+          "via": "I-16",
+          "description": "synthesise the design"
+        },
+        {
+          "from": "C-16",
+          "to": "C-17",
+          "via": "I-17",
+          "description": "score every decision point"
+        },
+        {
+          "from": "C-19",
+          "to": "C-18",
+          "via": "I-18",
+          "description": "lint and repair"
+        },
+        {
+          "from": "C-19",
+          "to": "C-17",
+          "via": "I-17",
+          "description": "review the gaps"
+        }
+      ]
+    },
+    {
       "id": "F-4",
       "name": "Drift check",
       "trigger": "sekkei check",
@@ -1858,6 +2538,55 @@
       "status": "accepted"
     },
     {
+      "id": "D-6",
+      "title": "A deterministic engine rather than a model as the design engine",
+      "context": "The engine must produce complete designs; a model would be more fluent but not reproducible or explainable.",
+      "options": [
+        {
+          "name": "rule-based engine over a catalogue",
+          "pros": [
+            "deterministic",
+            "every element traced to sentences and rules",
+            "offline, no cost",
+            "says what it did not recognise"
+          ],
+          "cons": [
+            "no understanding of prose",
+            "finite catalogue; novel domains get a generic decomposition"
+          ]
+        },
+        {
+          "name": "model-based drafting only",
+          "pros": [
+            "fluent on any domain"
+          ],
+          "cons": [
+            "not reproducible",
+            "invents requirements",
+            "needs credentials"
+          ]
+        },
+        {
+          "name": "model drafting checked by the linter",
+          "pros": [
+            "fluent and structurally checked"
+          ],
+          "cons": [
+            "semantic errors pass the linter"
+          ]
+        }
+      ],
+      "choice": "rule-based engine over a catalogue",
+      "rationale": "The harness exists to hold a line a model cannot hold for itself; the engine keeps that property. Model drafting stays as an optional extra.",
+      "consequences": "Domains outside the catalogue are handled by the layered fallback and flagged in the review; growing the catalogue is the improvement path.",
+      "affects": [
+        "C-14",
+        "C-16",
+        "C-19"
+      ],
+      "status": "accepted"
+    },
+    {
       "id": "D-5",
       "title": "No orchestration",
       "context": "Agent runtimes change monthly.",
@@ -1922,6 +2651,27 @@
       "affects": [
         "C-1",
         "C-9"
+      ]
+    },
+    {
+      "id": "K-4",
+      "description": "The catalogue does not cover a domain, so the engine produces a generic decomposition that looks complete.",
+      "likelihood": "high",
+      "impact": "medium",
+      "mitigation": "Unrecognised requirements and generic components are listed in the review and as a risk in the design; the fixtures include a novel domain to keep this honest.",
+      "affects": [
+        "C-14",
+        "C-17"
+      ]
+    },
+    {
+      "id": "K-5",
+      "description": "The verb/object heuristics derive a wrong operation name from an unusual sentence.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Operations carry the sentence they came from in their description; the fixtures assert the expected operations.",
+      "affects": [
+        "C-16"
       ]
     }
   ],
@@ -2189,8 +2939,8 @@
     },
     {
       "id": "WP-9",
-      "title": "LLM drafting",
-      "goal": "Implement the architect prompt and the draft-lint-feedback loop with an injectable client so it is testable offline.",
+      "title": "Design engine",
+      "goal": "Implement the model backends, the architect and review prompts, and the draft/review/revise pipeline with lint feedback, testable offline through a fake backend.",
       "components": [
         "C-9"
       ],
@@ -2207,14 +2957,132 @@
         "sekkei/llm.py",
         "tests/test_llm.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-9",
-          "description": "llm tests pass with a fake client",
+          "description": "design-engine tests pass with the fake backend, including the full draft/review/revise pipeline",
           "kind": "test",
           "command": "python -m pytest -q tests/test_llm.py",
           "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-12",
+      "title": "Engine: text and catalogue",
+      "goal": "Implement the requirements-text analysis (segmentation, quantity grammar, modality, verbs) and the knowledge base of patterns, archetypes, decisions, tactics and layouts.",
+      "components": [
+        "C-13",
+        "C-14"
+      ],
+      "implements": [
+        "I-13",
+        "I-14"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-13"
+      ],
+      "files": [
+        "sekkei/engine/text.py",
+        "sekkei/engine/catalog.py",
+        "tests/test_engine.py",
+        "tests/fixtures"
+      ],
+      "size": "L",
+      "acceptance": [
+        {
+          "id": "A-14",
+          "description": "text tests pass: quantities, sections, modality, verb inflection",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_engine.py -k 'quantities or segmentation'",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-13",
+      "title": "Engine: analysis and evaluation",
+      "goal": "Implement requirement-unit analysis with pattern/quality/constraint matching, decision scoring and the self-review.",
+      "components": [
+        "C-15",
+        "C-17"
+      ],
+      "implements": [
+        "I-15",
+        "I-17"
+      ],
+      "depends_on": [
+        "WP-12"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "files": [
+        "sekkei/engine/analysis.py",
+        "sekkei/engine/evaluate.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-15",
+          "description": "analysis tests pass on the fixtures",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_engine.py -k analysis",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-14",
+      "title": "Engine: synthesis, repair and facade",
+      "goal": "Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
+      "components": [
+        "C-16",
+        "C-18",
+        "C-19"
+      ],
+      "implements": [
+        "I-16",
+        "I-18",
+        "I-19"
+      ],
+      "depends_on": [
+        "WP-3",
+        "WP-13"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-14",
+        "R-15"
+      ],
+      "files": [
+        "sekkei/engine/synthesis.py",
+        "sekkei/engine/repair.py",
+        "sekkei/engine/__init__.py"
+      ],
+      "size": "L",
+      "acceptance": [
+        {
+          "id": "A-16",
+          "description": "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_engine.py",
+          "metric": ""
+        },
+        {
+          "id": "A-17",
+          "description": "R-14: two runs on the same text produce identical JSON",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-14"
         }
       ],
       "notes": ""
@@ -2266,7 +3134,8 @@
         "WP-7",
         "WP-8",
         "WP-9",
-        "WP-11"
+        "WP-11",
+        "WP-14"
       ],
       "satisfies": [
         "R-11",

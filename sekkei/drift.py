@@ -100,17 +100,22 @@ def _imports(file: Path, root: Path) -> list[tuple[str, Path]]:
                         break
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
-            for cand in _module_candidates(mod, node.level, file, root):
-                if cand.exists():
-                    out.append((mod or ".", cand))
-                    break
-            # `from pkg import submodule` resolves per name
+            # `from pkg import submodule` resolves per name; when at least one name is a
+            # submodule the dependency is on those modules, not on the package's __init__
+            submodules: list[tuple[str, Path]] = []
             for alias in node.names:
                 sub = f"{mod}.{alias.name}" if mod else alias.name
                 for cand in _module_candidates(sub, node.level, file, root):
                     if cand.exists():
-                        out.append((sub, cand))
+                        submodules.append((sub, cand))
                         break
+            if submodules:
+                out.extend(submodules)
+                continue
+            for cand in _module_candidates(mod, node.level, file, root):
+                if cand.exists():
+                    out.append((mod or ".", cand))
+                    break
     return out
 
 

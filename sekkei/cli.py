@@ -255,20 +255,81 @@ def cmd_prompt(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_draft(args: argparse.Namespace) -> int:
+def _progress(kind: str, data: dict) -> None:
+    if kind == "round":
+        c = R.summary(data["diagnostics"])
+        sys.stderr.write(f"{data['phase']} round {data['round']}: {c['error']} error(s), {c['warning']} warning(s)\n")
+    elif kind == "review":
+        sys.stderr.write(f"review pass {data['pass_']}: {data['findings']} finding(s)\n")
+    elif kind == "revise_failed":
+        sys.stderr.write("revision did not lint clean; keeping the previous design\n")
+
+
+def _backend(args: argparse.Namespace):
+    from .llm import get_backend
+
+    try:
+        return get_backend(args.backend, args.model)
+    except RuntimeError as exc:
+        sys.exit(f"error: {exc}")
+
+
+def cmd_design(args: argparse.Namespace) -> int:
+    """requirements text -> complete, lint-clean design, with no model: the engine."""
+    from .engine import design as run_engine
+
+    text = Path(args.input).read_text(encoding="utf-8")
+    result = run_engine(text)
+    M.dump(result.design, args.output)
+    print(f"wrote {args.output}: {len(result.design.requirements)} requirements, {len(result.design.components)} components, "
+          f"{len(result.design.interfaces)} interfaces, {len(result.design.decisions)} decisions, "
+          f"{len(result.design.work_packages)} work packages")
+    if args.render:
+        Path(args.render).write_text(RD.render_markdown(result.design), encoding="utf-8")
+        print(f"wrote {args.render}")
+    if args.review:
+        Path(args.review).write_text(result.review.to_markdown(), encoding="utf-8")
+        print(f"wrote {args.review}")
+    if args.trace:
+        Path(args.trace).write_text(json.dumps(result.trace_json(), indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"wrote {args.trace}")
+    for line in result.log:
+        print("  repair: " + line)
+    sys.stdout.write(R.format_text(result.diagnostics, hints=False))
+    an = result.analysis
+    print("recognised patterns: " + (", ".join(an.patterns) or "(none; layered fallback)"))
+    print("active qualities: " + (", ".join(f"{q}={w}" for q, w in an.qualities.items()) or "(none)"))
+    for x in result.design.decisions:
+        print(f"  {x.id} {x.title}: {x.choice}")
+    if result.review.needs_human:
+        print("needs a human: " + "; ".join(
+            [f"{len(result.review.unrecognised)} unrecognised requirement(s)"] * bool(result.review.unrecognised)
+            + [f"{len(result.review.unaddressed)} unaddressed quality(ies)"] * bool(result.review.unaddressed)
+            + [f"{len(result.review.generic)} generic component(s)"] * bool(result.review.generic)))
+    return 0 if result.ok else 1
+
+
+def cmd_draft_model(args: argparse.Namespace) -> int:
+    """Model-based drafting (optional): draft, lint loop, and with --review the architect review + revise."""
+    from .llm import design as llm_design
     from .llm import draft
 
     text = Path(args.input).read_text(encoding="utf-8")
-
-    def progress(n: int, diags: list[R.Diagnostic]) -> None:
-        c = R.summary(diags)
-        sys.stderr.write(f"round {n}: {c['error']} error(s), {c['warning']} warning(s)\n")
-
-    result = draft(text, model=args.model, rounds=args.rounds, on_round=progress)
+    backend = _backend(args)
+    sys.stderr.write(f"backend: {backend.name}\n")
+    try:
+        if args.review:
+            result = llm_design(text, backend=backend, rounds=args.rounds, review_rounds=1, on_event=_progress)
+            for f in result.findings:
+                print(f"  review [{f.severity}/{f.area}] {f.finding}")
+        else:
+            result = draft(text, backend=backend, rounds=args.rounds, on_event=_progress)
+    except RuntimeError as exc:
+        sys.exit(f"error: {exc}")
     if result.design is None:
         sys.exit("error: the model never returned a parseable design")
     M.dump(result.design, args.output)
-    print(f"wrote {args.output} after {result.rounds} round(s)")
+    print(f"wrote {args.output}")
     sys.stdout.write(R.format_text(result.diagnostics, hints=False))
     return 0 if result.ok else 1
 
@@ -360,11 +421,26 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-schema", action="store_true")
     sp.add_argument("-o", "--output")
 
-    sp = add("draft", cmd_draft, "ask Claude for a design from a requirements text (needs sekkei[llm])", design=False)
+    def model_args(sp):
+        sp.add_argument("--backend", choices=["auto", "claude-code", "anthropic"], default="auto",
+                        help="claude-code = local `claude -p` (default when on PATH); anthropic = the SDK")
+        sp.add_argument("--model", help="model id; default: the backend's default")
+        sp.add_argument("--rounds", type=int, default=3, help="lint feedback rounds per phase")
+
+    sp = add("design", cmd_design, "design a system from a requirements text (no model needed)", design=False)
+    sp.add_argument("input", help="requirements text file (Markdown or plain text)")
+    sp.add_argument("-o", "--output", default="design.json")
+    sp.add_argument("--render", metavar="DESIGN.md", help="also write the Markdown design document")
+    sp.add_argument("--review", metavar="REVIEW.md", help="also write the engine's review of its own design")
+    sp.add_argument("--trace", metavar="TRACE.json", help="also write the element-to-sentence/rule trace")
+
+    sp = add("draft", cmd_draft_model, "optional: draft a design with a model, lint with feedback; --review adds the architect review", design=False)
     sp.add_argument("input", help="requirements text file")
     sp.add_argument("-o", "--output", default="design.json")
-    sp.add_argument("--model", default="claude-opus-5")
-    sp.add_argument("--rounds", type=int, default=3)
+    sp.add_argument("--review", action="store_true", help="add the senior-architect review and revision pass")
+    sp.add_argument("--backend", choices=["auto", "claude-code", "anthropic"], default="auto")
+    sp.add_argument("--model", help="model id; default: the backend's default")
+    sp.add_argument("--rounds", type=int, default=3, help="lint feedback rounds per phase")
     return p
 
 

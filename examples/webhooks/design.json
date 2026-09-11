@@ -1,0 +1,2966 @@
+{
+  "sekkei": "1",
+  "name": "webhook-delivery-service",
+  "version": "0.1.0",
+  "summary": "We run a SaaS.",
+  "goals": [
+    "Clients read and write domain resources over HTTP.",
+    "Customers or operators manage resources through an authenticated API.",
+    "Producers hand events to the system, which persists them before acknowledging.",
+    "Work is queued durably and performed by workers with a retry schedule.",
+    "Outbound requests carry an HMAC signature; secrets rotate with a grace window.",
+    "The system notifies people through an external channel.",
+    "Targets that keep failing are disabled by policy and the owner is told.",
+    "Metrics, structured logs and health endpoints for operations."
+  ],
+  "non_goals": [],
+  "conventions": {
+    "language": "python",
+    "test_command": "python -m pytest -q",
+    "lint_command": "ruff check .",
+    "rules": [
+      "Type hints on every public function; dataclasses or pydantic for records.",
+      "No business logic in the HTTP layer.",
+      "Every management route goes through the authentication middleware; no route is exempt without a decision.",
+      "Every component logs one structured line per unit of work with the correlation id.",
+      "No in-process state that a second instance would not see; instances are interchangeable.",
+      "Prefer the boring option; a new piece of infrastructure needs a decision record.",
+      "Python 3.12 as stated in the constraints.",
+      "Stateless processes: configuration from the environment, no local files that a second instance would not see."
+    ],
+    "definition_of_done": [
+      "Acceptance checks of the package pass.",
+      "No file outside the write scope changed.",
+      "Every public operation of the implemented interfaces exists with the declared inputs."
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R-1",
+      "statement": "Customers register webhook endpoints; when things happen in our platform (order.created, order.paid, refund.issued, ...) we must deliver a signed JSON event to every endpoint subscribed to that event type.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-2",
+      "statement": "Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose event types, rotate the signing secret.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-3",
+      "statement": "Internal services publish events through an internal API (HTTP or in-process call).",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-4",
+      "statement": "Each event is delivered at least once to every matching endpoint. Deliveries are retried with exponential backoff (1 min, 5 min, 30 min, 2 h, 12 h; 5 attempts) on 5xx/timeout. 4xx (except 429) is final failure. 429 honours Retry-After.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-5",
+      "statement": "Every delivery carries an HMAC-SHA256 signature over the body with the endpoint's current secret, plus a timestamp header; after rotation, both old and new secrets are valid for 24 h.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-6",
+      "statement": "Customers can see delivery attempts per event (status, response code, timestamps) and manually redeliver.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-7",
+      "statement": "Endpoints that fail continuously for 3 days are disabled automatically and the customer is notified by email.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-8",
+      "statement": "1,000 events/s sustained publish rate, 5,000 endpoints; delivery latency p95 under 5 s for a healthy endpoint.",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "p95 latency at 1,000, 5,000",
+        "target": "< 5 s",
+        "unit": "s"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-9",
+      "statement": "No event lost on process crash (persist before ack).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "records lost across a process crash",
+        "target": "= 0",
+        "unit": "records"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-10",
+      "statement": "Per-endpoint isolation: one slow endpoint must not delay others.",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "p95 latency of healthy targets while one target stalls",
+        "target": "within the stated latency target",
+        "unit": ""
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-11",
+      "statement": "Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "required metrics exposed",
+        "target": "= all listed",
+        "unit": ""
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-12",
+      "statement": "Python 3.12, PostgreSQL available, Redis available. Single region. Team of 3.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-13",
+      "statement": "Must run as a set of stateless containers behind our existing ingress.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": ""
+    }
+  ],
+  "components": [
+    {
+      "id": "C-1",
+      "name": "Store",
+      "responsibility": "Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
+      "kind": "datastore",
+      "path": "app/store.py",
+      "requires": [],
+      "satisfies": [
+        "R-9",
+        "R-12"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:store"
+      ]
+    },
+    {
+      "id": "C-2",
+      "name": "Work queue",
+      "responsibility": "Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.",
+      "kind": "datastore",
+      "path": "app/queue.py",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-3",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-9",
+        "R-10"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:queue"
+      ]
+    },
+    {
+      "id": "C-3",
+      "name": "Secret store",
+      "responsibility": "Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
+      "kind": "datastore",
+      "path": "app/secrets.py",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-5"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:secrets"
+      ]
+    },
+    {
+      "id": "C-4",
+      "name": "Email provider",
+      "responsibility": "External email delivery service.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-7"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:email"
+      ]
+    },
+    {
+      "id": "C-5",
+      "name": "Customer endpoint",
+      "responsibility": "The customer's HTTPS receiver; outside our control.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:endpoint"
+      ]
+    },
+    {
+      "id": "C-6",
+      "name": "Domain core",
+      "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "kind": "module",
+      "path": "app/core.py",
+      "requires": [
+        "I-1",
+        "I-10",
+        "I-3",
+        "I-9"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-7",
+        "R-12"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:core"
+      ]
+    },
+    {
+      "id": "C-7",
+      "name": "Outbound HTTP client",
+      "responsibility": "Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome.",
+      "kind": "module",
+      "path": "app/dispatcher.py",
+      "requires": [
+        "I-10"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:dispatcher"
+      ]
+    },
+    {
+      "id": "C-8",
+      "name": "Signer",
+      "responsibility": "Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
+      "kind": "module",
+      "path": "app/signer.py",
+      "requires": [
+        "I-3"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-5"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:signer"
+      ]
+    },
+    {
+      "id": "C-9",
+      "name": "Notifier",
+      "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "kind": "module",
+      "path": "app/notifier.py",
+      "requires": [
+        "I-4",
+        "I-10"
+      ],
+      "satisfies": [
+        "R-7"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:notifier"
+      ]
+    },
+    {
+      "id": "C-10",
+      "name": "Observability",
+      "responsibility": "Metrics registry and exposition, structured logging, health/readiness endpoints.",
+      "kind": "module",
+      "path": "app/observability.py",
+      "requires": [],
+      "satisfies": [
+        "R-8",
+        "R-11"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:observability"
+      ]
+    },
+    {
+      "id": "C-11",
+      "name": "Authentication",
+      "responsibility": "Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
+      "kind": "module",
+      "path": "app/auth.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-6"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:auth"
+      ]
+    },
+    {
+      "id": "C-12",
+      "name": "Worker",
+      "responsibility": "Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.",
+      "kind": "job",
+      "path": "app/worker.py",
+      "requires": [
+        "I-2",
+        "I-6",
+        "I-13",
+        "I-10",
+        "I-7",
+        "I-8"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-10",
+        "R-11",
+        "R-13"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:worker"
+      ]
+    },
+    {
+      "id": "C-13",
+      "name": "Scheduler",
+      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "kind": "job",
+      "path": "app/scheduler.py",
+      "requires": [
+        "I-10",
+        "I-2"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-4",
+        "R-5",
+        "R-6"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:scheduler"
+      ]
+    },
+    {
+      "id": "C-14",
+      "name": "Health policy",
+      "responsibility": "Evaluates per-target failure history against the disable policy and applies the consequence.",
+      "kind": "job",
+      "path": "app/policy.py",
+      "requires": [
+        "I-6",
+        "I-9",
+        "I-10"
+      ],
+      "satisfies": [
+        "R-7"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:policy"
+      ]
+    },
+    {
+      "id": "C-15",
+      "name": "Admin HTTP API",
+      "responsibility": "Management surface for operators/customers: resource lifecycle and configuration; authenticated.",
+      "kind": "service",
+      "path": "app/admin_api.py",
+      "requires": [
+        "I-6",
+        "I-11",
+        "I-10",
+        "I-3"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-6",
+        "R-8",
+        "R-11",
+        "R-13"
+      ],
+      "tags": [
+        "layer:3",
+        "archetype:admin_api"
+      ]
+    },
+    {
+      "id": "C-16",
+      "name": "Ingest API",
+      "responsibility": "Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.",
+      "kind": "service",
+      "path": "app/ingest_api.py",
+      "requires": [
+        "I-6",
+        "I-2",
+        "I-10",
+        "I-11"
+      ],
+      "satisfies": [
+        "R-3",
+        "R-8",
+        "R-9",
+        "R-11",
+        "R-13"
+      ],
+      "tags": [
+        "layer:3",
+        "archetype:ingest_api"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "I-1",
+      "name": "Store interface",
+      "owner": "C-1",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "save",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "record",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "id",
+          "errors": [
+            "ConflictError on duplicate key"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": ""
+        },
+        {
+          "name": "get",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "record | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "list",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "filter",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "list[record], next page token",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "delete",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Store. "
+    },
+    {
+      "id": "I-2",
+      "name": "Work queue interface",
+      "owner": "C-2",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "enqueue",
+          "inputs": [
+            {
+              "name": "item",
+              "type": "WorkItem",
+              "description": ""
+            },
+            {
+              "name": "not_before",
+              "type": "datetime | None",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "item is durable before return",
+          "description": ""
+        },
+        {
+          "name": "lease",
+          "inputs": [
+            {
+              "name": "partition",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "limit",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "visibility",
+              "type": "timedelta",
+              "description": ""
+            }
+          ],
+          "output": "list[WorkItem]",
+          "errors": [],
+          "pre": "items whose not_before has passed",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "ack",
+          "inputs": [
+            {
+              "name": "item_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "nack",
+          "inputs": [
+            {
+              "name": "item_id",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "retry_at",
+              "type": "datetime | None",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "re-queue with a delay, or dead-letter when retries are exhausted"
+        },
+        {
+          "name": "depth",
+          "inputs": [
+            {
+              "name": "partition",
+              "type": "str | None",
+              "description": ""
+            }
+          ],
+          "output": "int",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Work queue. "
+    },
+    {
+      "id": "I-3",
+      "name": "Secret store interface",
+      "owner": "C-3",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "current",
+          "inputs": [
+            {
+              "name": "endpoint_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[Secret] valid now",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "rotate",
+          "inputs": [
+            {
+              "name": "endpoint_id",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "grace",
+              "type": "timedelta",
+              "description": ""
+            }
+          ],
+          "output": "Secret new",
+          "errors": [],
+          "pre": "stated values: 24 h (R-5)",
+          "post": "old secret stays valid until now + grace",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Secret store. "
+    },
+    {
+      "id": "I-4",
+      "name": "Email provider interface",
+      "owner": "C-4",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "send",
+          "inputs": [
+            {
+              "name": "to",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "subject",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "body",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "provider message id",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Email provider. External; contract is theirs."
+    },
+    {
+      "id": "I-5",
+      "name": "Customer endpoint interface",
+      "owner": "C-5",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "POST <url>",
+          "inputs": [
+            {
+              "name": "body",
+              "type": "json",
+              "description": ""
+            },
+            {
+              "name": "signature headers",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "2xx on acceptance",
+          "errors": [
+            "4xx final",
+            "5xx retry",
+            "429 with Retry-After"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Customer endpoint. External; contract is theirs."
+    },
+    {
+      "id": "I-6",
+      "name": "Domain core interface",
+      "owner": "C-6",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "register_endpoints",
+          "inputs": [
+            {
+              "name": "endpoints",
+              "type": "Endpoints | id",
+              "description": ""
+            }
+          ],
+          "output": "Endpoints | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
+        },
+        {
+          "name": "deliver_event",
+          "inputs": [
+            {
+              "name": "event",
+              "type": "Event | id",
+              "description": ""
+            }
+          ],
+          "output": "Event | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
+        },
+        {
+          "name": "sign_event",
+          "inputs": [
+            {
+              "name": "event",
+              "type": "Event | id",
+              "description": ""
+            }
+          ],
+          "output": "Event | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
+        },
+        {
+          "name": "manage_endpoints",
+          "inputs": [
+            {
+              "name": "endpoints",
+              "type": "Endpoints | id",
+              "description": ""
+            }
+          ],
+          "output": "Endpoints | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "create_endpoints",
+          "inputs": [
+            {
+              "name": "endpoints",
+              "type": "Endpoints | id",
+              "description": ""
+            }
+          ],
+          "output": "Endpoints | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "list_endpoints",
+          "inputs": [
+            {
+              "name": "endpoints",
+              "type": "Endpoints | id",
+              "description": ""
+            }
+          ],
+          "output": "Endpoints | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "delete_endpoints",
+          "inputs": [
+            {
+              "name": "endpoints",
+              "type": "Endpoints | id",
+              "description": ""
+            }
+          ],
+          "output": "Endpoints | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "set_types",
+          "inputs": [
+            {
+              "name": "types",
+              "type": "Types | id",
+              "description": ""
+            }
+          ],
+          "output": "Types | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "rotate_secret",
+          "inputs": [
+            {
+              "name": "secret",
+              "type": "Secret | id",
+              "description": ""
+            }
+          ],
+          "output": "Secret | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "sign_secret",
+          "inputs": [
+            {
+              "name": "secret",
+              "type": "Secret | id",
+              "description": ""
+            }
+          ],
+          "output": "Secret | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "publish_events",
+          "inputs": [
+            {
+              "name": "events",
+              "type": "Events | id",
+              "description": ""
+            }
+          ],
+          "output": "Events | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-3: Internal services publish events through an internal API (HTTP or in-process call)."
+        },
+        {
+          "name": "get_attempts",
+          "inputs": [
+            {
+              "name": "attempts",
+              "type": "Attempts | id",
+              "description": ""
+            }
+          ],
+          "output": "Attempts | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
+        },
+        {
+          "name": "redeliver_timestamps",
+          "inputs": [
+            {
+              "name": "timestamps",
+              "type": "Timestamps | id",
+              "description": ""
+            }
+          ],
+          "output": "Timestamps | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
+        },
+        {
+          "name": "disable_fail",
+          "inputs": [
+            {
+              "name": "fail",
+              "type": "Fail | id",
+              "description": ""
+            }
+          ],
+          "output": "Fail | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
+        },
+        {
+          "name": "notify_customer",
+          "inputs": [
+            {
+              "name": "customer",
+              "type": "Customer | id",
+              "description": ""
+            }
+          ],
+          "output": "Customer | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Domain core. "
+    },
+    {
+      "id": "I-7",
+      "name": "Outbound HTTP client interface",
+      "owner": "C-7",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "post",
+          "inputs": [
+            {
+              "name": "url",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "body",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "headers",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "timeout",
+              "type": "float",
+              "description": ""
+            }
+          ],
+          "output": "Outcome(status, latency, retry_after)",
+          "errors": [
+            "TimeoutError",
+            "ConnectionError",
+            "BlockedAddressError"
+          ],
+          "pre": "url resolves to a public address",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Outbound HTTP client. "
+    },
+    {
+      "id": "I-8",
+      "name": "Signer interface",
+      "owner": "C-8",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "sign",
+          "inputs": [
+            {
+              "name": "body",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "timestamp",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "secret",
+              "type": "bytes",
+              "description": ""
+            }
+          ],
+          "output": "signature hex",
+          "errors": [],
+          "pre": "",
+          "post": "HMAC-SHA256(timestamp + '.' + body)",
+          "description": ""
+        },
+        {
+          "name": "headers",
+          "inputs": [
+            {
+              "name": "body",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "secrets",
+              "type": "list[bytes]",
+              "description": ""
+            }
+          ],
+          "output": "dict of signature headers",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "one header per valid secret during a rotation window"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Signer. "
+    },
+    {
+      "id": "I-9",
+      "name": "Notifier interface",
+      "owner": "C-9",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "notify",
+          "inputs": [
+            {
+              "name": "recipient",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "template",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "context",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "message id",
+          "errors": [
+            "NotifyError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Notifier. "
+    },
+    {
+      "id": "I-10",
+      "name": "Observability interface",
+      "owner": "C-10",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "counter",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Counter",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "histogram",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Histogram",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "gauge",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Gauge",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "GET /metrics",
+          "inputs": [],
+          "output": "Prometheus text exposition",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "GET /healthz",
+          "inputs": [],
+          "output": "200 when dependencies reachable",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "log",
+          "inputs": [
+            {
+              "name": "event",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "fields",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "one JSON line per event"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Observability. "
+    },
+    {
+      "id": "I-11",
+      "name": "Authentication interface",
+      "owner": "C-11",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "authenticate",
+          "inputs": [
+            {
+              "name": "credentials",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Principal",
+          "errors": [
+            "AuthError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "authorize",
+          "inputs": [
+            {
+              "name": "principal",
+              "type": "Principal",
+              "description": ""
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "resource",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [
+            "Forbidden"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Authentication. "
+    },
+    {
+      "id": "I-12",
+      "name": "Worker interface",
+      "owner": "C-12",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "run_once",
+          "inputs": [
+            {
+              "name": "partition",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "int processed",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "one lease/process/ack cycle; the loop and concurrency live in the process entry point"
+        },
+        {
+          "name": "process",
+          "inputs": [
+            {
+              "name": "item",
+              "type": "WorkItem",
+              "description": ""
+            }
+          ],
+          "output": "Outcome",
+          "errors": [
+            "DeliveryError"
+          ],
+          "pre": "",
+          "post": "outcome recorded through core before ack",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Worker. "
+    },
+    {
+      "id": "I-13",
+      "name": "Scheduler interface",
+      "owner": "C-13",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "next_attempt",
+          "inputs": [
+            {
+              "name": "attempt",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "retry_after",
+              "type": "timedelta | None",
+              "description": ""
+            }
+          ],
+          "output": "datetime | None",
+          "errors": [],
+          "pre": "stated values: 1 min (R-4); 5 min (R-4); 30 min (R-4); 2 h (R-4); 12 h (R-4); 5 attempts (R-4); 24 h (R-5)",
+          "post": "",
+          "description": "None when attempts are exhausted"
+        },
+        {
+          "name": "promote_due",
+          "inputs": [
+            {
+              "name": "now",
+              "type": "datetime",
+              "description": ""
+            }
+          ],
+          "output": "int moved",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Scheduler. "
+    },
+    {
+      "id": "I-14",
+      "name": "Health policy interface",
+      "owner": "C-14",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "evaluate",
+          "inputs": [
+            {
+              "name": "now",
+              "type": "datetime",
+              "description": ""
+            }
+          ],
+          "output": "list[action taken]",
+          "errors": [],
+          "pre": "stated values: 3 days (R-7)",
+          "post": "",
+          "description": "disables targets failing continuously beyond the window and notifies"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Health policy. "
+    },
+    {
+      "id": "I-15",
+      "name": "Admin HTTP API interface",
+      "owner": "C-15",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "POST /endpoints",
+          "inputs": [
+            {
+              "name": "body",
+              "type": "endpoints fields",
+              "description": ""
+            }
+          ],
+          "output": "201 {endpoints id}",
+          "errors": [
+            "400 invalid body",
+            "401 unauthenticated",
+            "409 conflict"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
+        },
+        {
+          "name": "GET /endpoints",
+          "inputs": [
+            {
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
+              "description": ""
+            }
+          ],
+          "output": "200 [endpoints], next cursor",
+          "errors": [
+            "401 unauthenticated"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "DELETE /endpoints/{id}",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "204",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "POST /secrets/{id}/rotate",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 rotate accepted",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
+        },
+        {
+          "name": "GET /attempts/{id}",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "200 attempts",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
+        },
+        {
+          "name": "POST /timestamps/{id}/redeliver",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 redeliver accepted",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Admin HTTP API. "
+    },
+    {
+      "id": "I-16",
+      "name": "Ingest API interface",
+      "owner": "C-16",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "POST /events",
+          "inputs": [
+            {
+              "name": "type",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "payload",
+              "type": "json",
+              "description": ""
+            },
+            {
+              "name": "idempotency_key",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 {event_id}",
+          "errors": [
+            "400 invalid payload",
+            "409 duplicate idempotency key"
+          ],
+          "pre": "",
+          "post": "event persisted and enqueued before 202",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Ingest API. "
+    }
+  ],
+  "entities": [
+    {
+      "id": "E-1",
+      "name": "Record",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Generic domain record; refine per entity found in the requirements."
+    },
+    {
+      "id": "E-2",
+      "name": "Principal",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "kind",
+          "type": "enum(customer, operator, service)",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "scopes",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-3",
+      "name": "Event",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "type",
+          "type": "str",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "payload",
+          "type": "json",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "idempotency_key",
+          "type": "str",
+          "constraints": "unique per producer",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-4",
+      "name": "WorkItem",
+      "owner": "C-2",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "partition",
+          "type": "str",
+          "constraints": "indexed; the isolation key",
+          "description": ""
+        },
+        {
+          "name": "payload_ref",
+          "type": "uuid",
+          "constraints": "references the event",
+          "description": ""
+        },
+        {
+          "name": "attempt",
+          "type": "int",
+          "constraints": ">= 0",
+          "description": ""
+        },
+        {
+          "name": "not_before",
+          "type": "timestamp",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "leased_until",
+          "type": "timestamp | null",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-5",
+      "name": "DeliveryAttempt",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "work_item_id",
+          "type": "uuid",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "attempt",
+          "type": "int",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(success, retry, failed)",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "response_code",
+          "type": "int | null",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "error",
+          "type": "str | null",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-6",
+      "name": "Endpoint",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "url",
+          "type": "https url",
+          "constraints": "validated; no private addresses",
+          "description": ""
+        },
+        {
+          "name": "event_types",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "enabled",
+          "type": "bool",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "disabled_reason",
+          "type": "str | null",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "failing_since",
+          "type": "timestamp | null",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-7",
+      "name": "Secret",
+      "owner": "C-3",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "endpoint_id",
+          "type": "uuid",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "value",
+          "type": "bytes",
+          "constraints": "encrypted at rest",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "valid_until",
+          "type": "timestamp | null",
+          "constraints": "set on rotation",
+          "description": ""
+        }
+      ],
+      "description": ""
+    }
+  ],
+  "flows": [
+    {
+      "id": "F-1",
+      "name": "Manage a resource",
+      "trigger": "authenticated management request",
+      "steps": [
+        {
+          "from": "C-15",
+          "to": "C-11",
+          "via": "I-11",
+          "description": "authenticate and authorize"
+        },
+        {
+          "from": "C-15",
+          "to": "C-6",
+          "via": "I-6",
+          "description": "apply the change"
+        },
+        {
+          "from": "C-6",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "persist"
+        }
+      ]
+    },
+    {
+      "id": "F-2",
+      "name": "Publish an event",
+      "trigger": "producer calls the ingest API",
+      "steps": [
+        {
+          "from": "C-16",
+          "to": "C-6",
+          "via": "I-6",
+          "description": "validate the event against known types"
+        },
+        {
+          "from": "C-6",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "persist the event"
+        },
+        {
+          "from": "C-16",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "enqueue one work item per matching target; ack only after both are durable"
+        }
+      ]
+    },
+    {
+      "id": "F-3",
+      "name": "Deliver a work item",
+      "trigger": "worker leases due items",
+      "steps": [
+        {
+          "from": "C-12",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "lease items of one partition"
+        },
+        {
+          "from": "C-12",
+          "to": "C-6",
+          "via": "I-6",
+          "description": "load target, secrets and payload"
+        },
+        {
+          "from": "C-12",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "ack on success, nack with retry_at on retryable failure, dead-letter when exhausted"
+        }
+      ]
+    },
+    {
+      "id": "F-4",
+      "name": "Retry after failure",
+      "trigger": "scheduler tick",
+      "steps": [
+        {
+          "from": "C-13",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "promote items whose not_before has passed"
+        }
+      ]
+    },
+    {
+      "id": "F-5",
+      "name": "Disable a continuously failing target",
+      "trigger": "policy tick",
+      "steps": [
+        {
+          "from": "C-14",
+          "to": "C-6",
+          "via": "I-6",
+          "description": "read failure history and disable the target"
+        },
+        {
+          "from": "C-14",
+          "to": "C-9",
+          "via": "I-9",
+          "description": "notify the owner"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-1",
+      "title": "API style",
+      "context": "Clients need a programmable surface.",
+      "options": [
+        {
+          "name": "REST/JSON over HTTP",
+          "pros": [
+            "universal tooling",
+            "cacheable reads"
+          ],
+          "cons": [
+            "over-fetching on nested data"
+          ]
+        },
+        {
+          "name": "gRPC",
+          "pros": [
+            "typed contracts",
+            "streaming"
+          ],
+          "cons": [
+            "browser and debugging friction"
+          ]
+        },
+        {
+          "name": "GraphQL",
+          "pros": [
+            "flexible queries"
+          ],
+          "cons": [
+            "complexity budget for a small team"
+          ]
+        }
+      ],
+      "choice": "REST/JSON over HTTP",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). REST/JSON over HTTP: 1.44; gRPC: 1.31; GraphQL: 1.16",
+      "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
+      "affects": [
+        "C-15"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-2",
+      "title": "Primary store",
+      "context": "Domain records need durable, queryable storage.",
+      "options": [
+        {
+          "name": "PostgreSQL",
+          "pros": [
+            "transactions",
+            "indexes and JSON",
+            "already available"
+          ],
+          "cons": [
+            "operational dependency"
+          ]
+        },
+        {
+          "name": "SQLite",
+          "pros": [
+            "zero operations",
+            "single file"
+          ],
+          "cons": [
+            "one writer at a time",
+            "no network access"
+          ]
+        },
+        {
+          "name": "Files (JSON/CSV on disk)",
+          "pros": [
+            "no dependencies",
+            "human readable"
+          ],
+          "cons": [
+            "no transactions or concurrency"
+          ]
+        },
+        {
+          "name": "In-memory",
+          "pros": [
+            "fastest",
+            "trivial"
+          ],
+          "cons": [
+            "lost on restart"
+          ]
+        }
+      ],
+      "choice": "PostgreSQL",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL: 3.34; In-memory: 1.44; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
+      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "affects": [
+        "C-1"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-3",
+      "title": "Caller authentication",
+      "context": "Management operations must be attributable to a customer or operator.",
+      "options": [
+        {
+          "name": "API keys per customer, hashed at rest, sent as a bearer token",
+          "pros": [
+            "simple",
+            "scriptable"
+          ],
+          "cons": [
+            "no delegation or expiry unless added"
+          ]
+        },
+        {
+          "name": "OAuth2 / OIDC with the platform's identity provider",
+          "pros": [
+            "single sign-on",
+            "expiry and scopes"
+          ],
+          "cons": [
+            "integration effort"
+          ]
+        },
+        {
+          "name": "Mutual TLS",
+          "pros": [
+            "strong",
+            "no secrets in headers"
+          ],
+          "cons": [
+            "certificate lifecycle for every customer"
+          ]
+        }
+      ],
+      "choice": "API keys per customer, hashed at rest, sent as a bearer token",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)",
+      "consequences": "Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "affects": [
+        "C-11",
+        "C-15"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-4",
+      "title": "How producers publish",
+      "context": "Internal services must hand events to the system.",
+      "options": [
+        {
+          "name": "HTTP publish endpoint with idempotency keys",
+          "pros": [
+            "language-agnostic",
+            "one contract"
+          ],
+          "cons": [
+            "one network hop",
+            "callers need retries"
+          ]
+        },
+        {
+          "name": "In-process client library that writes the outbox in the caller's transaction",
+          "pros": [
+            "no lost events at the source"
+          ],
+          "cons": [
+            "couples callers to our schema and language"
+          ]
+        },
+        {
+          "name": "Message bus topic",
+          "pros": [
+            "decoupled"
+          ],
+          "cons": [
+            "new infrastructure"
+          ]
+        }
+      ],
+      "choice": "HTTP publish endpoint with idempotency keys",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). HTTP publish endpoint with idempotency keys: 1.94; In-process client library that writes the outbox: 1.66; Message bus topic: unavailable (needs broker, not in the constraints)",
+      "consequences": "Not choosing 'In-process client library that writes the outbox' gives up: no lost events at the source.",
+      "affects": [
+        "C-16"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-5",
+      "title": "Work queue technology",
+      "context": "Work items must survive a crash and be leased by several workers.",
+      "options": [
+        {
+          "name": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
+          "pros": [
+            "transactional with the domain data (persist + enqueue atomically)",
+            "no new infrastructure",
+            "easy to inspect"
+          ],
+          "cons": [
+            "throughput bounded by the database (fine to ~10k items/s)",
+            "needs a vacuum-friendly schema"
+          ]
+        },
+        {
+          "name": "Redis Streams with consumer groups",
+          "pros": [
+            "high throughput",
+            "built-in consumer groups and pending lists"
+          ],
+          "cons": [
+            "durability depends on AOF/fsync configuration",
+            "separate from the transactional store: needs an outbox"
+          ]
+        },
+        {
+          "name": "Managed broker (SQS/RabbitMQ/Kafka)",
+          "pros": [
+            "scales independently",
+            "delayed delivery built in (SQS)"
+          ],
+          "cons": [
+            "new infrastructure and cost",
+            "at-least-once semantics still need an outbox"
+          ]
+        },
+        {
+          "name": "In-memory queue",
+          "pros": [
+            "simplest possible"
+          ],
+          "cons": [
+            "work is lost on crash",
+            "single process only"
+          ]
+        }
+      ],
+      "choice": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.37; Redis Streams with consumer groups: 2.01; In-memory queue: 1.44; Managed broker: unavailable (needs broker, not in the constraints)",
+      "consequences": "Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.",
+      "affects": [
+        "C-2",
+        "C-16",
+        "C-12"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-6",
+      "title": "Where delayed retries wait",
+      "context": "Failed deliveries must run again at a computed future time.",
+      "options": [
+        {
+          "name": "not_before column on the work item; the scheduler promotes due rows",
+          "pros": [
+            "one durable store for queued and delayed items",
+            "trivial to inspect and to redeliver manually"
+          ],
+          "cons": [
+            "a periodic scan (index on not_before)"
+          ]
+        },
+        {
+          "name": "Redis sorted set keyed by due time",
+          "pros": [
+            "cheap due-time queries"
+          ],
+          "cons": [
+            "a second store to keep consistent"
+          ]
+        },
+        {
+          "name": "In-process timers",
+          "pros": [
+            "no store"
+          ],
+          "cons": [
+            "lost on restart"
+          ]
+        }
+      ],
+      "choice": "not_before column on the work item; the scheduler promotes due rows",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). not_before column on the work item: 2.08; Redis sorted set keyed by due time: 1.60; In-process timers: 1.42",
+      "consequences": "Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.",
+      "affects": [
+        "C-13",
+        "C-2"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-7",
+      "title": "Process topology",
+      "context": "The same code base serves requests and performs background work.",
+      "options": [
+        {
+          "name": "One image, role by flag: `api` and `worker` processes scale independently",
+          "pros": [
+            "stateless containers",
+            "independent scaling of ingress and outbound work",
+            "one build"
+          ],
+          "cons": [
+            "two deployables to operate"
+          ]
+        },
+        {
+          "name": "Single process with background threads",
+          "pros": [
+            "one deployable"
+          ],
+          "cons": [
+            "request latency competes with outbound work",
+            "cannot scale roles separately"
+          ]
+        },
+        {
+          "name": "Separate services per concern (ingest, admin, delivery)",
+          "pros": [
+            "clear ownership"
+          ],
+          "cons": [
+            "three deployables for a team of three",
+            "shared schema anyway"
+          ]
+        }
+      ],
+      "choice": "One image, role by flag: `api` and `worker` processes scale independently",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). One image, role by flag: `api` and `worker` proc: 1.84; Separate services per concern: 1.58; Single process with background threads: 1.43",
+      "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
+      "affects": [
+        "C-15",
+        "C-16",
+        "C-12",
+        "C-13",
+        "C-14"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-8",
+      "title": "Outbound request safety",
+      "context": "The system makes HTTP requests to customer-supplied URLs.",
+      "options": [
+        {
+          "name": "Resolve and block private/link-local ranges; pin the resolved IP; cap body size and redirects; per-request timeout",
+          "pros": [
+            "closes SSRF and slow-loris classes"
+          ],
+          "cons": [
+            "a resolver step per request"
+          ]
+        },
+        {
+          "name": "Plain HTTP client with a timeout",
+          "pros": [
+            "simplest"
+          ],
+          "cons": [
+            "SSRF into internal networks",
+            "unbounded response bodies"
+          ]
+        }
+      ],
+      "choice": "Resolve and block private/link-local ranges; pin the resolved IP; cap body size and redirects; per-request timeout",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Resolve and block private/link-local ranges: 1.49; Plain HTTP client with a timeout: 1.19",
+      "consequences": "Not choosing 'Plain HTTP client with a timeout' gives up: simplest.",
+      "affects": [
+        "C-7"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-9",
+      "title": "Storage of signing secrets",
+      "context": "Per-endpoint secrets are sensitive and must be readable by workers.",
+      "options": [
+        {
+          "name": "Encrypted column (AES-GCM) with a key from the environment/KMS",
+          "pros": [
+            "one store",
+            "workers read directly"
+          ],
+          "cons": [
+            "key rotation procedure needed"
+          ]
+        },
+        {
+          "name": "External secrets manager (Vault/KMS-backed)",
+          "pros": [
+            "audited access",
+            "rotation built in"
+          ],
+          "cons": [
+            "latency and a new dependency on the hot path"
+          ]
+        },
+        {
+          "name": "Plaintext column",
+          "pros": [
+            "simplest"
+          ],
+          "cons": [
+            "database dump exposes every customer secret"
+          ]
+        }
+      ],
+      "choice": "Encrypted column (AES-GCM) with a key from the environment/KMS",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Encrypted column: 1.52; Plaintext column: 1.48; External secrets manager: unavailable (needs vault, not in the constraints)",
+      "consequences": "Not choosing 'Plaintext column' gives up: simplest.",
+      "affects": [
+        "C-3",
+        "C-8"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-10",
+      "title": "Per-target isolation of outbound work",
+      "context": "One slow or failing target must not delay work for the others.",
+      "options": [
+        {
+          "name": "Partition the queue by target; each lease takes one partition with a per-partition concurrency cap",
+          "pros": [
+            "a slow target only occupies its own slot",
+            "fair scheduling across targets"
+          ],
+          "cons": [
+            "more bookkeeping in the queue",
+            "partition count = target count"
+          ]
+        },
+        {
+          "name": "Single FIFO queue with a global worker pool",
+          "pros": [
+            "simplest"
+          ],
+          "cons": [
+            "one slow target blocks pool slots for everyone (head-of-line blocking)"
+          ]
+        },
+        {
+          "name": "Hash targets to N shards, one worker pool per shard",
+          "pros": [
+            "bounded blast radius without per-target state"
+          ],
+          "cons": [
+            "a slow target still delays its shard"
+          ]
+        }
+      ],
+      "choice": "Partition the queue by target; each lease takes one partition with a per-partition concurrency cap",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Partition the queue by target: 1.74; Hash targets to N shards, one worker pool per sh: 1.59; Single FIFO queue with a global worker pool: 1.40",
+      "consequences": "Not choosing 'Hash targets to N shards, one worker pool per sh' gives up: bounded blast radius without per-target state. Not choosing 'Single FIFO queue with a global worker pool' gives up: simplest.",
+      "affects": [
+        "C-2",
+        "C-12"
+      ],
+      "status": "accepted"
+    }
+  ],
+  "risks": [
+    {
+      "id": "K-1",
+      "description": "Payloads or uploads without size limits exhaust memory or disk.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
+      "affects": [
+        "C-16"
+      ]
+    },
+    {
+      "id": "K-2",
+      "description": "Entities evolve; migrations run against live data.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Versioned migrations applied before deploy; additive changes first, removals one release later.",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-3",
+      "description": "A management operation reachable without authentication.",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
+      "affects": [
+        "C-15",
+        "C-11"
+      ]
+    },
+    {
+      "id": "K-4",
+      "description": "At-least-once delivery means a target can receive the same event twice (crash between call and ack).",
+      "likelihood": "high",
+      "impact": "medium",
+      "mitigation": "Send a stable event id and attempt number in headers; document idempotent consumption; never retry on 2xx.",
+      "affects": [
+        "C-12",
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-5",
+      "description": "Many targets fail at once (regional outage) and their retries align, creating a burst.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Add jitter to the backoff schedule and cap concurrent deliveries per partition and globally.",
+      "affects": [
+        "C-13",
+        "C-12"
+      ]
+    },
+    {
+      "id": "K-6",
+      "description": "Customer-supplied URLs can point at internal addresses or metadata services.",
+      "likelihood": "high",
+      "impact": "high",
+      "mitigation": "Resolve before connecting, block private ranges, pin the IP, forbid redirects to non-public hosts.",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-7",
+      "description": "Retried and dead-lettered items accumulate and slow the lease query.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Partial index on (partition, not_before) for live items; archive terminal items on a schedule.",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-8",
+      "description": "Timestamp-based signatures and not_before scheduling depend on wall clocks.",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "Use the database clock for scheduling; tolerate a bounded skew window when verifying timestamps.",
+      "affects": [
+        "C-8",
+        "C-13"
+      ]
+    },
+    {
+      "id": "K-9",
+      "description": "Signing secrets in the database are exposed by a dump or a read-only breach.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Encrypt at rest with a key outside the database; log secret reads; rotate on suspicion.",
+      "affects": [
+        "C-3"
+      ]
+    },
+    {
+      "id": "K-10",
+      "description": "A widespread failure disables many targets and emails every owner at once.",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "Rate-limit notifications per owner and batch them.",
+      "affects": [
+        "C-9",
+        "C-14"
+      ]
+    },
+    {
+      "id": "K-11",
+      "description": "Per-target labels on metrics explode cardinality.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Label by outcome and partition class, not by target id; expose per-target detail through the API instead.",
+      "affects": [
+        "C-10"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "title": "Store + Work queue + Observability",
+      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
+      "components": [
+        "C-1",
+        "C-2",
+        "C-10"
+      ],
+      "implements": [
+        "I-1",
+        "I-2",
+        "I-10"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-1",
+        "R-3",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-9",
+        "R-10",
+        "R-11",
+        "R-12"
+      ],
+      "files": [
+        "app/store.py",
+        "tests/test_store.py",
+        "app/queue.py",
+        "tests/test_queue.py",
+        "app/observability.py",
+        "tests/test_observability.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Store, Work queue, Observability pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_store.py tests/test_queue.py tests/test_observability.py",
+          "metric": ""
+        },
+        {
+          "id": "A-2",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-3",
+          "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
+        },
+        {
+          "id": "A-4",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        },
+        {
+          "id": "A-5",
+          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
+        }
+      ],
+      "notes": "family: crud_api"
+    },
+    {
+      "id": "WP-2",
+      "title": "Secret store",
+      "goal": "Implement Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
+      "components": [
+        "C-3"
+      ],
+      "implements": [
+        "I-3"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-5"
+      ],
+      "files": [
+        "app/secrets.py",
+        "tests/test_secrets.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-6",
+          "description": "unit tests of Secret store pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_secrets.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: signing"
+    },
+    {
+      "id": "WP-3",
+      "title": "Authentication + Outbound HTTP client + Scheduler",
+      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Outbound HTTP client: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "components": [
+        "C-11",
+        "C-7",
+        "C-13"
+      ],
+      "implements": [
+        "I-11",
+        "I-7",
+        "I-13"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-4",
+        "R-5",
+        "R-6"
+      ],
+      "files": [
+        "app/auth.py",
+        "tests/test_auth.py",
+        "app/dispatcher.py",
+        "tests/test_dispatcher.py",
+        "app/scheduler.py",
+        "tests/test_scheduler.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-7",
+          "description": "unit tests of Authentication, Outbound HTTP client, Scheduler pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_auth.py tests/test_dispatcher.py tests/test_scheduler.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: admin_api"
+    },
+    {
+      "id": "WP-4",
+      "title": "Notifier + Signer",
+      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting; Signer: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
+      "components": [
+        "C-9",
+        "C-8"
+      ],
+      "implements": [
+        "I-9",
+        "I-8"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-5",
+        "R-7"
+      ],
+      "files": [
+        "app/notifier.py",
+        "tests/test_notifier.py",
+        "app/signer.py",
+        "tests/test_signer.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "unit tests of Notifier, Signer pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_notifier.py tests/test_signer.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: notification"
+    },
+    {
+      "id": "WP-5",
+      "title": "Domain core",
+      "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "components": [
+        "C-6"
+      ],
+      "implements": [
+        "I-6"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2",
+        "WP-4"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-7",
+        "R-12"
+      ],
+      "files": [
+        "app/core.py",
+        "tests/test_core.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-9",
+          "description": "unit tests of Domain core pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_core.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: crud_api"
+    },
+    {
+      "id": "WP-6",
+      "title": "Admin HTTP API + Worker + Ingest API",
+      "goal": "Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.",
+      "components": [
+        "C-15",
+        "C-12",
+        "C-16"
+      ],
+      "implements": [
+        "I-15",
+        "I-12",
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2",
+        "WP-3",
+        "WP-4",
+        "WP-5"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-4",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-9",
+        "R-10",
+        "R-11",
+        "R-13"
+      ],
+      "files": [
+        "app/admin_api.py",
+        "tests/test_admin_api.py",
+        "app/worker.py",
+        "tests/test_worker.py",
+        "app/ingest_api.py",
+        "tests/test_ingest_api.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-10",
+          "description": "unit tests of Admin HTTP API, Worker, Ingest API pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_ingest_api.py",
+          "metric": ""
+        },
+        {
+          "id": "A-11",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-12",
+          "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
+        },
+        {
+          "id": "A-13",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        },
+        {
+          "id": "A-14",
+          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
+        }
+      ],
+      "notes": "family: admin_api"
+    },
+    {
+      "id": "WP-7",
+      "title": "Health policy",
+      "goal": "Implement Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.",
+      "components": [
+        "C-14"
+      ],
+      "implements": [
+        "I-14"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-4",
+        "WP-5"
+      ],
+      "satisfies": [
+        "R-7"
+      ],
+      "files": [
+        "app/policy.py",
+        "tests/test_policy.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-15",
+          "description": "unit tests of Health policy pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_policy.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: health_policy"
+    }
+  ]
+}

@@ -260,7 +260,25 @@ diff, graph, rules} → model`. `graph` depends on `model` only; `rules`, `rende
 `examples/self/build_design.py`) and enforced by `sekkei check` in the test-suite: an
 import that violates it fails the build.
 
+## 11b. The design engine
+
+`sekkei design REQ.md` synthesises a complete design from a requirements text with no
+model. Its own design document is [docs/ENGINE_DESIGN.md](docs/ENGINE_DESIGN.md); in
+short: `engine/text.py` (segmentation, quantities, modality, verbs) → `engine/analysis.py`
+(requirement units, patterns, qualities, constraints) → `engine/synthesis.py` (archetypes
+merged into components, derived operations, entities, flows, requirement mapping,
+packaging) with `engine/evaluate.py` (scored decisions, self-review) → `engine/repair.py`
+(lint-driven repairs) → `engine/__init__.py` (`design(text)`). The knowledge base is
+`engine/catalog.py`. Dependency direction inside the engine: `__init__ → repair →
+{synthesis, evaluate} → {analysis, catalog} → text`, and everything → `model`; nothing in
+the engine imports `llm`. Components C-13 … C-19 in `examples/self/design.json`.
+
 ## 12. Trade-offs recorded
+
+- **A deterministic engine, not a model, is the design engine (D-6).** It cannot read
+  prose; it can be explained, reproduced and tested. Domains outside the catalogue are
+  handled by the layered fallback and named in the review. Model drafting remains an
+  optional extra (`draft`), never the default.
 
 - **Determinism over cleverness.** No fuzzy matching anywhere. The price is that the
   author must write ids explicitly; the reward is that a green lint means something.

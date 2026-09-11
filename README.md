@@ -1,130 +1,108 @@
 # sekkei
 
-**A design-first harness for LLM coding agents.** sekkei (設計, "design") plays the
-solution architect: it holds the architecture as a *checkable graph*, refuses designs
-that do not check, hands each coding agent a *self-contained brief* for one work package,
-and later verifies that the code still matches the design.
+**A solution-architecture engine and a design-first harness for LLM coding agents.**
+sekkei (設計, "design") takes a requirements text and produces a complete architecture —
+components, contracts, entities, flows, scored decisions, risks, work packages with
+acceptance checks — **without calling a model**, then holds the line while agents build it:
+it lints the design, hands each agent a self-contained brief, refuses stale briefs, and
+checks the code against the design afterwards.
 
-Pure Python standard library, 3.11+. No model is required to use it; an optional extra
-lets Claude draft the first version of a design.
+Pure Python standard library, 3.11+. Deterministic: same text, same design, byte for byte.
 
 ```
-requirements ──satisfied by──▶ components ──own──▶ interfaces
-      ▲                             ▲                  ▲
-      └──── work packages ──build───┘──implement───────┘
-                  │
-                  └── acceptance checks ── prove the requirement
+requirements.md ──sekkei design──▶ design.json ──lint/plan──▶ brief WP-n ──(agent)──▶ accept ──▶ check
+                                       │
+                                       └── DESIGN.md · REVIEW.md (what the engine could not decide) · trace.json
 ```
-
-## Why
-
-LLM agents implement fast and design badly: they start coding before the architecture is
-settled, lose requirements between sessions, and build components in parallel that meet at
-interfaces nobody wrote down. Spec-driven workflows (Spec Kit, Kiro, OpenSpec, BMAD)
-supply templates and prompts, but their "consistency analysis" is itself done by the model
-reading Markdown, so a wrong analysis fails silently ([prior-art notes](docs/PRIOR_ART.md)).
-
-sekkei's position: a design is a **graph with contracts**, and a deterministic program
-should check it, order it, brief it, and verify it. The model proposes and implements;
-sekkei holds the line. Every diagnostic is reproducible from the design file alone.
-
-## What it does
-
-| Command | What you get |
-|---|---|
-| `sekkei init` | a starter `design.json` that lints clean |
-| `sekkei lint` | 36 deterministic rules with stable ids, severities and fix hints; exit 1 on errors |
-| `sekkei plan` | work packages in parallel-safe *waves*, the size-weighted critical path, what is ready now |
-| `sekkei brief WP-3` | a self-contained brief: goal, requirements verbatim, contracts to implement, contracts to consume (do not modify), write scope, conventions, acceptance checks, and the completion-report template |
-| `sekkei check --root .` | drift between design and Python code: missing paths, missing operations, parameter mismatches, **undeclared imports between components** |
-| `sekkei scope WP-3 $(git diff --name-only)` | files an agent touched outside its package |
-| `sekkei accept report.json` | validates the agent's completion report (all checks passed, files in scope, brief not stale) and unlocks dependents |
-| `sekkei diff old.json` | what changed in the design and which packages' briefs that invalidates |
-| `sekkei render` / `graph` / `matrix` | `DESIGN.md` with Mermaid graphs, DOT output, the traceability matrix |
-| `sekkei schema` / `rules` / `prompt` | JSON Schema, the rule table, an architect system prompt for any model |
-| `sekkei draft spec.md` | (optional, `pip install "sekkei[llm]"`) ask Claude for a design, lint, feed the diagnostics back, repeat |
 
 ## Quick start
 
 ```sh
 pip install git+https://github.com/yui9696/sekkei
-sekkei init            # writes design.json (a tiny to-do API) — edit it or replace it
-sekkei lint            # OK: no diagnostics
-sekkei plan            # Waves: 1. WP-1   2. WP-2   Critical path (weight 3): WP-1 -> WP-2
-sekkei brief WP-1      # hand this to the agent
-# ... the agent implements WP-1 and returns report.json ...
-sekkei accept report.json   # accepted WP-1; now ready: WP-2
-sekkei check --root .       # does the code match the design?
+sekkei design requirements.md --render DESIGN.md --review REVIEW.md
+sekkei plan             # waves of work packages, critical path, what is ready now
+sekkei brief WP-1       # hand this to a coding agent
+sekkei accept report.json
+sekkei check --root .   # does the code still match the design?
 ```
 
-With a coding agent such as Claude Code, the loop is: paste the output of `sekkei prompt`
-plus your requirements, let the agent write `design.json`, run `sekkei lint` until clean,
-then feed it one `sekkei brief` at a time and `sekkei accept` its reports. The agent never
-needs to see the whole design.
+Try it on the bundled webhook-delivery spec:
 
-## The rules
+```sh
+sekkei design examples/webhooks/requirements.md --render /tmp/DESIGN.md --review /tmp/REVIEW.md
+```
 
-Rules are grouped by what they protect. A `must` requirement with no component is an
-error; the same for a `should` is a warning, for a `could` an info.
+## The engine
 
-| group | protects | examples |
+A solution architect's job, mechanised into five deterministic steps
+([docs/ENGINE_DESIGN.md](docs/ENGINE_DESIGN.md)):
+
+| step | what happens | where |
 |---|---|---|
-| **S** structure | the file is well-formed | duplicate id, dangling reference, invalid enum value, unknown key (typo), empty design |
-| **C** consistency | the graph agrees with itself | component dependency cycle, flow step through an interface its target does not own, package implements an interface whose owner it does not build, implicit package dependency |
-| **V** coverage | nothing falls through | requirement with no component / no package, component in no package, package without acceptance checks, non-functional requirement without a metric |
-| **A** agent-fitness | one agent can do one package in one session | package without a write scope, two unordered packages that may write the same file, package too large |
-| **Q** wording | text is not vacuous (heuristic; `--disable Q`) | "fast", "robust" without a metric |
+| analyse | sentences → requirement units with modality (must/should/could), kind (functional / non-functional / constraint), the numbers as metrics (`p95 latency < 5 s`, `>= 1000 events/s`), actors, verbs, objects | `engine/text.py`, `engine/analysis.py` |
+| recognise | 22 capability patterns (async delivery with retries, request signing, admin API, event ingest, audit log, batch pipeline, CLI tool, …) and 12 quality attributes matched by signals in the text | `engine/catalog.py` |
+| synthesise | patterns bring archetypes (31), which merge into components with interfaces and operations; entities, flows, requirement-to-component mapping; operations are derived from the verbs and objects of the input sentences | `engine/synthesis.py` |
+| decide | 12 decision points with 36 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
+| package | components are layered, cut into ≤3-component work packages with unique write scopes, ordered by the interfaces they consume; acceptance checks derived from the metrics | `engine/synthesis.py` |
 
-Full table: `sekkei rules` or [docs/RULES.md](docs/RULES.md). Every rule has a planted
-defect in `tests/test_rules.py`, and a meta-test fails if one is missing, so the linter
-cannot be vacuously green.
+Then the engine **reviews its own output**: requirements it did not recognise, quality
+attributes it has no tactic for, generic components from the fallback, assumptions made.
+It says what it does not know instead of hiding it. Every element carries a trace to the
+sentences and catalogue rules that produced it (`--trace`).
 
-## Design file
+What the engine produced for the webhook spec (`examples/webhooks/`): 16 components
+including a partitioned durable queue, worker, retry scheduler carrying the backoff
+schedule from the text as a precondition, HMAC signer with a rotation-window secret store,
+SSRF-safe outbound client, health policy with notifier, admin and ingest APIs with
+operations derived from the sentences (`POST /endpoints`, `DELETE /endpoints/{id}`,
+`POST /secrets/{id}/rotate`, `POST /events`), observability; 10 scored decisions; 7 work
+packages in 5 waves; zero lint diagnostics; nothing unrecognised. Time: 0.05–0.3 s.
 
-JSON, versioned (`"sekkei": "1"`), schema from `sekkei schema`. One decision worth knowing:
-a component *provides* an interface by being its `owner`; there is no separate `provides`
-list, because two lists that must agree will not. Work packages carry `files`, their
-write scope, which is what makes parallel waves safe and out-of-scope edits detectable.
+**Limits, stated plainly.** The engine has no understanding of prose. Its catalogue is
+finite; a domain outside it (the bundled greenhouse-controller fixture) gets a layered
+fallback (surface / core / store / config) and a review that names every unrecognised
+sentence. Operation names come from a verb/object heuristic and carry the sentence they
+came from so a wrong one is easy to spot. This is where a human architect — or a model —
+still earns their keep, and sekkei tells you exactly where that is.
 
-Hand-authoring is easier in the Python DSL (`sekkei lint -d design.py` works directly):
+## The harness
 
-```python
-from sekkei.dsl import DesignBuilder, op, check
+| command | what you get |
+|---|---|
+| `lint` | 36 deterministic rules (structure, consistency, coverage, agent-fitness, wording) with stable ids and fix hints; every rule has a planted-defect test |
+| `plan` | parallel-safe waves (no two concurrent packages share a file), size-weighted critical path, ready packages, `--json` for orchestrators |
+| `brief WP-n` | a self-contained brief: goal, requirements verbatim, contracts to implement, contracts to consume (do not modify), write scope, conventions, acceptance checks, completion-report template |
+| `check --root .` | drift between design and Python code: missing paths/operations, parameter mismatches, **undeclared imports between components** |
+| `scope`, `accept`, `status`, `next`, `diff` | write-scope check for changed files; completion-report validation (all checks passed, files in scope, **brief not stale**); design-version diff naming the packages whose briefs it invalidates |
+| `render`, `graph`, `matrix`, `schema`, `rules` | `DESIGN.md` with Mermaid, DOT, traceability matrix, JSON Schema, the rule table |
+| `draft` (optional) | let a model draft instead: local Claude Code CLI or the `anthropic` SDK, lint feedback rounds, `--review` for a senior-architect review-and-revise pass. Tested with a fake backend only |
 
-b = DesignBuilder("todo-api")
-b.requirement("R-1", "A client can create a to-do item by POSTing a title and gets back its id.")
-b.component("C-1", "Store", "Keeps items in memory in insertion order.", path="app/store.py", satisfies=["R-1"])
-b.interface("I-1", "Store API", owner="C-1", kind="class",
-            operations=[op("add", inputs=[("title", "str")], output="int", errors=["ValueError if empty"])])
-b.work_package("WP-1", "Store", goal="Implement the in-memory store and its tests.",
-               components=["C-1"], implements=["I-1"], satisfies=["R-1"],
-               files=["app/store.py", "tests/test_store.py"],
-               acceptance=[check("A-1", "tests pass", command="python -m pytest -q tests/test_store.py")])
-design = b.build()
-```
+Hand-authoring is also possible: JSON (`sekkei schema`) or a Python DSL (`sekkei.dsl`).
 
-## Dogfood
+## Dogfood and numbers
 
 sekkei's own architecture is [`examples/self/design.json`](examples/self/design.json)
-(source: `examples/self/build_design.py`, prose: [DESIGN.md](DESIGN.md)). The test-suite
-lints it in strict mode and runs `sekkei check` against this repository, so an import that
-violates the declared dependency direction fails the build. The test-suite also plants a
-defect into a copy of that design to prove the drift check is not vacuous on real code.
+(19 components including the engine's seven; prose in [DESIGN.md](DESIGN.md)). The
+test-suite lints it in strict mode and runs `sekkei check` against this repository, so an
+import that violates the declared dependency direction fails the build.
 
-Measured on this repository (Apple Silicon laptop, CPython 3.14, 5 runs):
-`lint` + `check` in-process 0.16–0.32 s; both commands through the CLI 0.56 s wall time.
-122 tests.
+Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
-## Limits, honestly
+| what | value |
+|---|---|
+| tests | 153 |
+| engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) |
+| `sekkei design` on the webhook spec | 0.05–0.3 s |
+| `lint` + `check` on the self design | 0.16–0.32 s |
+| catalogue | 22 patterns, 31 archetypes, 12 decision points / 36 options, 12 quality tactics, 13 risks, 9 language layouts |
 
-- Drift checking parses **Python only** (standard-library `ast`). Other languages get
-  path-presence and scope checks; symbol and import checks report `not_checkable`.
-- Dynamic imports (`importlib`, `__import__`) are invisible to the import check.
-- The wording rules (group Q) are heuristics with a fixed vocabulary. They are warnings.
-- `sekkei draft` needs the `anthropic` package and API credentials; it is tested with a
-  fake client and has not been exercised against the live API in this repository.
-- sekkei computes the plan; it does not run agents. `sekkei plan --json` is the contract
-  for whatever does.
+## Prior art
+
+Spec Kit, Kiro, OpenSpec and BMAD supply templates and prompts; their consistency analysis
+is done by the model reading Markdown. Requirements-traceability suites are deterministic
+but not built around agents, briefs or write scopes. Rule-based architecture synthesis
+with ATAM-style scoring exists in the literature; a dependency-free, tested implementation
+wired to an agent harness is what this repository adds. See [docs/PRIOR_ART.md](docs/PRIOR_ART.md).
 
 ## Development
 

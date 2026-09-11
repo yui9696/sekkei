@@ -1,0 +1,916 @@
+{
+  "patterns": {
+    "crud_api": 6,
+    "admin_api": 7,
+    "event_ingest": 4,
+    "async_delivery": 13,
+    "signing": 6,
+    "notification": 4,
+    "health_policy": 7,
+    "observability": 6
+  },
+  "qualities": {
+    "durability": 1.0,
+    "performance": 0.88,
+    "isolation": 0.94,
+    "security": 0.52,
+    "operability": 0.82,
+    "scalability": 0.7,
+    "simplicity": 0.8
+  },
+  "constraints": [
+    "containers",
+    "multi_instance",
+    "postgres",
+    "redis",
+    "single_region"
+  ],
+  "languages": [
+    "python"
+  ],
+  "elements": {
+    "R-1": {
+      "sentences": [
+        1
+      ],
+      "rules": [
+        "pattern:crud_api",
+        "pattern:admin_api",
+        "pattern:async_delivery",
+        "pattern:signing",
+        "quality:security"
+      ]
+    },
+    "R-2": {
+      "sentences": [
+        2
+      ],
+      "rules": [
+        "pattern:crud_api",
+        "pattern:admin_api",
+        "pattern:signing",
+        "quality:security"
+      ]
+    },
+    "R-3": {
+      "sentences": [
+        3
+      ],
+      "rules": [
+        "pattern:crud_api",
+        "pattern:event_ingest"
+      ]
+    },
+    "R-4": {
+      "sentences": [
+        4
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "quality:durability"
+      ]
+    },
+    "R-5": {
+      "sentences": [
+        5
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "pattern:signing",
+        "quality:security"
+      ]
+    },
+    "R-6": {
+      "sentences": [
+        6
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:async_delivery"
+      ]
+    },
+    "R-7": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:notification",
+        "pattern:health_policy"
+      ]
+    },
+    "R-8": {
+      "sentences": [
+        8
+      ],
+      "rules": [
+        "pattern:event_ingest",
+        "pattern:async_delivery",
+        "quality:performance",
+        "quality:operability",
+        "quality:scalability"
+      ]
+    },
+    "R-9": {
+      "sentences": [
+        9
+      ],
+      "rules": [
+        "pattern:event_ingest",
+        "quality:durability"
+      ]
+    },
+    "R-10": {
+      "sentences": [
+        10
+      ],
+      "rules": [
+        "pattern:crud_api",
+        "quality:isolation"
+      ]
+    },
+    "R-11": {
+      "sentences": [
+        11
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "pattern:observability",
+        "quality:performance",
+        "quality:operability"
+      ]
+    },
+    "R-12": {
+      "sentences": [
+        12
+      ],
+      "rules": [
+        "quality:simplicity"
+      ]
+    },
+    "R-13": {
+      "sentences": [
+        13
+      ],
+      "rules": [
+        "quality:scalability"
+      ]
+    },
+    "C-1": {
+      "sentences": [
+        9,
+        12
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:event_ingest",
+        "pattern:async_delivery"
+      ]
+    },
+    "I-1": {
+      "sentences": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:event_ingest",
+        "pattern:async_delivery"
+      ]
+    },
+    "C-2": {
+      "sentences": [
+        1,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10
+      ],
+      "rules": [
+        "pattern:event_ingest",
+        "pattern:async_delivery"
+      ]
+    },
+    "I-2": {
+      "sentences": [
+        1,
+        3,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:event_ingest",
+        "pattern:async_delivery"
+      ]
+    },
+    "C-3": {
+      "sentences": [
+        1,
+        2,
+        5
+      ],
+      "rules": [
+        "pattern:signing",
+        "quantities:signing"
+      ]
+    },
+    "I-3": {
+      "sentences": [
+        1,
+        2,
+        5
+      ],
+      "rules": [
+        "pattern:signing",
+        "quantities:signing"
+      ]
+    },
+    "C-4": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:notification"
+      ]
+    },
+    "I-4": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:notification"
+      ]
+    },
+    "C-5": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "I-5": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "C-6": {
+      "sentences": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        12
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:event_ingest",
+        "pattern:async_delivery",
+        "pattern:health_policy"
+      ]
+    },
+    "I-6": {
+      "sentences": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:event_ingest",
+        "pattern:async_delivery",
+        "pattern:health_policy"
+      ]
+    },
+    "C-7": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "I-7": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "C-8": {
+      "sentences": [
+        1,
+        2,
+        5
+      ],
+      "rules": [
+        "pattern:signing"
+      ]
+    },
+    "I-8": {
+      "sentences": [
+        1,
+        2,
+        5
+      ],
+      "rules": [
+        "pattern:signing"
+      ]
+    },
+    "C-9": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:notification",
+        "pattern:health_policy"
+      ]
+    },
+    "I-9": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:notification",
+        "pattern:health_policy"
+      ]
+    },
+    "C-10": {
+      "sentences": [
+        8,
+        11
+      ],
+      "rules": [
+        "pattern:observability",
+        "tactic:performance",
+        "tactic:operability"
+      ]
+    },
+    "I-10": {
+      "sentences": [],
+      "rules": [
+        "pattern:observability",
+        "tactic:performance",
+        "tactic:operability"
+      ]
+    },
+    "C-11": {
+      "sentences": [
+        1,
+        2,
+        6
+      ],
+      "rules": [
+        "pattern:admin_api"
+      ]
+    },
+    "I-11": {
+      "sentences": [
+        1,
+        2,
+        6
+      ],
+      "rules": [
+        "pattern:admin_api"
+      ]
+    },
+    "C-12": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6,
+        8,
+        10,
+        11,
+        13
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "I-12": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "C-13": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "quantities:async_delivery"
+      ]
+    },
+    "I-13": {
+      "sentences": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "quantities:async_delivery"
+      ]
+    },
+    "C-14": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:health_policy",
+        "quantities:health_policy"
+      ]
+    },
+    "I-14": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:health_policy",
+        "quantities:health_policy"
+      ]
+    },
+    "C-15": {
+      "sentences": [
+        1,
+        2,
+        6,
+        8,
+        11,
+        13
+      ],
+      "rules": [
+        "pattern:admin_api"
+      ]
+    },
+    "I-15": {
+      "sentences": [
+        1,
+        2,
+        6
+      ],
+      "rules": [
+        "pattern:admin_api"
+      ]
+    },
+    "C-16": {
+      "sentences": [
+        3,
+        8,
+        9,
+        11,
+        13
+      ],
+      "rules": [
+        "pattern:event_ingest"
+      ]
+    },
+    "I-16": {
+      "sentences": [
+        3
+      ],
+      "rules": [
+        "pattern:event_ingest"
+      ]
+    },
+    "E-1": {
+      "sentences": [],
+      "rules": [
+        "entity:record"
+      ]
+    },
+    "E-2": {
+      "sentences": [],
+      "rules": [
+        "entity:principal"
+      ]
+    },
+    "E-3": {
+      "sentences": [],
+      "rules": [
+        "entity:event"
+      ]
+    },
+    "E-4": {
+      "sentences": [],
+      "rules": [
+        "entity:work_item"
+      ]
+    },
+    "E-5": {
+      "sentences": [],
+      "rules": [
+        "entity:attempt"
+      ]
+    },
+    "E-6": {
+      "sentences": [],
+      "rules": [
+        "entity:target"
+      ]
+    },
+    "E-7": {
+      "sentences": [],
+      "rules": [
+        "entity:secret"
+      ]
+    },
+    "F-1": {
+      "sentences": [],
+      "rules": [
+        "flow:manage"
+      ]
+    },
+    "F-2": {
+      "sentences": [],
+      "rules": [
+        "flow:ingest"
+      ]
+    },
+    "F-3": {
+      "sentences": [],
+      "rules": [
+        "flow:deliver"
+      ]
+    },
+    "F-4": {
+      "sentences": [],
+      "rules": [
+        "flow:retry"
+      ]
+    },
+    "F-5": {
+      "sentences": [],
+      "rules": [
+        "flow:disable"
+      ]
+    },
+    "D-1": {
+      "sentences": [],
+      "rules": [
+        "decision:api_style",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-2": {
+      "sentences": [],
+      "rules": [
+        "decision:store_tech",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-3": {
+      "sentences": [],
+      "rules": [
+        "decision:auth_scheme",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-4": {
+      "sentences": [],
+      "rules": [
+        "decision:ingest_style",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-5": {
+      "sentences": [],
+      "rules": [
+        "decision:queue_tech",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-6": {
+      "sentences": [],
+      "rules": [
+        "decision:retry_scheduling",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-7": {
+      "sentences": [],
+      "rules": [
+        "decision:topology",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-8": {
+      "sentences": [],
+      "rules": [
+        "decision:outbound_safety",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-9": {
+      "sentences": [],
+      "rules": [
+        "decision:secret_storage",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "D-10": {
+      "sentences": [],
+      "rules": [
+        "decision:isolation",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity"
+      ]
+    },
+    "K-1": {
+      "sentences": [],
+      "rules": [
+        "risk:unbounded_input"
+      ]
+    },
+    "K-2": {
+      "sentences": [],
+      "rules": [
+        "risk:schema_drift"
+      ]
+    },
+    "K-3": {
+      "sentences": [],
+      "rules": [
+        "risk:auth_bypass"
+      ]
+    },
+    "K-4": {
+      "sentences": [],
+      "rules": [
+        "risk:duplicate_delivery"
+      ]
+    },
+    "K-5": {
+      "sentences": [],
+      "rules": [
+        "risk:thundering_retry"
+      ]
+    },
+    "K-6": {
+      "sentences": [],
+      "rules": [
+        "risk:ssrf"
+      ]
+    },
+    "K-7": {
+      "sentences": [],
+      "rules": [
+        "risk:queue_bloat"
+      ]
+    },
+    "K-8": {
+      "sentences": [],
+      "rules": [
+        "risk:clock_skew"
+      ]
+    },
+    "K-9": {
+      "sentences": [],
+      "rules": [
+        "risk:secret_exposure"
+      ]
+    },
+    "K-10": {
+      "sentences": [],
+      "rules": [
+        "risk:notification_storm"
+      ]
+    },
+    "K-11": {
+      "sentences": [],
+      "rules": [
+        "risk:metric_cardinality"
+      ]
+    },
+    "WP-1": {
+      "sentences": [],
+      "rules": [
+        "package:layer0:crud_api"
+      ]
+    },
+    "WP-2": {
+      "sentences": [],
+      "rules": [
+        "package:layer0:signing"
+      ]
+    },
+    "WP-3": {
+      "sentences": [],
+      "rules": [
+        "package:layer1:admin_api"
+      ]
+    },
+    "WP-4": {
+      "sentences": [],
+      "rules": [
+        "package:layer1:notification"
+      ]
+    },
+    "WP-5": {
+      "sentences": [],
+      "rules": [
+        "package:layer2:crud_api"
+      ]
+    },
+    "WP-6": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:admin_api"
+      ]
+    },
+    "WP-7": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:health_policy"
+      ]
+    }
+  },
+  "sentences": [
+    {
+      "index": 0,
+      "text": "We run a SaaS.",
+      "section": "",
+      "modality": ""
+    },
+    {
+      "index": 1,
+      "text": "Customers register webhook endpoints; when things happen in our platform (order.created, order.paid, refund.issued, ...) we must deliver a signed JSON event to every endpoint subscribed to that event type.",
+      "section": "",
+      "modality": "must"
+    },
+    {
+      "index": 2,
+      "text": "Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose event types, rotate the signing secret.",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 3,
+      "text": "Internal services publish events through an internal API (HTTP or in-process call).",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 4,
+      "text": "Each event is delivered at least once to every matching endpoint. Deliveries are retried with exponential backoff (1 min, 5 min, 30 min, 2 h, 12 h; 5 attempts) on 5xx/timeout. 4xx (except 429) is final failure. 429 honours Retry-After.",
+      "section": "functional",
+      "modality": "must"
+    },
+    {
+      "index": 5,
+      "text": "Every delivery carries an HMAC-SHA256 signature over the body with the endpoint's current secret, plus a timestamp header; after rotation, both old and new secrets are valid for 24 h.",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 6,
+      "text": "Customers can see delivery attempts per event (status, response code, timestamps) and manually redeliver.",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 7,
+      "text": "Endpoints that fail continuously for 3 days are disabled automatically and the customer is notified by email.",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 8,
+      "text": "1,000 events/s sustained publish rate, 5,000 endpoints; delivery latency p95 under 5 s for a healthy endpoint.",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 9,
+      "text": "No event lost on process crash (persist before ack).",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 10,
+      "text": "Per-endpoint isolation: one slow endpoint must not delay others.",
+      "section": "nonfunctional",
+      "modality": "must"
+    },
+    {
+      "index": 11,
+      "text": "Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 12,
+      "text": "Python 3.12, PostgreSQL available, Redis available. Single region. Team of 3.",
+      "section": "constraint",
+      "modality": ""
+    },
+    {
+      "index": 13,
+      "text": "Must run as a set of stateless containers behind our existing ingress.",
+      "section": "constraint",
+      "modality": "must"
+    }
+  ],
+  "repairs": []
+}
