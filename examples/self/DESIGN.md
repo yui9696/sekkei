@@ -39,6 +39,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-16 | functional | must | Besides the design, the engine hands over an architect's notes: the questions the text leaves open with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a requirements template. | — |
 | R-17 | functional | must | The engine answers its own open questions from evidence in the text or defensible defaults, appends the answers to the requirements so they shape the design, and records each as a proposed decision with the options considered and what to change if the real answer differs. | — |
 | R-18 | functional | must | Every functional requirement no pattern recognised gets an owner: an existing specific component by word overlap, the surface and core for a human use case, or a newly synthesised component named from the sentence's verb class and object, wired into the design and packaged. | — |
+| R-19 | functional | must | A human can design in dialogue: free sentences become classified requirement bullets, the engine re-designs after every turn and asks one thing at a time in architect order (placements to confirm, stack, load and quality, data/security/operations/cost, close decisions), each with its proposal; answers are normalised into canonical bullets so the requirements file reproduces the design without the dialogue; the session resumes from saved state. | — |
 
 ## Components
 
@@ -64,6 +65,7 @@ graph LR
   C_18["C-18 Repair"]
   C_19["C-19 Engine facade"]
   C_24["C-24 Answers"]
+  C_26["C-26 Interview"]
   C_25["C-25 Owners"]
   C_20["C-20 Gap questions"]
   C_21["C-21 Sizing"]
@@ -96,6 +98,7 @@ graph LR
   C_10 -->|I-12| C_12
   C_10 -->|I-19| C_19
   C_10 -->|I-20| C_20
+  C_10 -->|I-26| C_26
   C_11 -->|I-1| C_1
   C_11 -->|I-8| C_8
   C_12 -->|I-1| C_1
@@ -126,6 +129,13 @@ graph LR
   C_19 -->|I-25| C_25
   C_24 -->|I-15| C_15
   C_24 -->|I-20| C_20
+  C_26 -->|I-1| C_1
+  C_26 -->|I-4| C_4
+  C_26 -->|I-13| C_13
+  C_26 -->|I-15| C_15
+  C_26 -->|I-19| C_19
+  C_26 -->|I-20| C_20
+  C_26 -->|I-24| C_24
   C_25 -->|I-1| C_1
   C_25 -->|I-13| C_13
   C_25 -->|I-14| C_14
@@ -222,7 +232,7 @@ graph LR
 - **kind**: cli · **path**: `sekkei/cli.py`
 - **responsibility**: argparse front end over every module.
 - **provides**: I-10
-- **requires**: I-1, I-2, I-3, I-4, I-5, I-6, I-7, I-9, I-11, I-12, I-19, I-20
+- **requires**: I-1, I-2, I-3, I-4, I-5, I-6, I-7, I-9, I-11, I-12, I-19, I-20, I-26
 - **satisfies**: R-11, R-8
 
 ### C-11 — Starter
@@ -305,6 +315,14 @@ graph LR
 - **requires**: I-15, I-20
 - **satisfies**: R-17
 
+### C-26 — Interview
+
+- **kind**: module · **path**: `sekkei/engine/interview.py`
+- **responsibility**: The dialogue: prompts in architect order with proposals, canonical bullets from answers, owner and decision overrides, undo, saved state, and the read-eval loop.
+- **provides**: I-26
+- **requires**: I-1, I-4, I-13, I-15, I-19, I-20, I-24
+- **satisfies**: R-19
+
 ### C-25 — Owners
 
 - **kind**: module · **path**: `sekkei/engine/owners.py`
@@ -353,7 +371,8 @@ graph LR
 3. C-16, C-18, C-24, C-5, C-9
 4. C-23
 5. C-19
-6. C-10
+6. C-26
+7. C-10
 
 ## Interfaces
 
@@ -513,7 +532,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `synthesise` | `an`: Analysis | Synthesis: design, trace, generic component ids, log | — | — |
+| `synthesise` | `an`: Analysis, `forced_decisions`: dict \| None, `owner_overrides`: dict \| None | Synthesis: design, trace, generic component ids, log, placements, close_calls | — | — |
 
 ### I-17 — Evaluation API
 
@@ -522,7 +541,7 @@ graph LR
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
 | `score_option` | `opt`: Option, `qualities`: dict, `constraints`: set | Scored(score, available, reason) | — | — |
-| `decide` | `dp`: DecisionPoint, `qualities`: dict, `constraints`: set | (best, ranked, rationale, consequences) | — | — |
+| `decide` | `dp`: DecisionPoint, `qualities`: dict, `constraints`: set, `forced`: str \| None | (best, ranked, rationale, consequences); forced names the winner | — | — |
 | `review` | `design`: Design, `an`: Analysis, `generic_components`: list[str] | Review (unrecognised, unaddressed, generic, assumptions, notes) | — | — |
 
 ### I-18 — Repair API
@@ -539,7 +558,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `design` | `text`: str, `assume`: bool | EngineResult: design, analysis, review, notes, answers, placements, diagnostics, trace; ok when no lint error | — | — |
+| `design` | `text`: str, `assume`: bool, `overrides`: Overrides \| None | EngineResult: design, analysis, review, notes, answers, placements, close_calls, diagnostics, trace; ok when no lint error | — | — |
 | `ask` | `text`: str | list[Question] | — | — |
 
 ### I-24 — Answers API
@@ -552,6 +571,17 @@ graph LR
 | `answers` | `qs`: list[Question], `an`: Analysis | list[Answer] | — | — |
 | `augment` | `text`: str, `ans`: list[Answer] | requirements text with the answers appended under engine-marked sections | — | — |
 | `answers_markdown` | `ans`: list[Answer] | str | — | — |
+
+### I-26 — Interview API
+
+- **kind**: module · **owner**: C-26 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `Interview` | — | class: add(text), pending() -> [Prompt], reply(prompt, text), result(), status(), undo(), to_state()/from_state(), write_outputs(dir) | — | — |
+| `canonical_bullet` | `qid`: str, `raw`: str | (section, bullet) the analyser recognises | — | — |
+| `classify_free_text` | `text`: str | list[(section, bullet)] | — | — |
+| `run_cli` | `inp`: IO, `out`: IO, `root`: Path, `base_file`: Path \| None, `out_dir`: Path \| None | exit code; reads replies, saves .sekkei/interview.json after every turn | — | — |
 
 ### I-25 — Owners API
 
@@ -618,6 +648,7 @@ graph LR
 | `sekkei schema / rules / prompt` | — | JSON Schema; rule table; architect prompt | — | — |
 | `sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json] [--augmented REQ.md] [--no-assume]` | — | a complete, lint-clean design without any model, plus the architect's notes; open questions answered unless --no-assume | — | — |
 | `sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]` | — | the open questions; the requirements template | — | — |
+| `sekkei interview [REQ.md] [--root DIR] [--out-dir DIR] [--script FILE]` | — | design in dialogue; /design writes design.json, DESIGN.md, NOTES.md, requirements.md | — | — |
 | `sekkei draft REQ.md [--review] [--backend claude-code\|anthropic]` | — | optional model-based draft | — | — |
 
 ### I-11 — Starter
@@ -946,6 +977,7 @@ graph LR
   WP_12["WP-12 Engine: text and catalogue (L)"]
   WP_13["WP-13 Engine: analysis and evaluation (M)"]
   WP_16["WP-16 Engine: questions, answers and owners (M)"]
+  WP_17["WP-17 Interview (M)"]
   WP_15["WP-15 Engine: architect's notes (M)"]
   WP_14["WP-14 Engine: synthesis, repair and facade (L)"]
   WP_11["WP-11 Diff (S)"]
@@ -963,6 +995,9 @@ graph LR
   WP_1 --> WP_12
   WP_12 --> WP_13
   WP_13 --> WP_16
+  WP_4 --> WP_17
+  WP_14 --> WP_17
+  WP_16 --> WP_17
   WP_2 --> WP_15
   WP_13 --> WP_15
   WP_16 --> WP_15
@@ -977,6 +1012,7 @@ graph LR
   WP_9 --> WP_10
   WP_11 --> WP_10
   WP_14 --> WP_10
+  WP_17 --> WP_10
 ```
 
 **Waves** (packages in one wave may run in parallel):
@@ -987,9 +1023,10 @@ graph LR
 4. WP-16, WP-6, WP-8, WP-9
 5. WP-15
 6. WP-14
-7. WP-10
+7. WP-17
+8. WP-10
 
-_Critical path (weight 18):_ WP-1 → WP-12 → WP-13 → WP-16 → WP-15 → WP-14 → WP-10
+_Critical path (weight 20):_ WP-1 → WP-12 → WP-13 → WP-16 → WP-15 → WP-14 → WP-17 → WP-10
 
 ### WP-1 — Model (M)
 
@@ -1111,6 +1148,16 @@ Implement the gap questions, the answer rules for every question and the owner p
 - **acceptance**:
   - A-19 (test) autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component — `python -m pytest -q tests/test_autonomy.py`
 
+### WP-17 — Interview (M)
+
+Implement the dialogue: prompt ordering with proposals, canonical bullets, overrides, undo, saved state, the read-eval loop and the CLI command.
+
+- **components**: C-26 · **implements**: I-26
+- **depends on**: WP-4, WP-14, WP-16 · **satisfies**: R-19
+- **write scope**: `sekkei/engine/interview.py`, `tests/test_interview.py`
+- **acceptance**:
+  - A-20 (test) interview tests pass: architect order, Enter accepts, canonical bullets are recognised, named owners override, decisions can be forced, state round-trips, scripted session — `python -m pytest -q tests/test_interview.py`
+
 ### WP-15 — Engine: architect's notes (M)
 
 Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.
@@ -1147,7 +1194,7 @@ Compare two design versions element by element and map the changes to the work p
 Expose every operation on the command line with exit codes and JSON output, and prove the whole loop end to end.
 
 - **components**: C-10 · **implements**: I-10
-- **depends on**: WP-6, WP-7, WP-8, WP-9, WP-11, WP-14 · **satisfies**: R-11, R-8, R-12
+- **depends on**: WP-6, WP-7, WP-8, WP-9, WP-11, WP-14, WP-17 · **satisfies**: R-11, R-8, R-12
 - **write scope**: `sekkei/cli.py`, `sekkei/__main__.py`, `tests/test_cli.py`, `tests/test_self.py`
 - **acceptance**:
   - A-10 (test) CLI round-trip test passes: init, lint, render, plan, brief, accept, next — `python -m pytest -q tests/test_cli.py`
@@ -1176,6 +1223,7 @@ Expose every operation on the command line with exit codes and JSON output, and 
 | R-16 | must | C-19, C-20, C-21, C-22, C-23 | WP-16, WP-15, WP-14 | A-19, A-18, A-16, A-17 |
 | R-17 | must | C-19, C-24 | WP-16, WP-14 | A-19, A-16, A-17 |
 | R-18 | must | C-16, C-25 | WP-16, WP-14 | A-19, A-16, A-17 |
+| R-19 | must | C-26 | WP-17 | A-20 |
 
 ## Conventions
 

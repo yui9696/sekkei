@@ -319,6 +319,20 @@ def cmd_design(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def cmd_interview(args: argparse.Namespace) -> int:
+    """Design in dialogue: the engine asks one thing at a time; answers become requirements."""
+    from .engine.interview import run_cli
+
+    root = Path(args.root) if args.root else Path.cwd()
+    inp = open(args.script, encoding="utf-8") if args.script else sys.stdin
+    try:
+        return run_cli(inp, sys.stdout, root, Path(args.input) if args.input else None,
+                       Path(args.out_dir) if args.out_dir else None)
+    finally:
+        if args.script:
+            inp.close()
+
+
 def cmd_ask(args: argparse.Namespace) -> int:
     """Only the questions an architect would ask about a requirements text."""
     from .engine import ask
@@ -465,6 +479,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--trace", metavar="TRACE.json", help="also write the element-to-sentence/rule trace")
     sp.add_argument("--augmented", metavar="REQ.md", help="also write the requirements with the engine's assumed answers appended")
     sp.add_argument("--no-assume", action="store_true", help="do not answer open questions; leave them in the notes")
+
+    sp = add("interview", cmd_interview, "design in dialogue: describe the system, answer one question at a time", design=False)
+    sp.add_argument("input", nargs="?", help="optional requirements file to start from")
+    sp.add_argument("--root", help="where .sekkei/interview.json lives (default: cwd)")
+    sp.add_argument("--out-dir", help="where /design writes design.json, DESIGN.md, NOTES.md, requirements.md (default: root)")
+    sp.add_argument("--script", help="read replies from a file instead of the terminal")
 
     sp = add("ask", cmd_ask, "print the questions an architect would ask about a requirements text", design=False)
     sp.add_argument("input", help="requirements text file")

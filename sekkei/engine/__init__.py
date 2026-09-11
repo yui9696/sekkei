@@ -26,6 +26,14 @@ from .threats import inject_risks
 
 
 @dataclass
+class Overrides:
+    """Decisions a human made in the interview: requirement statement -> owner component name/id;
+    decision key or title -> option name (or prefix)."""
+    owners: dict[str, str] = field(default_factory=dict)
+    decisions: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class EngineResult:
     design: Design
     analysis: Analysis
@@ -37,6 +45,7 @@ class EngineResult:
     answers: list[Answer] = field(default_factory=list)
     placements: list[Placement] = field(default_factory=list)
     augmented_text: str = ""
+    close_calls: list[tuple[str, str, str, list[tuple[str, float]]]] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -68,8 +77,10 @@ def _assumed_decisions(d: Design, ans: list[Answer]) -> None:
             [Option(o, [], []) for o in a.options], a.options[0], a.rationale, "If the real answer differs: " + a.if_wrong, affects, "proposed"))
 
 
-def design(text: str, assume: bool = True) -> EngineResult:
-    """Design from a requirements text. With ``assume`` the engine answers its own open questions first."""
+def design(text: str, assume: bool = True, overrides: Overrides | None = None) -> EngineResult:
+    """Design from a requirements text. With ``assume`` the engine answers its own open questions first;
+    ``overrides`` carries owners and options a human chose in the interview."""
+    overrides = overrides or Overrides()
     an = analyse(text)
     ans: list[Answer] = []
     full = text
@@ -81,7 +92,7 @@ def design(text: str, assume: bool = True) -> EngineResult:
             ans += new
             full = augment(text, ans)
             an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets})
-    syn = synthesise(an)
+    syn = synthesise(an, overrides.decisions, overrides.owners)
     _assumed_decisions(syn.design, ans)
     for x in syn.design.decisions:
         syn.trace.setdefault(x.id, {"sentences": [], "rules": ["assumed-answer"]})
@@ -91,7 +102,7 @@ def design(text: str, assume: bool = True) -> EngineResult:
     d, diags, log = repair(syn.design)
     rv = review(d, an, syn.generic)
     nt = notes(d, an, rv, ans, syn.placements)
-    return EngineResult(d, an, rv, nt, diags, syn.trace, syn.log + log, ans, syn.placements, full)
+    return EngineResult(d, an, rv, nt, diags, syn.trace, syn.log + log, ans, syn.placements, full, syn.close_calls)
 
 
 def ask(text: str) -> list[Question]:
@@ -99,4 +110,4 @@ def ask(text: str) -> list[Question]:
     return questions(analyse(text))
 
 
-__all__ = ["EngineResult", "REQUIREMENTS_TEMPLATE", "ask", "design", "analyse", "synthesise", "review", "repair"]
+__all__ = ["EngineResult", "Overrides", "REQUIREMENTS_TEMPLATE", "ask", "design", "analyse", "synthesise", "review", "repair"]

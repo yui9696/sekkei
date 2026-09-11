@@ -84,6 +84,11 @@ class Synthesis:
     generic: list[str] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
     placements: list[Placement] = field(default_factory=list)
+    #: (decision id, decision key, title, [(option name, score), (option name, score)]) where the top two are within CLOSE_MARGIN
+    close_calls: list[tuple[str, str, str, list[tuple[str, float]]]] = field(default_factory=list)
+
+
+CLOSE_MARGIN = 0.15
 
 
 def _layout(an: Analysis) -> K.Layout:
@@ -304,7 +309,12 @@ def _satisfiers(u: ReqUnit, active: list[str], surfaces: list[str]) -> list[str]
     return out
 
 
-def synthesise(an: Analysis) -> Synthesis:
+def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
+               owner_overrides: dict[str, str] | None = None) -> Synthesis:
+    """``forced_decisions``: decision key or title -> option name (or prefix). ``owner_overrides``:
+    requirement statement -> component name (or id) that must own it instead of the engine's choice."""
+    forced_decisions = forced_decisions or {}
+    owner_overrides = owner_overrides or {}
     layout = _layout(an)
     active, generic_keys, reasons = _active_archetypes(an)
     requires = _requires(active)
@@ -375,7 +385,14 @@ def synthesise(an: Analysis) -> Synthesis:
     # --- owners for requirements no pattern recognised ------------------------
     placements: list[Placement] = []
     for u in an.unrecognised:
-        p = place(u, d, layout, cid, iid, requires)
+        chosen = owner_overrides.get(u.sentence.text)
+        target = None
+        if chosen:
+            target = d.component(chosen) or next((c for c in d.components if c.name.lower() == chosen.lower()), None)
+        if target is not None:
+            p = Placement(u.id, [target.id], "chosen in the interview", f"owner {target.name} named by the human")
+        else:
+            p = place(u, d, layout, cid, iid, requires)
         placements.append(p)
         for owner in p.owners:
             comp = d.component(owner)
@@ -452,14 +469,19 @@ def synthesise(an: Analysis) -> Synthesis:
             dkeys.append(dk)
     n = 0
     chosen: dict[str, str] = {}
+    close_calls: list[tuple[str, str, str, list[tuple[str, float]]]] = []
     for dk in dkeys:
         dp = K.DECISIONS[dk]
         affects = [cid[a] for a in dp.affects if a in cid]
         if not affects:
             continue
-        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints)
+        forced = forced_decisions.get(dk) or forced_decisions.get(dp.title)
+        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints, forced)
         n += 1
         chosen[dk] = best.option.name
+        avail = [s for s in ranked if s.available]
+        if not forced and len(avail) >= 2 and avail[0].score - avail[1].score < CLOSE_MARGIN:
+            close_calls.append((f"D-{n}", dk, dp.title, [(s.option.name, s.score) for s in avail[:2]]))
         d.decisions.append(Decision(f"D-{n}", dp.title, dp.context, [Option(o.name, list(o.pros), list(o.cons)) for o in dp.options],
                                     best.option.name, rationale, consequences, affects, "accepted"))
         trace[f"D-{n}"] = {"sentences": [], "rules": [f"decision:{dk}"] + [f"quality:{q}" for q in an.qualities]}
@@ -556,4 +578,4 @@ def synthesise(an: Analysis) -> Synthesis:
                                            deps, satisfies, files, "S" if len(ids) == 1 else "M", acc,
                                            notes=f"family: {family_of[ids[0]]}"))
         trace[wp_id] = {"sentences": [], "rules": [f"package:layer{[i for i, L in enumerate(layers) if ids[0] in L][0]}:{family_of[ids[0]]}"]}
-    return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log, placements)
+    return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log, placements, close_calls)

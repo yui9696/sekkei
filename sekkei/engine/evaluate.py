@@ -30,12 +30,18 @@ def score_option(opt: K.Option, qualities: dict[str, float], constraints: set[st
     return Scored(opt, round(score / total + bonus, 3), True, "stated in the constraints" if bonus else "")
 
 
-def decide(dp: K.DecisionPoint, qualities: dict[str, float], constraints: set[str]) -> tuple[Scored, list[Scored], str, str]:
+def decide(dp: K.DecisionPoint, qualities: dict[str, float], constraints: set[str],
+           forced: str | None = None) -> tuple[Scored, list[Scored], str, str]:
+    """Score the options; ``forced`` (an option name or a unique prefix/substring) overrides the winner."""
     ranked = sorted((score_option(o, qualities, constraints) for o in dp.options),
                     key=lambda s: (-s.available, -s.score, dp.options.index(s.option)))
     best = ranked[0]
     if not best.available:  # every option unavailable: fall back to catalogue order but say so
         best = Scored(dp.options[0], 0.0, True, "no option satisfied the constraints; catalogue default taken")
+    if forced:
+        hit = next((s for s in ranked if s.option.name.lower().startswith(forced.lower()) or forced.lower() in s.option.name.lower()), None)
+        if hit is not None:
+            best = Scored(hit.option, hit.score, True, "chosen in the interview")
     drivers = sorted(qualities.items(), key=lambda kv: -kv[1])[:2]
     driver_txt = ", ".join(f"{q} (weight {w})" for q, w in drivers) or "simplicity (no qualities stated)"
     rationale = (f"Scored against the active qualities; decided by {driver_txt}. "

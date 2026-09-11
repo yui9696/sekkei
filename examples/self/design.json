@@ -166,6 +166,13 @@
       "kind": "functional",
       "priority": "must",
       "rationale": ""
+    },
+    {
+      "id": "R-19",
+      "statement": "A human can design in dialogue: free sentences become classified requirement bullets, the engine re-designs after every turn and asks one thing at a time in architect order (placements to confirm, stack, load and quality, data/security/operations/cost, close decisions), each with its proposal; answers are normalised into canonical bullets so the requirements file reproduces the design without the dialogue; the session resumes from saved state.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
     }
   ],
   "components": [
@@ -321,7 +328,8 @@
         "I-11",
         "I-12",
         "I-19",
-        "I-20"
+        "I-20",
+        "I-26"
       ],
       "satisfies": [
         "R-11",
@@ -492,6 +500,26 @@
       ],
       "satisfies": [
         "R-17"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-26",
+      "name": "Interview",
+      "responsibility": "The dialogue: prompts in architect order with proposals, canonical bullets from answers, owner and decision overrides, undo, saved state, and the read-eval loop.",
+      "kind": "module",
+      "path": "sekkei/engine/interview.py",
+      "requires": [
+        "I-1",
+        "I-4",
+        "I-13",
+        "I-15",
+        "I-19",
+        "I-20",
+        "I-24"
+      ],
+      "satisfies": [
+        "R-19"
       ],
       "tags": []
     },
@@ -1899,9 +1927,19 @@
               "name": "an",
               "type": "Analysis",
               "description": ""
+            },
+            {
+              "name": "forced_decisions",
+              "type": "dict | None",
+              "description": ""
+            },
+            {
+              "name": "owner_overrides",
+              "type": "dict | None",
+              "description": ""
             }
           ],
-          "output": "Synthesis: design, trace, generic component ids, log",
+          "output": "Synthesis: design, trace, generic component ids, log, placements, close_calls",
           "errors": [],
           "pre": "",
           "post": "",
@@ -1959,9 +1997,14 @@
               "name": "constraints",
               "type": "set",
               "description": ""
+            },
+            {
+              "name": "forced",
+              "type": "str | None",
+              "description": ""
             }
           ],
-          "output": "(best, ranked, rationale, consequences)",
+          "output": "(best, ranked, rationale, consequences); forced names the winner",
           "errors": [],
           "pre": "",
           "post": "",
@@ -2044,9 +2087,14 @@
               "name": "assume",
               "type": "bool",
               "description": ""
+            },
+            {
+              "name": "overrides",
+              "type": "Overrides | None",
+              "description": ""
             }
           ],
-          "output": "EngineResult: design, analysis, review, notes, answers, placements, diagnostics, trace; ok when no lint error",
+          "output": "EngineResult: design, analysis, review, notes, answers, placements, close_calls, diagnostics, trace; ok when no lint error",
           "errors": [],
           "pre": "",
           "post": "",
@@ -2147,6 +2195,95 @@
             }
           ],
           "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-26",
+      "name": "Interview API",
+      "owner": "C-26",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "Interview",
+          "inputs": [],
+          "output": "class: add(text), pending() -> [Prompt], reply(prompt, text), result(), status(), undo(), to_state()/from_state(), write_outputs(dir)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "canonical_bullet",
+          "inputs": [
+            {
+              "name": "qid",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "raw",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "(section, bullet) the analyser recognises",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "classify_free_text",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[(section, bullet)]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "run_cli",
+          "inputs": [
+            {
+              "name": "inp",
+              "type": "IO",
+              "description": ""
+            },
+            {
+              "name": "out",
+              "type": "IO",
+              "description": ""
+            },
+            {
+              "name": "root",
+              "type": "Path",
+              "description": ""
+            },
+            {
+              "name": "base_file",
+              "type": "Path | None",
+              "description": ""
+            },
+            {
+              "name": "out_dir",
+              "type": "Path | None",
+              "description": ""
+            }
+          ],
+          "output": "exit code; reads replies, saves .sekkei/interview.json after every turn",
           "errors": [],
           "pre": "",
           "post": "",
@@ -2537,6 +2674,15 @@
           "name": "sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]",
           "inputs": [],
           "output": "the open questions; the requirements template",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei interview [REQ.md] [--root DIR] [--out-dir DIR] [--script FILE]",
+          "inputs": [],
+          "output": "design in dialogue; /design writes design.json, DESIGN.md, NOTES.md, requirements.md",
           "errors": [],
           "pre": "",
           "post": "",
@@ -3635,6 +3781,40 @@
       "notes": ""
     },
     {
+      "id": "WP-17",
+      "title": "Interview",
+      "goal": "Implement the dialogue: prompt ordering with proposals, canonical bullets, overrides, undo, saved state, the read-eval loop and the CLI command.",
+      "components": [
+        "C-26"
+      ],
+      "implements": [
+        "I-26"
+      ],
+      "depends_on": [
+        "WP-4",
+        "WP-14",
+        "WP-16"
+      ],
+      "satisfies": [
+        "R-19"
+      ],
+      "files": [
+        "sekkei/engine/interview.py",
+        "tests/test_interview.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-20",
+          "description": "interview tests pass: architect order, Enter accepts, canonical bullets are recognised, named owners override, decisions can be forced, state round-trips, scripted session",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_interview.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
       "id": "WP-15",
       "title": "Engine: architect's notes",
       "goal": "Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
@@ -3774,7 +3954,8 @@
         "WP-8",
         "WP-9",
         "WP-11",
-        "WP-14"
+        "WP-14",
+        "WP-17"
       ],
       "satisfies": [
         "R-11",

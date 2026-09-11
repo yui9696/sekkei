@@ -164,6 +164,39 @@ in a work package. Every placement is recorded in the trace and in the notes wit
 was made (`matched (score n)`, `surface+core`, `synthesised`), so a wrong owner is one
 line to spot.
 
+## 7d. The interview: designing in dialogue
+
+`sekkei interview [requirements.md]` runs the architect's conversation (`engine/interview.py`).
+The human describes the system in sentences; the engine turns each sentence into a
+requirement bullet (classified functional / non-functional / constraint by the same
+heuristics as a file), re-designs after every turn, and asks **one thing at a time**, in
+the order an architect would:
+
+1. **Placements to confirm** — a sentence no pattern recognised, with the owner the engine
+   chose or synthesised; the human accepts or names another component.
+2. **Stack questions** — language, store, deployment, team.
+3. **Load and quality** — rate, volume, payload, latency, availability.
+4. **Data, security, operations, cost** — retention, backups, migration, auth, authz,
+   external calls, compliance, alerting, budget.
+5. **Close decisions** — a decision point whose top two options score within 0.15 of each
+   other is put to the human with both options' pros and cons.
+
+Every prompt carries the engine's proposal (the answer rule's result with its evidence or
+default). Enter accepts it; a typed answer is normalised into a canonical bullet
+(`Team of 3.`, `PostgreSQL available.`, `p95 under 200 ms.`) and appended to the
+requirements under an `## … (interview)` section, so the transcript *is* the requirements
+file and every answer is reproducible without the dialogue. `skip` leaves a question open
+(the engine's assumed answer then applies, marked as such). Commands: `/add <text>`,
+`/status`, `/design`, `/undo`, `/done`, `/help`. State lives in `.sekkei/interview.json`
+so a session resumes where it stopped. The loop is driven through an `Interview` object
+with `pending()` / `reply()` so it is testable without a terminal, and `--script FILE`
+replays answers non-interactively.
+
+Overrides from the dialogue (chosen owners, chosen options) are applied by
+`design(text, overrides=…)`: a chosen owner takes the requirement from the synthesised
+component (which is dropped if it ends up empty); a chosen option is forced at the
+decision point with the rationale "chosen in the interview".
+
 ## 8. Tests
 
 - Determinism: `design(text)` twice → identical JSON.

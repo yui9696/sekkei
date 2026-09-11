@@ -61,6 +61,24 @@ notes list the questions it would have asked, each with the assumption it used m
 Answer a question by adding a bullet and run again; only the parts the answer touches
 change.
 
+## Or design in dialogue
+
+```sh
+sekkei interview            # or: sekkei interview requirements.md
+```
+
+Describe the system in sentences (English); the engine turns each into a classified
+requirement, re-designs after every turn, and asks **one thing at a time in the order an
+architect would**: owners to confirm for sentences no pattern knows, then stack (language,
+store, deployment, team), load and quality, data/security/operations/cost, and finally the
+decisions whose top two options score within 0.15 of each other. Every prompt shows the
+engine's proposal with its evidence or default; Enter accepts it, a typed answer is
+normalised into a canonical bullet (`Team of 3.`, `PostgreSQL available.`,
+`Operations complete within 200 ms p95.`), `skip` leaves it to the engine. The transcript
+*is* `requirements.md`, so the design is reproducible without the dialogue; the session
+resumes from `.sekkei/interview.json`. `/add`, `/status`, `/design`, `/undo`, `/done`.
+`--script replies.txt` replays a session non-interactively.
+
 ## Nothing is left to a human by default
 
 Two things an architect normally does in the meeting room, the engine does on its own:
@@ -152,7 +170,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 169 |
+| tests | 177 |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) + the two-line minimal spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
