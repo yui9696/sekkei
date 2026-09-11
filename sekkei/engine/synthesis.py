@@ -17,11 +17,14 @@ from . import catalog as K
 from . import text as T
 from .analysis import Analysis, ReqUnit
 from .evaluate import decide
-from .owners import Placement, place
+from .owners import Placement, _human_subject, place
 
 # archetype -> archetypes that call it (in addition to Archetype.needs), applied when both are active
 CONSUMERS: dict[str, list[str]] = {
-    "observability": ["surface_api", "admin_api", "ingest_api", "worker", "scheduler", "policy", "core", "cli", "batch", "push", "notifier", "dispatcher"],
+    "observability": ["surface_api", "admin_api", "ingest_api", "worker", "scheduler", "policy", "core", "cli", "batch", "push", "notifier", "dispatcher", "mqtt_consumer", "geo"],
+    "geo": ["core"],
+    "sms": ["notifier"],
+    "sftp_target": ["exporter", "batch"],
     "dispatcher": ["worker"],
     "signer": ["worker"],
     "secrets": ["admin_api", "core"],
@@ -75,6 +78,7 @@ QUALITY_CARRIERS = {
 
 _HTTP_SURFACES = ("surface_api", "admin_api", "ingest_api")
 _ALL_SURFACES = (*_HTTP_SURFACES, "cli", "push", "ui")
+_HUMAN_SURFACES = ("surface_api", "admin_api", "cli", "ui")   # where a person's use case enters
 
 
 @dataclass
@@ -89,6 +93,62 @@ class Synthesis:
 
 
 CLOSE_MARGIN = 0.15
+
+
+def _peak_rate(an: Analysis) -> float:
+    """The largest stated rate in items per second (0 when none)."""
+    rates = [T.per_second(q) or 0.0 for u in an.requirements for q in u.sentence.quantities if q.kind == "rate"]
+    return max(rates, default=0.0)
+
+
+_ENTITY_STOP = {"audit", "access", "data", "request", "requests", "log", "logs", "job", "jobs", "process", "end", "start",
+                "system", "api", "app", "apps", "dashboard", "email", "link", "list", "report", "reports", "chart", "charts",
+                "page", "pages", "result", "results", "summary", "summaries", "position", "positions", "history", "text",
+                "service", "services", "batch", "csv", "json", "pdf", "team", "teams", "threshold", "minute", "minutes",
+                "second", "seconds", "time", "day", "days", "card", "call", "calls", "search", "query", "queries", "id",
+                "level", "levels", "statistic", "statistics", "offer", "offers", "provider", "providers", "server", "servers",
+                "broker", "cluster", "region", "role", "roles", "member", "members", "employee", "employees", "user", "users"}
+
+
+def _domain_entities(an: Analysis, functional_units: list[ReqUnit]) -> list[tuple[str, list[str]]]:
+    """Candidate domain entities: objects of create/register/upload/request/send verbs and frequent plural nouns,
+    with attributes taken from a parenthesis right after the noun ('readings (speed, fuel level, ...)')."""
+    counts: dict[str, int] = {}
+    attrs: dict[str, list[str]] = {}
+    for u in functional_units:
+        if u.sentence.assumed:
+            continue
+        text = u.sentence.text
+        for v in u.sentence.verbs:
+            if v in ("create", "register", "upload", "request", "send", "publish", "submit", "add", "store", "record", "rate", "book", "order", "accept", "offer", "charge", "tag"):
+                o = _object_after(v, u.sentence)
+                if o:
+                    counts[o] = counts.get(o, 0) + 2
+        words = u.sentence.words
+        for i, n in enumerate(u.sentence.nouns):
+            if n.endswith("s") and len(n) > 4 and not T.verb_of(n):
+                counts[n] = counts.get(n, 0) + 1
+        for i, w in enumerate(words[:-1]):
+            if w in ("a", "an", "the", "each", "every", "per") and _is_object(words[i + 1]):
+                counts[words[i + 1]] = counts.get(words[i + 1], 0) + 1
+        for m in re.finditer(r"\b([a-z]+) \(([^)]{3,80})\)", text.lower()):
+            noun, inside = m.group(1), m.group(2)
+            fields = [f.strip() for f in inside.split(",") if f.strip() and len(f.strip().split()) <= 3]
+            if fields:
+                attrs[noun] = fields
+    merged: dict[str, int] = {}
+    for n, c in counts.items():
+        base = n[:-1] if n.endswith("s") and not n.endswith("ss") else n
+        if base in _ENTITY_STOP or n in _ENTITY_STOP or base in T.ACTORS or n in T.ACTORS or len(base) < 3:
+            continue
+        merged[base] = merged.get(base, 0) + c
+    top = sorted(merged.items(), key=lambda kv: (-kv[1], kv[0]))[:6]
+    out = []
+    for base, c in top:
+        if c < 2:
+            continue
+        out.append((base, attrs.get(base) or attrs.get(base + "s") or []))
+    return out
 
 
 def _layout(an: Analysis) -> K.Layout:
@@ -125,7 +185,9 @@ def _active_archetypes(an: Analysis) -> tuple[list[str], list[str], dict[str, li
     human = {"staff", "manager", "managers", "grower", "owner", "owners", "member", "members", "employee", "employees",
              "customer", "customers", "user", "users", "admin", "admins", "administrator", "operator", "operators",
              "visitor", "visitors", "client", "clients", "subscriber", "subscribers", "anyone", "people", "developer", "developers"}
-    if pats and not any(a in active for a in _ALL_SURFACES) \
+    if "mqtt_ingest" in an.patterns and "ingest_api" in active and not re.search(r"\bhttp\b|\brest\b|\bapi\b", " ".join(s.lower for s in an.sentences if not s.assumed)):
+        del active["ingest_api"]  # devices publish over MQTT; an HTTP ingest surface would be redundant
+    if pats and not any(a in active for a in _HUMAN_SURFACES) \
             and any(set(u.sentence.actors) & human for u in an.requirements if u.kind == "functional"):
         active.setdefault("surface_api", None)
         reasons.setdefault("surface_api", []).append("inference:human-actors-need-a-surface")
@@ -358,6 +420,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             mine = [u for u in functional_units if set(u.patterns) & my_patterns or (not u.recognised and key in ("core", *surfaces[:1]))]
             if key == "core":
                 mine = functional_units
+            elif key in _HUMAN_SURFACES and key == next((a for a in active if a in _HUMAN_SURFACES), None):
+                mine = [u for u in functional_units if _human_subject(u) and not u.sentence.assumed] + [u for u in mine if u not in functional_units or not _human_subject(u)]
             derived = _derived_ops(mine, "http" if key in _HTTP_SURFACES else ("cli" if key == "cli" else "module"))
             names = {o.name for o in ops}
             ops += [o for o in derived if o.name not in names]
@@ -431,6 +495,17 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         owner = cid[ENTITY_OWNER.get(e, "store")]
         d.entities.append(Entity(f"E-{n}", tmpl.name, owner, [FieldDef(nm, tp, c) for nm, tp, c in tmpl.fields], tmpl.description))
         trace[f"E-{n}"] = {"sentences": [], "rules": [f"entity:{e}"]}
+    # domain entities named in the text itself (objects of create/register/... and frequent plural nouns)
+    if "store" in cid:
+        existing = {e.name.lower() for e in d.entities}
+        n = len(d.entities)
+        for base, fields in _domain_entities(an, functional_units):
+            if base in existing or any(base in x for x in existing):
+                continue
+            n += 1
+            fds = [FieldDef("id", "uuid", "primary key")] + [FieldDef(re.sub(r"\s+", "_", f), "…", "from the text") for f in fields] + [FieldDef("created_at", "timestamp", "")]
+            d.entities.append(Entity(f"E-{n}", base.capitalize(), cid["store"], fds, f"Domain entity named in the requirements ('{base}'); confirm the fields."))
+            trace[f"E-{n}"] = {"sentences": [], "rules": ["entity:from-text"]}
 
     # --- flows -----------------------------------------------------------------
     fkeys: list[str] = []
@@ -476,7 +551,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         if not affects:
             continue
         forced = forced_decisions.get(dk) or forced_decisions.get(dp.title)
-        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints, forced)
+        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints, forced, _peak_rate(an))
         n += 1
         chosen[dk] = best.option.name
         avail = [s for s in ranked if s.available]

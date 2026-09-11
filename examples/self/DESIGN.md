@@ -129,6 +129,7 @@ graph LR
   C_19 -->|I-25| C_25
   C_24 -->|I-15| C_15
   C_24 -->|I-20| C_20
+  C_24 -->|I-21| C_21
   C_26 -->|I-1| C_1
   C_26 -->|I-4| C_4
   C_26 -->|I-13| C_13
@@ -143,6 +144,7 @@ graph LR
   C_20 -->|I-15| C_15
   C_21 -->|I-1| C_1
   C_21 -->|I-3| C_3
+  C_21 -->|I-13| C_13
   C_21 -->|I-15| C_15
   C_22 -->|I-1| C_1
   C_23 -->|I-1| C_1
@@ -312,7 +314,7 @@ graph LR
 - **kind**: module · **path**: `sekkei/engine/answers.py`
 - **responsibility**: Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.
 - **provides**: I-24
-- **requires**: I-15, I-20
+- **requires**: I-15, I-20, I-21
 - **satisfies**: R-17
 
 ### C-26 — Interview
@@ -344,7 +346,7 @@ graph LR
 - **kind**: module · **path**: `sekkei/engine/sizing.py`
 - **responsibility**: Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.
 - **provides**: I-21
-- **requires**: I-1, I-3, I-15
+- **requires**: I-1, I-3, I-13, I-15
 - **satisfies**: R-16
 
 ### C-22 — Threat model
@@ -502,6 +504,7 @@ graph LR
 | `quantities` | `text`: str | list[Quantity] (rate \| latency \| duration \| count \| size \| percent \| factor \| code \| number) | — | — |
 | `modality` | `text`: str | 'must' \| 'should' \| 'could' \| '' | — | — |
 | `tokens` | `text`: str | list[str] | — | — |
+| `per_second` | `q`: Quantity | float \| None: a rate normalised to per second | — | — |
 | `verb_of` | `word`: str | lexicon verb or '' | — | — |
 | `title_of` | `text`: str | str | — | — |
 | `slug` | `text`: str | str | — | — |
@@ -976,7 +979,7 @@ graph LR
   WP_9["WP-9 Design engine (M)"]
   WP_12["WP-12 Engine: text and catalogue (L)"]
   WP_13["WP-13 Engine: analysis and evaluation (M)"]
-  WP_16["WP-16 Engine: questions, answers and owners (M)"]
+  WP_16["WP-16 Engine: questions, sizing, answers and owners (L)"]
   WP_17["WP-17 Interview (M)"]
   WP_15["WP-15 Engine: architect's notes (M)"]
   WP_14["WP-14 Engine: synthesis, repair and facade (L)"]
@@ -994,11 +997,11 @@ graph LR
   WP_3 --> WP_9
   WP_1 --> WP_12
   WP_12 --> WP_13
+  WP_2 --> WP_16
   WP_13 --> WP_16
   WP_4 --> WP_17
   WP_14 --> WP_17
   WP_16 --> WP_17
-  WP_2 --> WP_15
   WP_13 --> WP_15
   WP_16 --> WP_15
   WP_3 --> WP_14
@@ -1026,7 +1029,7 @@ graph LR
 7. WP-17
 8. WP-10
 
-_Critical path (weight 20):_ WP-1 → WP-12 → WP-13 → WP-16 → WP-15 → WP-14 → WP-17 → WP-10
+_Critical path (weight 22):_ WP-1 → WP-12 → WP-13 → WP-16 → WP-15 → WP-14 → WP-17 → WP-10
 
 ### WP-1 — Model (M)
 
@@ -1138,13 +1141,13 @@ Implement requirement-unit analysis with pattern/quality/constraint matching, de
 - **acceptance**:
   - A-15 (test) analysis tests pass on the fixtures — `python -m pytest -q tests/test_engine.py -k analysis`
 
-### WP-16 — Engine: questions, answers and owners (M)
+### WP-16 — Engine: questions, sizing, answers and owners (L)
 
-Implement the gap questions, the answer rules for every question and the owner placement (overlap, surface+core, synthesis) for unrecognised requirements.
+Implement the gap questions, capacity/effort estimates, the answer rules for every question (which use the implied rate) and the owner placement for unrecognised requirements.
 
-- **components**: C-20, C-24, C-25 · **implements**: I-20, I-24, I-25
-- **depends on**: WP-13 · **satisfies**: R-16, R-17, R-18
-- **write scope**: `sekkei/engine/gaps.py`, `sekkei/engine/answers.py`, `sekkei/engine/owners.py`, `tests/test_autonomy.py`
+- **components**: C-20, C-21, C-24, C-25 · **implements**: I-20, I-21, I-24, I-25
+- **depends on**: WP-2, WP-13 · **satisfies**: R-16, R-17, R-18
+- **write scope**: `sekkei/engine/gaps.py`, `sekkei/engine/sizing.py`, `sekkei/engine/answers.py`, `sekkei/engine/owners.py`, `tests/test_autonomy.py`
 - **acceptance**:
   - A-19 (test) autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component — `python -m pytest -q tests/test_autonomy.py`
 
@@ -1160,11 +1163,11 @@ Implement the dialogue: prompt ordering with proposals, canonical bullets, overr
 
 ### WP-15 — Engine: architect's notes (M)
 
-Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.
+Implement the STRIDE-lite threat model and the notes report with the requirements template.
 
-- **components**: C-21, C-22, C-23 · **implements**: I-21, I-22, I-23
-- **depends on**: WP-2, WP-13, WP-16 · **satisfies**: R-16
-- **write scope**: `sekkei/engine/sizing.py`, `sekkei/engine/threats.py`, `sekkei/engine/report.py`, `tests/test_notes.py`
+- **components**: C-22, C-23 · **implements**: I-22, I-23
+- **depends on**: WP-13, WP-16 · **satisfies**: R-16
+- **write scope**: `sekkei/engine/threats.py`, `sekkei/engine/report.py`, `tests/test_notes.py`
 - **acceptance**:
   - A-18 (test) notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks — `python -m pytest -q tests/test_notes.py`
 

@@ -32,6 +32,9 @@ ACTORS = (
     "seller", "sellers", "merchant", "merchants", "driver", "drivers", "patient", "patients", "doctor", "doctors",
     "student", "students", "teacher", "teachers", "player", "players", "guest", "guests", "anyone", "people",
     "tool", "command", "program", "script", "application", "app", "controller", "device", "bot", "job",
+    "rider", "riders", "passenger", "passengers", "fleet manager", "fleet managers", "team lead", "team leads",
+    "lead", "leads", "supervisor", "supervisors", "clerk", "clerks", "nurse", "nurses", "tenant", "citizen", "citizens",
+    "shopper", "shoppers", "learner", "learners", "trainer", "trainers", "host", "hosts", "truck", "trucks", "vehicle", "vehicles",
     "customer", "customers", "user", "users", "admin", "admins", "administrator", "operator", "operators",
     "ops", "developer", "developers", "internal service", "internal services", "service", "services",
     "client", "clients", "team", "system", "subscriber", "subscribers", "tenant", "tenants",
@@ -58,6 +61,10 @@ VERBS = {
     "reject": ("POST", "reject"), "book": ("POST", "book"), "reserve": ("POST", "reserve"),
     "order": ("POST", "order"), "pay": ("POST", "pay"), "refund": ("POST", "refund"), "ship": ("POST", "ship"),
     "receive": ("", "receive"), "scan": ("POST", "scan"), "reuse": ("", "reuse"), "keep": ("", "keep"),
+    "request": ("POST", "request"), "drop": ("", "drop"), "discard": ("", "discard"), "accept": ("POST", "accept"),
+    "decline": ("POST", "decline"), "offer": ("", "offer"), "match": ("", "match"), "charge": ("", "charge"),
+    "tag": ("PUT", "tag"), "extract": ("", "extract"), "split": ("", "split"), "index": ("", "index"),
+    "summarize": ("", "summarize"), "summarise": ("", "summarise"), "view": ("GET", "get"), "rate": ("POST", "rate"),
     "delete": ("DELETE", "delete"), "remove": ("DELETE", "delete"), "revoke": ("DELETE", "revoke"),
     "manage": ("", "manage"), "notify": ("", "notify"), "notified": ("", "notify"), "store": ("", "store"),
     "persist": ("", "persist"), "validate": ("", "validate"), "verify": ("", "verify"), "sign": ("", "sign"),
@@ -108,6 +115,18 @@ _NUM = r"(?<![\w.-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB])?
 _UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
 _QUANT_RE = re.compile(_NUM + r"\s?" + _UNIT + r"(?![a-zA-Z])", re.I)
 _PERCENTILE_RE = re.compile(r"\bp(50|90|95|99|999)\b", re.I)
+_INTERVAL_RE = re.compile(r"\bevery (\d+|ten|five|two|three|thirty|sixty) ?(seconds?|s|minutes?|min|hours?|h)\b", re.I)
+_WORD_NUM = {"two": 2, "three": 3, "five": 5, "ten": 10, "thirty": 30, "sixty": 60}
+
+
+def interval_seconds(text: str) -> float | None:
+    """'every 5 seconds' / 'every ten seconds' / 'every 30 minutes' -> seconds, or None."""
+    m = _INTERVAL_RE.search(text)
+    if not m:
+        return None
+    n = _WORD_NUM.get(m.group(1).lower()) or float(m.group(1))
+    unit = m.group(2).lower()
+    return n * (60 if unit.startswith("min") else 3600 if unit.startswith("h") else 1)
 _COMPARATOR_RE = re.compile(r"\b(under|below|less than|at most|no more than|within|up to|<=|<|at least|more than|over|>=|>|exactly|sustained)\b", re.I)
 
 
@@ -268,6 +287,20 @@ def quantities(text: str) -> list[Quantity]:
                     kind = "count"
         out.append(Quantity(value, unit, kind, m.group(0).strip(), comparator, pct.group(0).lower() if pct else "", noun))
     return out
+
+
+def per_second(q: "Quantity") -> float | None:
+    """Normalise a rate quantity to per second (None if it is not a rate)."""
+    unit = q.unit.lower()
+    if "/s" in unit or "per second" in unit or "per sec" in unit or unit in ("rps", "qps"):
+        return q.value
+    if "/min" in unit or "per minute" in unit:
+        return q.value / 60
+    if "/h" in unit or "per hour" in unit:
+        return q.value / 3600
+    if "/day" in unit or "per day" in unit:
+        return q.value / 86400
+    return None
 
 
 def tokens(text: str) -> list[str]:

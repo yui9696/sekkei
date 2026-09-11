@@ -471,6 +471,8 @@ graph LR
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
 | `POST /secrets/{id}/rotate` | `id`: str | 202 rotate accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
+| `POST /events` | `body`: events fields | 201 {events id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
+| | from R-3: Internal services publish events through an internal API (HTTP or in-process call). | | | |
 | `GET /attempts/{id}` | `id`: str | 200 attempts | 401 unauthenticated, 404 unknown id | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
 | `POST /timestamps/{id}/redeliver` | `id`: str | 202 redeliver accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
@@ -581,6 +583,15 @@ Generic domain record; refine per entity found in the requirements.
 | `action` | str |  |
 | `resource` | str | indexed |
 | `at` | timestamp |  |
+
+### E-10 — Timestamp (owner C-1)
+
+Domain entity named in the requirements ('timestamp'); confirm the fields.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `created_at` | timestamp |  |
 
 ## Flows
 

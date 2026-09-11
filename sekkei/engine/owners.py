@@ -19,7 +19,7 @@ CONTROL_VERBS = {"open", "close", "switch", "adjust", "control", "drive", "actua
 COMPUTE_VERBS = {"compute", "calculate", "generate", "render", "convert", "transform", "aggregate", "trim", "filter", "parse", "validate", "verify", "process", "count", "sign", "archive", "purge"}
 VIEW_VERBS = {"see", "view", "show", "get", "list", "search", "query", "inspect", "check", "download", "export", "manage", "update", "edit", "change", "configure", "create", "add", "delete", "remove", "save", "reuse", "register", "submit", "upload", "share", "invite", "assign", "approve", "reject", "book", "reserve", "order", "pay", "cancel", "choose", "subscribe", "confirm", "keep"}
 
-_SURFACES = ("surface_api", "admin_api", "ingest_api", "cli", "push", "ui")
+_SURFACES = ("surface_api", "admin_api", "ingest_api", "cli", "ui", "push")
 #: archetypes too generic to claim a requirement by word overlap
 _GENERIC = {"core", "store", "observability", "config", "queue", "auth", *_SURFACES}
 
@@ -48,7 +48,7 @@ def _sentence_tokens(u: ReqUnit) -> set[str]:
 
 
 _NON_HUMAN = {"tool", "command", "program", "script", "application", "app", "controller", "device", "bot", "job",
-              "system", "service", "services", "team", "we"}
+              "system", "service", "services", "team", "we", "truck", "trucks", "vehicle", "vehicles", "sensor", "sensors"}
 
 
 def _human_subject(u: ReqUnit) -> bool:

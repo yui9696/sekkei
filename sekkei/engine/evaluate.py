@@ -16,8 +16,11 @@ class Scored:
     reason: str
 
 
-def score_option(opt: K.Option, qualities: dict[str, float], constraints: set[str]) -> Scored:
-    """utility = Σ_q w_q · fit_o(q); unavailable if a needed constraint token is absent or an excluded one present."""
+def score_option(opt: K.Option, qualities: dict[str, float], constraints: set[str], rate: float = 0.0) -> Scored:
+    """utility = Σ_q w_q · fit_o(q); unavailable if a needed constraint token is absent or an excluded one present;
+    an option with a rate ceiling below the stated rate is unavailable."""
+    if opt.max_rate and rate > opt.max_rate:
+        return Scored(opt, -1.0, False, f"stated rate {rate:,.0f}/s exceeds this option's ceiling of {opt.max_rate:,.0f}/s")
     if opt.needs and not any(n in constraints for n in opt.needs):
         return Scored(opt, -1.0, False, f"needs {' or '.join(opt.needs)}, not in the constraints")
     hit = [x for x in opt.excludes if x in constraints]
@@ -31,9 +34,10 @@ def score_option(opt: K.Option, qualities: dict[str, float], constraints: set[st
 
 
 def decide(dp: K.DecisionPoint, qualities: dict[str, float], constraints: set[str],
-           forced: str | None = None) -> tuple[Scored, list[Scored], str, str]:
-    """Score the options; ``forced`` (an option name or a unique prefix/substring) overrides the winner."""
-    ranked = sorted((score_option(o, qualities, constraints) for o in dp.options),
+           forced: str | None = None, rate: float = 0.0) -> tuple[Scored, list[Scored], str, str]:
+    """Score the options; ``forced`` (an option name or a unique prefix/substring) overrides the winner;
+    ``rate`` is the stated peak rate per second (0 when unknown)."""
+    ranked = sorted((score_option(o, qualities, constraints, rate) for o in dp.options),
                     key=lambda s: (-s.available, -s.score, dp.options.index(s.option)))
     best = ranked[0]
     if not best.available:  # every option unavailable: fall back to catalogue order but say so

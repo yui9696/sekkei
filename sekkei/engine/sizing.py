@@ -11,6 +11,26 @@ from dataclasses import dataclass, field
 from .. import graph as G
 from ..model import Design
 from .analysis import Analysis
+from .text import interval_seconds
+from .text import per_second as _per_second
+
+
+def implied_rate(an: Analysis) -> tuple[float, str] | None:
+    """'2,000 online drivers ... every 5 seconds' -> 400/s with its derivation; None when not derivable."""
+    interval = None
+    src = ""
+    for u in an.requirements:
+        secs = interval_seconds(u.sentence.text)
+        if secs:
+            interval, src = secs, u.id
+            break
+    if not interval:
+        return None
+    pops = [(q, u) for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and (q.value >= 100 or q.noun in POPULATION_NOUNS or q.noun in ("drivers", "trucks", "devices", "sensors", "vehicles"))]
+    if not pops:
+        return None
+    q, u = max(pops, key=lambda t: t[0].value)
+    return q.value / interval, f"{q.raw} {q.noun} ({u.id}) ÷ every {interval:g} s ({src})"
 
 DEFAULT_PAYLOAD_BYTES = 2048
 DEFAULT_SERVICE_MS = 200          # mean time of one outbound/handler call
@@ -35,20 +55,6 @@ class Capacity:
     estimates: list[Estimate] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
-
-
-def _per_second(q) -> float | None:
-    """Normalise a rate quantity to per second."""
-    unit = q.unit.lower()
-    if "/s" in unit or "per second" in unit or "per sec" in unit or unit in ("rps", "qps"):
-        return q.value
-    if "/min" in unit or "per minute" in unit:
-        return q.value / 60
-    if "/h" in unit or "per hour" in unit:
-        return q.value / 3600
-    if "/day" in unit or "per day" in unit:
-        return q.value / 86400
-    return None
 
 
 def _fmt(n: float) -> str:
@@ -85,7 +91,13 @@ def capacity(an: Analysis) -> Capacity:
             break
     cap.assumptions.append(f"Record size: {payload_src}.")
 
-    if not rates:
+    implied = implied_rate(an)
+    if implied and not [r for r in rates if not r[0].sentence.assumed]:
+        rate_val, derivation = implied
+        cap.estimates.append(Estimate("implied update rate", _fmt(rate_val) + "/s", "count ÷ interval", derivation))
+        cap.estimates.append(Estimate("implied updates per day", _fmt(rate_val * 86400), "implied rate × 86,400 s", derivation))
+        cap.estimates.append(Estimate("storage growth per day (updates)", _fmt(rate_val * 86400 * payload) + "B", "implied rate × 86,400 × record size", derivation + f"; {payload_src}"))
+    if not rates and not implied:
         cap.missing.append("no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated")
     for u, q, r in rates[:2]:
         what = q.noun or "requests"

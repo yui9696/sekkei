@@ -1827,6 +1827,25 @@
           "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
         },
         {
+          "name": "POST /events",
+          "inputs": [
+            {
+              "name": "body",
+              "type": "events fields",
+              "description": ""
+            }
+          ],
+          "output": "201 {events id}",
+          "errors": [
+            "400 invalid body",
+            "401 unauthenticated",
+            "409 conflict"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-3: Internal services publish events through an internal API (HTTP or in-process call)."
+        },
+        {
           "name": "GET /attempts/{id}",
           "inputs": [
             {
@@ -2266,6 +2285,26 @@
         }
       ],
       "description": ""
+    },
+    {
+      "id": "E-10",
+      "name": "Timestamp",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('timestamp'); confirm the fields."
     }
   ],
   "flows": [

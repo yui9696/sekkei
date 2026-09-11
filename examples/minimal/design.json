@@ -1012,7 +1012,30 @@
       "name": "Public HTTP API interface",
       "owner": "C-11",
       "kind": "http",
-      "operations": [],
+      "operations": [
+        {
+          "name": "GET /subscribers",
+          "inputs": [
+            {
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
+              "description": ""
+            }
+          ],
+          "output": "200 [subscriber], next cursor",
+          "errors": [
+            "401 unauthenticated"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Admins can export the subscriber list as CSV."
+        }
+      ],
       "stability": "draft",
       "description": "Provided by Public HTTP API. "
     }

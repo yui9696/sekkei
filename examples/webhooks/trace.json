@@ -701,6 +701,12 @@
         "entity:audit_entry"
       ]
     },
+    "E-10": {
+      "sentences": [],
+      "rules": [
+        "entity:from-text"
+      ]
+    },
     "F-1": {
       "sentences": [],
       "rules": [

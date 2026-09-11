@@ -170,11 +170,21 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 177 |
+| tests | 181 |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) + the two-line minimal spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
 | catalogue | 22 patterns, 31 archetypes, 12 decision points / 36 options, 12 quality tactics, 13 risks, 9 language layouts |
+
+## How good is it, measured
+
+[docs/EVALUATION_2026-09-11.md](docs/EVALUATION_2026-09-11.md): three specifications written
+after the engine was finished (ride dispatch, document search with LLM summaries, fleet
+telemetry over MQTT), scored on ten architect's criteria with the evidence. Result 15/20,
+15/20, 16/20 after the fixes that the evaluation itself motivated (11, 12, 12 before). What
+a human still adds is listed there: state machines and timing rules inside a use case,
+pipelines implied by a consequence ("must not block uploads"), technologies the catalogue
+does not know, and naming.
 
 ## Prior art
 

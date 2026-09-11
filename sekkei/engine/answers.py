@@ -76,6 +76,14 @@ def answer(q: Question, an: Analysis) -> Answer | None:
             return A(q.id, q.topic, "Single-user interactive use; load is not a design driver.", [("nonfunctional", "Load is one user's interactive use; throughput is not a design driver (assumed by the engine).")],
                      ["single user", "shared server, 100 requests/s", "batch over millions of records"], "A command-line or offline tool serves one user at a time.", "cli/no network",
                      "State the data volume per run instead; the latency target and memory limits change.", ["cli"])
+        from .sizing import implied_rate
+
+        imp = implied_rate(an)
+        if imp:
+            rate = max(1, int(round(imp[0])))
+            return A(q.id, q.topic, f"{rate:,} updates/s sustained (derived), 10x at peak.", [("nonfunctional", f"The system sustains {rate:,} updates/s with peaks of {rate * 10:,} updates/s (assumed by the engine: {imp[1]}).")],
+                     [f"{rate:,} updates/s", f"{rate * 10:,} updates/s", f"{max(1, rate // 10):,} updates/s"], f"Derived from the text: {imp[1]}.", imp[1],
+                     "State the measured rate; capacity estimates and the queue decision change.", ["queue", "surface_api"])
         n = _max_count(an)
         rate = max(10, int(n / 100)) if n else 100
         return A(q.id, q.topic, f"{rate:,} requests/s sustained, 10x at peak.", [("nonfunctional", f"The system sustains {rate:,} requests/s with peaks of {rate * 10:,} requests/s (assumed by the engine).")],

@@ -143,7 +143,7 @@ b.component("C-19", "Engine facade", "design(text, assume): analyse, answer open
             path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
             satisfies=["R-13", "R-14", "R-15", "R-16", "R-17"])
 b.component("C-24", "Answers", "Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.",
-            path="sekkei/engine/answers.py", requires=["I-15", "I-20"], satisfies=["R-17"])
+            path="sekkei/engine/answers.py", requires=["I-15", "I-20", "I-21"], satisfies=["R-17"])
 b.component("C-26", "Interview", "The dialogue: prompts in architect order with proposals, canonical bullets from answers, owner and decision overrides, undo, saved state, and the read-eval loop.",
             path="sekkei/engine/interview.py", requires=["I-1", "I-4", "I-13", "I-15", "I-19", "I-20", "I-24"], satisfies=["R-19"])
 b.component("C-25", "Owners", "Owner placement for requirements no pattern recognised: word overlap with specific components, surface+core for human use cases, or a synthesised component.",
@@ -151,7 +151,7 @@ b.component("C-25", "Owners", "Owner placement for requirements no pattern recog
 b.component("C-20", "Gap questions", "The questions an architect asks before committing, derived from what the text does not say, each with the assumption used meanwhile.",
             path="sekkei/engine/gaps.py", requires=["I-15"], satisfies=["R-16"])
 b.component("C-21", "Sizing", "Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.",
-            path="sekkei/engine/sizing.py", requires=["I-1", "I-3", "I-15"], satisfies=["R-16"])
+            path="sekkei/engine/sizing.py", requires=["I-1", "I-3", "I-13", "I-15"], satisfies=["R-16"])
 b.component("C-22", "Threat model", "STRIDE-lite threats per archetype, injected into the design as risks with mitigations and proofs.",
             path="sekkei/engine/threats.py", requires=["I-1"], satisfies=["R-16"])
 b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.",
@@ -236,6 +236,7 @@ b.interface("I-13", "Text analysis API", owner="C-13", kind="module", stability=
     op("quantities", [("text", "str")], "list[Quantity] (rate | latency | duration | count | size | percent | factor | code | number)"),
     op("modality", [("text", "str")], "'must' | 'should' | 'could' | ''"),
     op("tokens", [("text", "str")], "list[str]"),
+    op("per_second", [("q", "Quantity")], "float | None: a rate normalised to per second"),
     op("verb_of", [("word", "str")], "lexicon verb or ''"),
     op("title_of", [("text", "str")], "str"),
     op("slug", [("text", "str")], "str"),
@@ -470,17 +471,17 @@ b.work_package("WP-13", "Engine: analysis and evaluation", goal="Implement requi
                components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12"], satisfies=["R-13", "R-15"], size="M",
                files=["sekkei/engine/analysis.py", "sekkei/engine/evaluate.py"],
                acceptance=[check("A-15", "analysis tests pass on the fixtures", command=T + "tests/test_engine.py -k analysis")])
-b.work_package("WP-16", "Engine: questions, answers and owners", goal="Implement the gap questions, the answer rules for every question and the owner placement (overlap, surface+core, synthesis) for unrecognised requirements.",
-               components=["C-20", "C-24", "C-25"], implements=["I-20", "I-24", "I-25"], depends_on=["WP-13"], satisfies=["R-16", "R-17", "R-18"], size="M",
-               files=["sekkei/engine/gaps.py", "sekkei/engine/answers.py", "sekkei/engine/owners.py", "tests/test_autonomy.py"],
+b.work_package("WP-16", "Engine: questions, sizing, answers and owners", goal="Implement the gap questions, capacity/effort estimates, the answer rules for every question (which use the implied rate) and the owner placement for unrecognised requirements.",
+               components=["C-20", "C-21", "C-24", "C-25"], implements=["I-20", "I-21", "I-24", "I-25"], depends_on=["WP-2", "WP-13"], satisfies=["R-16", "R-17", "R-18"], size="L",
+               files=["sekkei/engine/gaps.py", "sekkei/engine/sizing.py", "sekkei/engine/answers.py", "sekkei/engine/owners.py", "tests/test_autonomy.py"],
                acceptance=[check("A-19", "autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component", command=T + "tests/test_autonomy.py")])
 b.work_package("WP-17", "Interview", goal="Implement the dialogue: prompt ordering with proposals, canonical bullets, overrides, undo, saved state, the read-eval loop and the CLI command.",
                components=["C-26"], implements=["I-26"], depends_on=["WP-4", "WP-14", "WP-16"], satisfies=["R-19"], size="M",
                files=["sekkei/engine/interview.py", "tests/test_interview.py"],
                acceptance=[check("A-20", "interview tests pass: architect order, Enter accepts, canonical bullets are recognised, named owners override, decisions can be forced, state round-trips, scripted session", command=T + "tests/test_interview.py")])
-b.work_package("WP-15", "Engine: architect's notes", goal="Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
-               components=["C-21", "C-22", "C-23"], implements=["I-21", "I-22", "I-23"], depends_on=["WP-2", "WP-13", "WP-16"], satisfies=["R-16"], size="M",
-               files=["sekkei/engine/sizing.py", "sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
+b.work_package("WP-15", "Engine: architect's notes", goal="Implement the STRIDE-lite threat model and the notes report with the requirements template.",
+               components=["C-22", "C-23"], implements=["I-22", "I-23"], depends_on=["WP-13", "WP-16"], satisfies=["R-16"], size="M",
+               files=["sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
                acceptance=[check("A-18", "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks", command=T + "tests/test_notes.py")])
 b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
                components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",

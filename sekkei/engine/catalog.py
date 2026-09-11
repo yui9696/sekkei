@@ -64,6 +64,7 @@ class Option:
     needs: list[str] = field(default_factory=list)      # constraint tokens required (any of)
     excludes: list[str] = field(default_factory=list)   # constraint tokens that rule it out
     bonus_when: list[str] = field(default_factory=list) # constraint tokens that make this the stated choice (+1.0)
+    max_rate: float = 0.0                                # items/s above which the option is penalised (0 = no ceiling)
 
 
 @dataclass
@@ -227,6 +228,25 @@ ARCHETYPES: dict[str, Archetype] = {a.key: a for a in [
                   OpT("show", [("view", "str"), ("state", "dict")], "None"),
                   OpT("on_input", [("event", "InputEvent")], "None", description="forwards the user's action to the core"),
               ]),
+    Archetype("mqtt_consumer", "MQTT consumer", "Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence.",
+              kind="service", layer=3, needs=["core", "queue", "mqtt_broker"], iface_kind="event", ops=[
+                  OpT("on_message", [("topic", "str"), ("payload", "bytes"), ("message_id", "str")], "None", ["ValidationError -> dead-letter topic"],
+                      post="reading persisted (idempotent on message_id) before the broker ack"),
+              ]),
+    Archetype("mqtt_broker", "MQTT broker", "Existing broker operated elsewhere; delivers device messages at least once.", kind="external", layer=0, iface_kind="event", ops=[
+        OpT("subscribe", [("topic", "str"), ("qos", "int")], "message stream"),
+    ]),
+    Archetype("sftp_target", "SFTP server", "External file drop for exports.", kind="external", layer=0, iface_kind="file", ops=[
+        OpT("put", [("path", "str"), ("data", "bytes")], "None", ["transfer error -> retry next run"]),
+    ]),
+    Archetype("sms", "SMS provider", "External SMS gateway.", kind="external", layer=0, iface_kind="http", ops=[
+        OpT("send", [("to", "str"), ("text", "str")], "provider message id"),
+    ]),
+    Archetype("geo", "Geospatial index", "Keeps current positions and answers nearest-neighbour queries within a radius.",
+              layer=1, needs=["store"], iface_kind="module", ops=[
+                  OpT("update_position", [("subject_id", "str"), ("lat", "float"), ("lon", "float"), ("at", "datetime")], "None"),
+                  OpT("nearest", [("lat", "float"), ("lon", "float"), ("radius_m", "int"), ("limit", "int"), ("filter", "dict")], "list[(subject_id, distance_m)]"),
+              ]),
     Archetype("cli", "Command line", "Parses arguments, calls the core, prints results, sets the exit code.",
               kind="cli", layer=3, needs=["core"], iface_kind="cli"),
     Archetype("config", "Configuration", "Loads and validates settings from environment/files; single typed object.",
@@ -322,7 +342,7 @@ DECISIONS: dict[str, DecisionPoint] = {d.key: d for d in [
                   [Option("PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
                           ["transactional with the domain data (persist + enqueue atomically)", "no new infrastructure", "easy to inspect"],
                           ["throughput bounded by the database (fine to ~10k items/s)", "needs a vacuum-friendly schema"],
-                          {"durability": 3, "simplicity": 3, "performance": 2, "isolation": 2, "scalability": 2, "cost": 3, "operability": 3}, needs=["postgres"]),
+                          {"durability": 3, "simplicity": 3, "performance": 2, "isolation": 2, "scalability": 2, "cost": 3, "operability": 3}, needs=["postgres"], max_rate=10000),
                    Option("Redis Streams with consumer groups",
                           ["high throughput", "built-in consumer groups and pending lists"],
                           ["durability depends on AOF/fsync configuration", "separate from the transactional store: needs an outbox"],
@@ -333,7 +353,7 @@ DECISIONS: dict[str, DecisionPoint] = {d.key: d for d in [
                           {"durability": 3, "simplicity": 1, "performance": 3, "isolation": 2, "scalability": 3, "cost": 1, "operability": 2}, needs=["broker"]),
                    Option("In-memory queue",
                           ["simplest possible"], ["work is lost on crash", "single process only"],
-                          {"durability": 0, "simplicity": 3, "performance": 3, "isolation": 1, "scalability": 0, "cost": 3, "operability": 2})],
+                          {"durability": 0, "simplicity": 3, "performance": 3, "isolation": 1, "scalability": 0, "cost": 3, "operability": 2}, max_rate=1000)],
                   ["queue", "ingest_api", "worker"], trigger=["async_delivery", "event_ingest", "batch_pipeline"]),
     DecisionPoint("store_tech", "Primary store",
                   "Domain records need durable, queryable storage.",
@@ -518,7 +538,7 @@ PATTERNS: list[Pattern] = [
             ["auth", "store"], ["principal"], [], ["auth_scheme"], ["auth_bypass"], "Callers are authenticated and authorized."),
     Pattern("rate_limiting", "Rate limiting", [(r"rate[- ]limit", 3), (r"\bthrottl", 2), (r"\bquota", 2)],
             ["ratelimit"], [], [], [], [], "Request budgets per caller."),
-    Pattern("cache", "Caching", [(r"\bcach(?:e|ing)\b", 3)], ["cache"], [], [], ["cache_policy"], [], "Hot reads are cached."),
+    Pattern("cache", "Caching", [(r"\bcach(?:e|es|ed|ing)\b", 3)], ["cache"], [], [], ["cache_policy"], [], "Hot reads are cached."),
     Pattern("search", "Search", [(r"\bsearch", 2), (r"full[- ]text", 3), (r"\bfilter", 1)], ["search", "store"], [], [], [], [], "Users search and filter records."),
     Pattern("file_storage", "File storage", [(r"\bupload", 2), (r"\bfiles?\b", 1), (r"\battachment", 2), (r"\bblob", 2), (r"\bs3\b", 2), (r"\bimages?\b|\bphotos?\b|\bdocuments?\b", 1)],
             ["files", "core"], ["file"], [], [], ["unbounded_input"], "Files are uploaded, stored and served."),
@@ -530,6 +550,13 @@ PATTERNS: list[Pattern] = [
             ["cli", "core", "config"], [], ["cli_run"], ["store_tech"], [], "A command-line front end over the core."),
     Pattern("local_ui", "Local user interface", [(r"touch ?panel", 3), (r"\bscreen\b", 2), (r"\bgui\b", 3), (r"\bdisplay(?:s|ed)?\b", 1), (r"\bchart\b|\bgraph\b", 1), (r"\bbutton", 2), (r"\bpanel\b", 1)],
             ["ui", "core"], [], [], [], [], "A local screen shows state and takes inputs."),
+    Pattern("mqtt_ingest", "MQTT ingestion", [(r"\bmqtt\b", 3), (r"\bbroker\b", 1), (r"\btopic", 1)],
+            ["mqtt_consumer", "mqtt_broker", "core", "store", "queue"], ["event", "work_item"], [], ["queue_tech", "store_tech"], ["duplicate_delivery", "queue_bloat"],
+            "Devices publish over MQTT; the consumer persists before acknowledging."),
+    Pattern("sftp_export", "SFTP export", [(r"\bsftp\b|\bftp\b", 3)], ["sftp_target", "exporter"], [], [], [], [], "Exports are dropped on an SFTP server."),
+    Pattern("sms_notification", "SMS notification", [(r"\bsms\b|\btext message", 3)], ["notifier", "sms"], [], [], [], ["notification_storm"], "People are notified by SMS."),
+    Pattern("geo", "Geospatial matching", [(r"\bnearest\b|\bnearby\b", 2), (r"\bgps\b|\bposition", 1), (r"\bpostgis\b|\bgeo", 2), (r"\blocation", 1), (r"\bradius\b|\bwithin \d+ ?(?:km|m|miles)\b", 2)],
+            ["geo", "core", "store"], [], [], ["store_tech"], [], "Positions are indexed and nearest matches are found."),
     Pattern("realtime", "Real-time push", [(r"\bwebsocket", 3), (r"real[- ]time", 2), (r"\bpush\b", 1), (r"\bstream", 1), (r"\bsse\b|server-sent", 3)],
             ["push", "core", "bus"], [], [], ["topology"], [], "Connected clients receive events as they happen."),
     Pattern("payments", "Payments", [(r"\bpayment", 3), (r"\binvoice", 2), (r"\bbilling\b", 2), (r"\bstripe\b|\bcharge\b", 2)],

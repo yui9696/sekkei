@@ -1,0 +1,2728 @@
+{
+  "sekkei": "1",
+  "name": "fleet-telemetry-ingestion",
+  "version": "0.1.0",
+  "summary": "Trucks send sensor readings to a central service that keeps the fleet manager informed.",
+  "goals": [
+    "Producers hand events to the system, which persists them before acknowledging.",
+    "The system notifies people through an external channel.",
+    "Callers are authenticated and authorized.",
+    "Scheduled jobs process stored records in windows.",
+    "Devices publish over MQTT; the consumer persists before acknowledging.",
+    "Exports are dropped on an SFTP server.",
+    "People are notified by SMS.",
+    "Records move in and out as files."
+  ],
+  "non_goals": [],
+  "conventions": {
+    "language": "java",
+    "test_command": "./gradlew test",
+    "lint_command": "./gradlew check",
+    "rules": [
+      "Constructor injection; no static state.",
+      "Prefer the boring option; a new piece of infrastructure needs a decision record.",
+      "Java 21 as stated in the constraints.",
+      "Stateless processes: configuration from the environment, no local files that a second instance would not see."
+    ],
+    "definition_of_done": [
+      "Acceptance checks of the package pass.",
+      "No file outside the write scope changed.",
+      "Every public operation of the implemented interfaces exists with the declared inputs."
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R-1",
+      "statement": "Each truck publishes a batch of sensor readings (speed, fuel level, engine temperature, position) every 30 seconds over MQTT.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-2",
+      "statement": "The service validates readings, drops duplicates, and stores them.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+    },
+    {
+      "id": "R-3",
+      "statement": "Fleet managers view the latest reading per truck and a 24-hour chart per sensor.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+    },
+    {
+      "id": "R-4",
+      "statement": "When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is notified by SMS.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-5",
+      "statement": "A nightly job aggregates readings into daily statistics per truck and exports them as CSV to an SFTP server.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-6",
+      "statement": "5,000 trucks, 20,000 readings/s at peak; a reading is visible to managers within 10 s p95.",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "p95 latency at 5,000, 20,000",
+        "target": "<= 10 s",
+        "unit": "s"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-7",
+      "statement": "Readings are never lost once acknowledged to the truck; duplicates never appear in charts.",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "records lost across a process crash",
+        "target": "= 0",
+        "unit": "records"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-8",
+      "statement": "Raw readings are kept 90 days, daily statistics 5 years.",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "time at 5 years",
+        "target": "90 days",
+        "unit": "days"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-9",
+      "statement": "Java 21, PostgreSQL with TimescaleDB available, Kafka available. Team of 5. On-prem Kubernetes.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-10",
+      "statement": "The MQTT broker already exists and is operated by another team.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-11",
+      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-12",
+      "statement": "Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine).",
+      "kind": "functional",
+      "priority": "could",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-13",
+      "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "size at 2 KB",
+        "target": "<= 256 kb",
+        "unit": "kb"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-14",
+      "statement": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "ratio",
+        "target": "99.9 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-15",
+      "statement": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "time at 4 h",
+        "target": "24 h",
+        "unit": "h"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-16",
+      "statement": "External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "time at 5",
+        "target": "10 s",
+        "unit": "s"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-17",
+      "statement": "Authentication via an OIDC identity provider (assumed by the engine: internal users).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-18",
+      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-19",
+      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    }
+  ],
+  "components": [
+    {
+      "id": "C-1",
+      "name": "Store",
+      "responsibility": "Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
+      "kind": "datastore",
+      "path": "src/main/java/app/Store.java",
+      "requires": [],
+      "satisfies": [
+        "R-7",
+        "R-9",
+        "R-14",
+        "R-16"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:store"
+      ]
+    },
+    {
+      "id": "C-2",
+      "name": "Work queue",
+      "responsibility": "Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.",
+      "kind": "datastore",
+      "path": "src/main/java/app/Queue.java",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-7",
+        "R-14",
+        "R-16"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:queue"
+      ]
+    },
+    {
+      "id": "C-3",
+      "name": "Email provider",
+      "responsibility": "External email delivery service.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-4"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:email"
+      ]
+    },
+    {
+      "id": "C-4",
+      "name": "MQTT broker",
+      "responsibility": "Existing broker operated elsewhere; delivers device messages at least once.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:mqtt_broker"
+      ]
+    },
+    {
+      "id": "C-5",
+      "name": "SFTP server",
+      "responsibility": "External file drop for exports.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-5"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:sftp_target"
+      ]
+    },
+    {
+      "id": "C-6",
+      "name": "SMS provider",
+      "responsibility": "External SMS gateway.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-4"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:sms"
+      ]
+    },
+    {
+      "id": "C-7",
+      "name": "Domain core",
+      "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "kind": "module",
+      "path": "src/main/java/app/Core.java",
+      "requires": [
+        "I-1",
+        "I-9",
+        "I-8",
+        "I-16"
+      ],
+      "satisfies": [
+        "R-3",
+        "R-1",
+        "R-5",
+        "R-9",
+        "R-10",
+        "R-18",
+        "R-19"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:core"
+      ]
+    },
+    {
+      "id": "C-8",
+      "name": "Notifier",
+      "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "kind": "module",
+      "path": "src/main/java/app/Notifier.java",
+      "requires": [
+        "I-3",
+        "I-9",
+        "I-6"
+      ],
+      "satisfies": [
+        "R-4"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:notifier"
+      ]
+    },
+    {
+      "id": "C-9",
+      "name": "Observability",
+      "responsibility": "Metrics registry and exposition, structured logging, health/readiness endpoints.",
+      "kind": "module",
+      "path": "src/main/java/app/Observability.java",
+      "requires": [],
+      "satisfies": [
+        "R-14"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:observability"
+      ]
+    },
+    {
+      "id": "C-10",
+      "name": "Authentication",
+      "responsibility": "Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
+      "kind": "module",
+      "path": "src/main/java/app/Auth.java",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-12",
+        "R-17"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:auth"
+      ]
+    },
+    {
+      "id": "C-11",
+      "name": "Import/export",
+      "responsibility": "Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "kind": "module",
+      "path": "src/main/java/app/Exporter.java",
+      "requires": [
+        "I-7",
+        "I-5"
+      ],
+      "satisfies": [
+        "R-5"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:exporter"
+      ]
+    },
+    {
+      "id": "C-12",
+      "name": "Scheduler",
+      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "kind": "job",
+      "path": "src/main/java/app/Scheduler.java",
+      "requires": [
+        "I-9",
+        "I-2"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-5",
+        "R-11"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:scheduler"
+      ]
+    },
+    {
+      "id": "C-13",
+      "name": "Batch job",
+      "responsibility": "Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "kind": "job",
+      "path": "src/main/java/app/Batch.java",
+      "requires": [
+        "I-1",
+        "I-12",
+        "I-9",
+        "I-5",
+        "I-11",
+        "I-7"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-5",
+        "R-11"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:batch"
+      ]
+    },
+    {
+      "id": "C-14",
+      "name": "Public HTTP API",
+      "responsibility": "Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
+      "kind": "service",
+      "path": "src/main/java/app/SurfaceApi.java",
+      "requires": [
+        "I-7",
+        "I-9",
+        "I-10",
+        "I-11"
+      ],
+      "satisfies": [
+        "R-3",
+        "R-6",
+        "R-8",
+        "R-9",
+        "R-13",
+        "R-15"
+      ],
+      "tags": [
+        "layer:3",
+        "archetype:surface_api"
+      ]
+    },
+    {
+      "id": "C-15",
+      "name": "MQTT consumer",
+      "responsibility": "Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence.",
+      "kind": "service",
+      "path": "src/main/java/app/MqttConsumer.java",
+      "requires": [
+        "I-7",
+        "I-2",
+        "I-4",
+        "I-9"
+      ],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:3",
+        "archetype:mqtt_consumer"
+      ]
+    },
+    {
+      "id": "C-16",
+      "name": "Readings processor",
+      "responsibility": "Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
+      "kind": "module",
+      "path": "src/main/java/app/ReadingsProcessor.java",
+      "requires": [
+        "I-9"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:readings_processor",
+        "synthesised"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "I-1",
+      "name": "Store interface",
+      "owner": "C-1",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "save",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "record",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "id",
+          "errors": [
+            "ConflictError on duplicate key"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": ""
+        },
+        {
+          "name": "get",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "record | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "list",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "filter",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "list[record], next page token",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "delete",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Store. "
+    },
+    {
+      "id": "I-2",
+      "name": "Work queue interface",
+      "owner": "C-2",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "enqueue",
+          "inputs": [
+            {
+              "name": "item",
+              "type": "WorkItem",
+              "description": ""
+            },
+            {
+              "name": "not_before",
+              "type": "datetime | None",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "item is durable before return",
+          "description": ""
+        },
+        {
+          "name": "lease",
+          "inputs": [
+            {
+              "name": "partition",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "limit",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "visibility",
+              "type": "timedelta",
+              "description": ""
+            }
+          ],
+          "output": "list[WorkItem]",
+          "errors": [],
+          "pre": "items whose not_before has passed",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "ack",
+          "inputs": [
+            {
+              "name": "item_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "nack",
+          "inputs": [
+            {
+              "name": "item_id",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "retry_at",
+              "type": "datetime | None",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "re-queue with a delay, or dead-letter when retries are exhausted"
+        },
+        {
+          "name": "depth",
+          "inputs": [
+            {
+              "name": "partition",
+              "type": "str | None",
+              "description": ""
+            }
+          ],
+          "output": "int",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Work queue. "
+    },
+    {
+      "id": "I-3",
+      "name": "Email provider interface",
+      "owner": "C-3",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "send",
+          "inputs": [
+            {
+              "name": "to",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "subject",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "body",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "provider message id",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Email provider. External; contract is theirs."
+    },
+    {
+      "id": "I-4",
+      "name": "MQTT broker interface",
+      "owner": "C-4",
+      "kind": "event",
+      "operations": [
+        {
+          "name": "subscribe",
+          "inputs": [
+            {
+              "name": "topic",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "qos",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "message stream",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by MQTT broker. External; contract is theirs."
+    },
+    {
+      "id": "I-5",
+      "name": "SFTP server interface",
+      "owner": "C-5",
+      "kind": "file",
+      "operations": [
+        {
+          "name": "put",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "data",
+              "type": "bytes",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [
+            "transfer error -> retry next run"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by SFTP server. External; contract is theirs."
+    },
+    {
+      "id": "I-6",
+      "name": "SMS provider interface",
+      "owner": "C-6",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "send",
+          "inputs": [
+            {
+              "name": "to",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "provider message id",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by SMS provider. External; contract is theirs."
+    },
+    {
+      "id": "I-7",
+      "name": "Domain core interface",
+      "owner": "C-7",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "publish_batch",
+          "inputs": [
+            {
+              "name": "batch",
+              "type": "Batch | id",
+              "description": ""
+            }
+          ],
+          "output": "Batch | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Each truck publishes a batch of sensor readings (speed, fuel level, engine temperature, po"
+        },
+        {
+          "name": "validate_readings",
+          "inputs": [
+            {
+              "name": "readings",
+              "type": "Readings | id",
+              "description": ""
+            }
+          ],
+          "output": "Readings | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "drop_duplicates",
+          "inputs": [
+            {
+              "name": "duplicates",
+              "type": "Duplicates | id",
+              "description": ""
+            }
+          ],
+          "output": "Duplicates | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "store_duplicates",
+          "inputs": [
+            {
+              "name": "duplicates",
+              "type": "Duplicates | id",
+              "description": ""
+            }
+          ],
+          "output": "Duplicates | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "get_latest",
+          "inputs": [
+            {
+              "name": "latest",
+              "type": "Latest | id",
+              "description": ""
+            }
+          ],
+          "output": "Latest | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
+        },
+        {
+          "name": "get_truck",
+          "inputs": [
+            {
+              "name": "truck",
+              "type": "Truck | id",
+              "description": ""
+            }
+          ],
+          "output": "Truck | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
+        },
+        {
+          "name": "notify_manager",
+          "inputs": [
+            {
+              "name": "manager",
+              "type": "Manager | id",
+              "description": ""
+            }
+          ],
+          "output": "Manager | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n"
+        },
+        {
+          "name": "aggregate_readings",
+          "inputs": [
+            {
+              "name": "readings",
+              "type": "Readings | id",
+              "description": ""
+            }
+          ],
+          "output": "Readings | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV"
+        },
+        {
+          "name": "export_sftp",
+          "inputs": [
+            {
+              "name": "sftp",
+              "type": "Sftp | id",
+              "description": ""
+            }
+          ],
+          "output": "Sftp | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV"
+        },
+        {
+          "name": "record_audit",
+          "inputs": [
+            {
+              "name": "audit",
+              "type": "Audit | id",
+              "description": ""
+            }
+          ],
+          "output": "Audit | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+        },
+        {
+          "name": "delete_engine",
+          "inputs": [
+            {
+              "name": "engine",
+              "type": "Engine | id",
+              "description": ""
+            }
+          ],
+          "output": "Engine | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Domain core. "
+    },
+    {
+      "id": "I-8",
+      "name": "Notifier interface",
+      "owner": "C-8",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "notify",
+          "inputs": [
+            {
+              "name": "recipient",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "template",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "context",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "message id",
+          "errors": [
+            "NotifyError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Notifier. "
+    },
+    {
+      "id": "I-9",
+      "name": "Observability interface",
+      "owner": "C-9",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "counter",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Counter",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "histogram",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Histogram",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "gauge",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "labels",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Gauge",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "GET /metrics",
+          "inputs": [],
+          "output": "Prometheus text exposition",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "GET /healthz",
+          "inputs": [],
+          "output": "200 when dependencies reachable",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "log",
+          "inputs": [
+            {
+              "name": "event",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "fields",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "one JSON line per event"
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Observability. "
+    },
+    {
+      "id": "I-10",
+      "name": "Authentication interface",
+      "owner": "C-10",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "authenticate",
+          "inputs": [
+            {
+              "name": "credentials",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Principal",
+          "errors": [
+            "AuthError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "authorize",
+          "inputs": [
+            {
+              "name": "principal",
+              "type": "Principal",
+              "description": ""
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "resource",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [
+            "Forbidden"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Authentication. "
+    },
+    {
+      "id": "I-11",
+      "name": "Import/export interface",
+      "owner": "C-11",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "export",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "filter",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
+            }
+          ],
+          "output": "byte stream",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "import_",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "stream",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
+            }
+          ],
+          "output": "ImportReport with per-row errors",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Import/export. "
+    },
+    {
+      "id": "I-12",
+      "name": "Scheduler interface",
+      "owner": "C-12",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "next_attempt",
+          "inputs": [
+            {
+              "name": "attempt",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "retry_after",
+              "type": "timedelta | None",
+              "description": ""
+            }
+          ],
+          "output": "datetime | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "None when attempts are exhausted"
+        },
+        {
+          "name": "promote_due",
+          "inputs": [
+            {
+              "name": "now",
+              "type": "datetime",
+              "description": ""
+            }
+          ],
+          "output": "int moved",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Scheduler. "
+    },
+    {
+      "id": "I-13",
+      "name": "Batch job interface",
+      "owner": "C-13",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "run",
+          "inputs": [
+            {
+              "name": "window",
+              "type": "DateRange",
+              "description": ""
+            }
+          ],
+          "output": "JobReport",
+          "errors": [
+            "JobError"
+          ],
+          "pre": "stated values: 30 seconds (R-1); 90 days (R-11); 1 year (R-11)",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Batch job. "
+    },
+    {
+      "id": "I-14",
+      "name": "Public HTTP API interface",
+      "owner": "C-14",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "GET /latests/{id}",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "200 latest",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Public HTTP API. "
+    },
+    {
+      "id": "I-15",
+      "name": "MQTT consumer interface",
+      "owner": "C-15",
+      "kind": "event",
+      "operations": [
+        {
+          "name": "on_message",
+          "inputs": [
+            {
+              "name": "topic",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "payload",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "message_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [
+            "ValidationError -> dead-letter topic"
+          ],
+          "pre": "",
+          "post": "reading persisted (idempotent on message_id) before the broker ack",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by MQTT consumer. "
+    },
+    {
+      "id": "I-16",
+      "name": "Readings processor interface",
+      "owner": "C-16",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "validate_readings",
+          "inputs": [
+            {
+              "name": "readings",
+              "type": "…",
+              "description": ""
+            }
+          ],
+          "output": "…",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "drop_duplicates",
+          "inputs": [
+            {
+              "name": "duplicates",
+              "type": "…",
+              "description": ""
+            }
+          ],
+          "output": "…",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "store",
+          "inputs": [
+            {
+              "name": "input",
+              "type": "…",
+              "description": ""
+            }
+          ],
+          "output": "…",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Readings processor. Contract derived from R-2; fill in the types marked '…'."
+    }
+  ],
+  "entities": [
+    {
+      "id": "E-1",
+      "name": "Event",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "type",
+          "type": "str",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "payload",
+          "type": "json",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "idempotency_key",
+          "type": "str",
+          "constraints": "unique per producer",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-2",
+      "name": "WorkItem",
+      "owner": "C-2",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "partition",
+          "type": "str",
+          "constraints": "indexed; the isolation key",
+          "description": ""
+        },
+        {
+          "name": "payload_ref",
+          "type": "uuid",
+          "constraints": "references the event",
+          "description": ""
+        },
+        {
+          "name": "attempt",
+          "type": "int",
+          "constraints": ">= 0",
+          "description": ""
+        },
+        {
+          "name": "not_before",
+          "type": "timestamp",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "leased_until",
+          "type": "timestamp | null",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-3",
+      "name": "Principal",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "kind",
+          "type": "enum(customer, operator, service)",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "scopes",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-4",
+      "name": "JobRun",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "job",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_start",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_end",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "report",
+          "type": "json",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-5",
+      "name": "Duplicate",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('duplicate'); confirm the fields."
+    },
+    {
+      "id": "E-6",
+      "name": "Reading",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "speed",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "fuel_level",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "engine_temperature",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "position",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('reading'); confirm the fields."
+    }
+  ],
+  "flows": [
+    {
+      "id": "F-1",
+      "name": "Run the batch job",
+      "trigger": "schedule fires",
+      "steps": [
+        {
+          "from": "C-13",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "read the window of records"
+        },
+        {
+          "from": "C-13",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "write results and the job report"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-1",
+      "title": "Work queue technology",
+      "context": "Work items must survive a crash and be leased by several workers.",
+      "options": [
+        {
+          "name": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
+          "pros": [
+            "transactional with the domain data (persist + enqueue atomically)",
+            "no new infrastructure",
+            "easy to inspect"
+          ],
+          "cons": [
+            "throughput bounded by the database (fine to ~10k items/s)",
+            "needs a vacuum-friendly schema"
+          ]
+        },
+        {
+          "name": "Redis Streams with consumer groups",
+          "pros": [
+            "high throughput",
+            "built-in consumer groups and pending lists"
+          ],
+          "cons": [
+            "durability depends on AOF/fsync configuration",
+            "separate from the transactional store: needs an outbox"
+          ]
+        },
+        {
+          "name": "Managed broker (SQS/RabbitMQ/Kafka)",
+          "pros": [
+            "scales independently",
+            "delayed delivery built in (SQS)"
+          ],
+          "cons": [
+            "new infrastructure and cost",
+            "at-least-once semantics still need an outbox"
+          ]
+        },
+        {
+          "name": "In-memory queue",
+          "pros": [
+            "simplest possible"
+          ],
+          "cons": [
+            "work is lost on crash",
+            "single process only"
+          ]
+        }
+      ],
+      "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
+      "consequences": "",
+      "affects": [
+        "C-2"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-2",
+      "title": "Primary store",
+      "context": "Domain records need durable, queryable storage.",
+      "options": [
+        {
+          "name": "PostgreSQL",
+          "pros": [
+            "transactions",
+            "indexes and JSON",
+            "already available"
+          ],
+          "cons": [
+            "operational dependency"
+          ]
+        },
+        {
+          "name": "SQLite",
+          "pros": [
+            "zero operations",
+            "single file"
+          ],
+          "cons": [
+            "one writer at a time",
+            "no network access"
+          ]
+        },
+        {
+          "name": "Files (JSON/CSV on disk)",
+          "pros": [
+            "no dependencies",
+            "human readable"
+          ],
+          "cons": [
+            "no transactions or concurrency"
+          ]
+        },
+        {
+          "name": "In-memory",
+          "pros": [
+            "fastest",
+            "trivial"
+          ],
+          "cons": [
+            "lost on restart"
+          ]
+        }
+      ],
+      "choice": "PostgreSQL",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.29; In-memory: 1.63; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
+      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "affects": [
+        "C-1"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-3",
+      "title": "Caller authentication",
+      "context": "Management operations must be attributable to a customer or operator.",
+      "options": [
+        {
+          "name": "API keys per customer, hashed at rest, sent as a bearer token",
+          "pros": [
+            "simple",
+            "scriptable"
+          ],
+          "cons": [
+            "no delegation or expiry unless added"
+          ]
+        },
+        {
+          "name": "OAuth2 / OIDC with the platform's identity provider",
+          "pros": [
+            "single sign-on",
+            "expiry and scopes"
+          ],
+          "cons": [
+            "integration effort"
+          ]
+        },
+        {
+          "name": "Mutual TLS",
+          "pros": [
+            "strong",
+            "no secrets in headers"
+          ],
+          "cons": [
+            "certificate lifecycle for every customer"
+          ]
+        }
+      ],
+      "choice": "OAuth2 / OIDC with the platform's identity provider",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints",
+      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "affects": [
+        "C-10"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-4",
+      "title": "Process topology",
+      "context": "The same code base serves requests and performs background work.",
+      "options": [
+        {
+          "name": "One image, role by flag: `api` and `worker` processes scale independently",
+          "pros": [
+            "stateless containers",
+            "independent scaling of ingress and outbound work",
+            "one build"
+          ],
+          "cons": [
+            "two deployables to operate"
+          ]
+        },
+        {
+          "name": "Single process with background threads",
+          "pros": [
+            "one deployable"
+          ],
+          "cons": [
+            "request latency competes with outbound work",
+            "cannot scale roles separately"
+          ]
+        },
+        {
+          "name": "Separate services per concern (ingest, admin, delivery)",
+          "pros": [
+            "clear ownership"
+          ],
+          "cons": [
+            "three deployables for a team of three",
+            "shared schema anyway"
+          ]
+        }
+      ],
+      "choice": "One image, role by flag: `api` and `worker` processes scale independently",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.71; Separate services per concern: 1.51; Single process with background threads: 1.40",
+      "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
+      "affects": [
+        "C-14",
+        "C-12"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-5",
+      "title": "Redundancy for the availability target",
+      "context": "The availability target must be met through instance failures and deploys.",
+      "options": [
+        {
+          "name": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
+          "pros": [
+            "survives one instance failure",
+            "zero-downtime deploys"
+          ],
+          "cons": [
+            "needs stateless instances and a shared store"
+          ]
+        },
+        {
+          "name": "Single instance with health-based restart",
+          "pros": [
+            "simplest",
+            "cheapest"
+          ],
+          "cons": [
+            "restart time is downtime",
+            "deploys are downtime"
+          ]
+        },
+        {
+          "name": "Active-active across two regions",
+          "pros": [
+            "survives a regional outage"
+          ],
+          "cons": [
+            "data replication and conflict handling",
+            "cost"
+          ]
+        }
+      ],
+      "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.71; Single instance with health-based restart: 1.40; Active-active across two regions: 1.31",
+      "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.",
+      "affects": [
+        "C-14"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-6",
+      "title": "Assumed answer: load (Q-payload)",
+      "context": "The requirements do not say. Question: Q-payload. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "2 KB / 256 KB",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "16 KB / 1 MB",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "256 bytes / 4 KB",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "2 KB / 256 KB",
+      "rationale": "Typical JSON record sizes; the maximum bounds request bodies.",
+      "consequences": "If the real answer differs: State the sizes; storage growth and body limits change.",
+      "affects": [
+        "C-14"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-7",
+      "title": "Assumed answer: quality (Q-availability)",
+      "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "99.9 %",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "99.5 %",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "99.99 %",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "99.9 %",
+      "rationale": "Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.",
+      "consequences": "If the real answer differs: State the target and what may be lost; topology and queue durability change.",
+      "affects": [
+        "C-2",
+        "C-9"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-8",
+      "title": "Assumed answer: data (Q-retention)",
+      "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "90 days / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "30 days / 90 days",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "indefinite",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "90 days / 1 year",
+      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "affects": [
+        "C-13",
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-9",
+      "title": "Assumed answer: data (Q-backup)",
+      "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "daily / 24 h / 4 h",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "hourly / 1 h / 1 h",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "daily / 24 h / 4 h",
+      "rationale": "The store's own daily backup is the cheapest credible baseline.",
+      "consequences": "If the real answer differs: State RPO/RTO; the store decision and a restore drill change.",
+      "affects": [
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-10",
+      "title": "Assumed answer: security (Q-auth)",
+      "context": "The requirements do not say. Question: Q-auth. Evidence: staff/employees mentioned.",
+      "options": [
+        {
+          "name": "OIDC",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "API keys",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "mTLS",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "OIDC",
+      "rationale": "Internal staff systems normally sit behind the company's SSO.",
+      "consequences": "If the real answer differs: State the scheme; the authentication decision is rescored.",
+      "affects": [
+        "C-10"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-11",
+      "title": "Assumed answer: cost (Q-budget)",
+      "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "existing only",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "managed services allowed",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "strict monthly cap",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "existing only",
+      "rationale": "The cheapest assumption; every decision already prefers the option needing no new infrastructure.",
+      "consequences": "If the real answer differs: State the budget; options adding infrastructure become available.",
+      "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-12",
+      "title": "Assumed answer: data (Q-migration)",
+      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "greenfield",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "one-shot import",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "gradual cut-over",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "greenfield",
+      "rationale": "Nothing in the text names an existing system.",
+      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
+      "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-13",
+      "title": "Assumed answer: security (Q-authz)",
+      "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "owner-scoped + admin role",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "flat (everyone sees everything)",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "role matrix per resource",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "owner-scoped + admin role",
+      "rationale": "Ownership scoping is the minimum that prevents cross-tenant access.",
+      "consequences": "If the real answer differs: State the roles; core operations and acceptance checks change.",
+      "affects": [
+        "C-7",
+        "C-10"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-14",
+      "title": "Assumed answer: resilience (Q-external)",
+      "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "10 s / 5 retries / queue",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "fail fast, no retry",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "30 s / unlimited retries",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "10 s / 5 retries / queue",
+      "rationale": "Bounded retries with a durable queue keep the system responsive during a one-hour outage.",
+      "consequences": "If the real answer differs: State the policy; the outbound client and scheduler contracts change.",
+      "affects": [
+        "C-12",
+        "C-2"
+      ],
+      "status": "proposed"
+    }
+  ],
+  "risks": [
+    {
+      "id": "K-1",
+      "description": "Payloads or uploads without size limits exhaust memory or disk.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
+      "affects": [
+        "C-14"
+      ]
+    },
+    {
+      "id": "K-2",
+      "description": "A widespread failure disables many targets and emails every owner at once.",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "Rate-limit notifications per owner and batch them.",
+      "affects": [
+        "C-8"
+      ]
+    },
+    {
+      "id": "K-3",
+      "description": "A management operation reachable without authentication.",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
+      "affects": [
+        "C-10"
+      ]
+    },
+    {
+      "id": "K-4",
+      "description": "Entities evolve; migrations run against live data.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Versioned migrations applied before deploy; additive changes first, removals one release later.",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-5",
+      "description": "At-least-once delivery means a target can receive the same event twice (crash between call and ack).",
+      "likelihood": "high",
+      "impact": "medium",
+      "mitigation": "Send a stable event id and attempt number in headers; document idempotent consumption; never retry on 2xx.",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-6",
+      "description": "Retried and dead-lettered items accumulate and slow the lease query.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Partial index on (partition, not_before) for live items; archive terminal items on a schedule.",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-7",
+      "description": "Parts of the requirements were not recognised by the catalogue and received a generic decomposition.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Review the components marked generic; refine responsibilities and interfaces before briefing.",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-8",
+      "description": "[tampering] Store: Injection through query construction.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-9",
+      "description": "[information_disclosure] Store: Backups and dumps contain everything.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Encrypt backups; restrict who can take them. Check: backup file is not readable without the key",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-10",
+      "description": "[denial_of_service] Work queue: A poison item is retried forever and blocks its partition.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Attempt cap and dead-letter; per-partition concurrency cap. Check: an always-failing item ends in the dead-letter after the cap",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-11",
+      "description": "[tampering] Work queue: Items are processed twice after a crash between call and ack.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Idempotent processing with the item id; ack only after the outcome is recorded. Check: kill the worker mid-call; the item is redelivered exactly once more",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-12",
+      "description": "[denial_of_service] Notifier: Notification storms and template injection.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
+      "affects": [
+        "C-8"
+      ]
+    },
+    {
+      "id": "K-13",
+      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
+      "affects": [
+        "C-10"
+      ]
+    },
+    {
+      "id": "K-14",
+      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
+      "affects": [
+        "C-10"
+      ]
+    },
+    {
+      "id": "K-15",
+      "description": "[spoofing] Public HTTP API: Requests without a verified caller identity reach domain operations.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials",
+      "affects": [
+        "C-14"
+      ]
+    },
+    {
+      "id": "K-16",
+      "description": "[tampering] Public HTTP API: Malformed or oversized bodies reach the core.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413",
+      "affects": [
+        "C-14"
+      ]
+    },
+    {
+      "id": "K-17",
+      "description": "[denial_of_service] Public HTTP API: A single caller saturates the service.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected",
+      "affects": [
+        "C-14"
+      ]
+    },
+    {
+      "id": "K-18",
+      "description": "[information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
+      "affects": [
+        "C-14"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "title": "Store + Work queue + Observability",
+      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
+      "components": [
+        "C-1",
+        "C-2",
+        "C-9"
+      ],
+      "implements": [
+        "I-1",
+        "I-2",
+        "I-9"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-1",
+        "R-7",
+        "R-9",
+        "R-14",
+        "R-16"
+      ],
+      "files": [
+        "src/main/java/app/Store.java",
+        "src/test/java/app/StoreTest.java",
+        "src/main/java/app/Queue.java",
+        "src/test/java/app/QueueTest.java",
+        "src/main/java/app/Observability.java",
+        "src/test/java/app/ObservabilityTest.java"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Store, Work queue, Observability pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.StoreTest",
+          "metric": ""
+        },
+        {
+          "id": "A-2",
+          "description": "R-7: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-7"
+        },
+        {
+          "id": "A-3",
+          "description": "R-14: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-14"
+        },
+        {
+          "id": "A-4",
+          "description": "R-16: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-16"
+        }
+      ],
+      "notes": "family: event_ingest"
+    },
+    {
+      "id": "WP-2",
+      "title": "Authentication + Scheduler + Readings processor",
+      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work; Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
+      "components": [
+        "C-10",
+        "C-12",
+        "C-16"
+      ],
+      "implements": [
+        "I-10",
+        "I-12",
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-5",
+        "R-11",
+        "R-12",
+        "R-17"
+      ],
+      "files": [
+        "src/main/java/app/Auth.java",
+        "src/test/java/app/AuthTest.java",
+        "src/main/java/app/Scheduler.java",
+        "src/test/java/app/SchedulerTest.java",
+        "src/main/java/app/ReadingsProcessor.java",
+        "src/test/java/app/ReadingsProcessorTest.java"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-5",
+          "description": "unit tests of Authentication, Scheduler, Readings processor pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.AuthTest",
+          "metric": ""
+        }
+      ],
+      "notes": "family: auth"
+    },
+    {
+      "id": "WP-3",
+      "title": "Notifier",
+      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "components": [
+        "C-8"
+      ],
+      "implements": [
+        "I-8"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-4"
+      ],
+      "files": [
+        "src/main/java/app/Notifier.java",
+        "src/test/java/app/NotifierTest.java"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-6",
+          "description": "unit tests of Notifier pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.NotifierTest",
+          "metric": ""
+        }
+      ],
+      "notes": "family: notification"
+    },
+    {
+      "id": "WP-4",
+      "title": "Domain core",
+      "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "components": [
+        "C-7"
+      ],
+      "implements": [
+        "I-7"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2",
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-3",
+        "R-5",
+        "R-9",
+        "R-10",
+        "R-18",
+        "R-19"
+      ],
+      "files": [
+        "src/main/java/app/Core.java",
+        "src/test/java/app/CoreTest.java"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-7",
+          "description": "unit tests of Domain core pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.CoreTest",
+          "metric": ""
+        }
+      ],
+      "notes": "family: event_ingest"
+    },
+    {
+      "id": "WP-5",
+      "title": "MQTT consumer + Import/export",
+      "goal": "Implement MQTT consumer: Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence; Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "components": [
+        "C-15",
+        "C-11"
+      ],
+      "implements": [
+        "I-15",
+        "I-11"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-4"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-5"
+      ],
+      "files": [
+        "src/main/java/app/MqttConsumer.java",
+        "src/test/java/app/MqttConsumerTest.java",
+        "src/main/java/app/Exporter.java",
+        "src/test/java/app/ExporterTest.java"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "unit tests of MQTT consumer, Import/export pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.Mqtt_consumerTest",
+          "metric": ""
+        }
+      ],
+      "notes": "family: mqtt_ingest"
+    },
+    {
+      "id": "WP-6",
+      "title": "Batch job + Public HTTP API",
+      "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results; Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
+      "components": [
+        "C-13",
+        "C-14"
+      ],
+      "implements": [
+        "I-13",
+        "I-14"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2",
+        "WP-4",
+        "WP-5"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-3",
+        "R-5",
+        "R-6",
+        "R-8",
+        "R-9",
+        "R-11",
+        "R-13",
+        "R-15"
+      ],
+      "files": [
+        "src/main/java/app/Batch.java",
+        "src/test/java/app/BatchTest.java",
+        "src/main/java/app/SurfaceApi.java",
+        "src/test/java/app/SurfaceApiTest.java"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-9",
+          "description": "unit tests of Batch job, Public HTTP API pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.BatchTest",
+          "metric": ""
+        },
+        {
+          "id": "A-10",
+          "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-6"
+        },
+        {
+          "id": "A-11",
+          "description": "R-8: time at 5 years 90 days days",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-12",
+          "description": "R-13: size at 2 KB <= 256 kb kb",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-13"
+        },
+        {
+          "id": "A-13",
+          "description": "R-15: time at 4 h 24 h h",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-15"
+        }
+      ],
+      "notes": "family: batch_pipeline"
+    }
+  ]
+}

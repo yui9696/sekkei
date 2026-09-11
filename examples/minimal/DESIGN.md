@@ -284,7 +284,10 @@ graph LR
 - **kind**: http · **owner**: C-11 · **stability**: draft
 - Provided by Public HTTP API. 
 
-_(no operations declared)_
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `GET /subscribers` | `filter`: query, `page`: cursor | 200 [subscriber], next cursor | 401 unauthenticated | — |
+| | from R-2: Admins can export the subscriber list as CSV. | | | |
 
 ## Entities
 
