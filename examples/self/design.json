@@ -1,0 +1,2309 @@
+{
+  "sekkei": "1",
+  "name": "sekkei",
+  "version": "0.1.0",
+  "summary": "A design-first harness for LLM coding agents: a checkable architecture graph, a deterministic linter, self-contained work-package briefs, a plan, and drift checks against the code.",
+  "goals": [
+    "A design schema rich enough for real systems and small enough for an LLM to emit correctly.",
+    "Every lint rule deterministic, identified, and covered by a planted-defect test.",
+    "Briefs that let one agent implement one package without reading the rest of the design.",
+    "A closed loop: brief, implementation, completion report, acceptance, next packages."
+  ],
+  "non_goals": [
+    "Generating application code.",
+    "Orchestrating agents.",
+    "Conversational requirements elicitation."
+  ],
+  "conventions": {
+    "language": "python",
+    "test_command": "python -m pytest -q",
+    "lint_command": "",
+    "rules": [
+      "Standard library only at runtime (the anthropic package is an optional extra used by sekkei/llm.py only).",
+      "Python 3.11+; type hints everywhere; dataclasses for the model.",
+      "No fuzzy matching: every diagnostic must be reproducible from the design alone.",
+      "Import direction: cli -> {brief, drift, state, render, llm, rules, graph} -> model; never upward."
+    ],
+    "definition_of_done": [
+      "The package's acceptance commands exit 0.",
+      "`sekkei check -d examples/self/design.json --root .` reports no error.",
+      "No file outside the package's write scope was changed."
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R-1",
+      "statement": "The design file describes requirements, components, interfaces with operations, entities, flows, decisions, risks, work packages and acceptance checks, and round-trips through JSON without loss.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-2",
+      "statement": "Every lint rule is deterministic, has a stable id, a fixed severity and a fix hint, and is covered by a planted-defect test that the meta-test enforces.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-3",
+      "statement": "A brief for a work package contains its goal, the requirements it satisfies verbatim, the contracts it implements, the contracts it consumes, its write scope, the conventions, its acceptance checks and the completion-report template, and nothing about other packages.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-4",
+      "statement": "The plan orders work packages into waves such that every package's dependencies lie in earlier waves, and reports the size-weighted critical path.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-5",
+      "statement": "For Python code the drift check reports missing component paths, missing operations, parameter mismatches and undeclared imports between components.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-6",
+      "statement": "A completion report is accepted only if every acceptance check of the package passed and every touched file is inside the package's write scope; acceptance unlocks dependents.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-7",
+      "statement": "No runtime dependency outside the Python standard library; Python 3.11 or newer.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-8",
+      "statement": "Linting and drift-checking this repository's own design finishes fast enough to run on every commit.",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "wall time of `sekkei lint` plus `sekkei check` on examples/self on a laptop",
+        "target": "<= 1",
+        "unit": "s"
+      },
+      "rationale": ""
+    },
+    {
+      "id": "R-9",
+      "statement": "A human can author a design in a small Python DSL that yields the same model as the JSON.",
+      "kind": "functional",
+      "priority": "should",
+      "rationale": ""
+    },
+    {
+      "id": "R-10",
+      "statement": "An optional command drafts a design from free text with Claude, lints it, and feeds the diagnostics back until the design is clean or the round limit is reached.",
+      "kind": "functional",
+      "priority": "could",
+      "rationale": ""
+    },
+    {
+      "id": "R-11",
+      "statement": "A command line exposes every operation with a default design file, JSON output where an orchestrator would consume it, and exit code 1 on errors.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-12",
+      "statement": "Two versions of a design can be compared, listing added, removed and changed elements and the work packages whose briefs became stale; a completion report against a stale brief is rejected unless forced.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    }
+  ],
+  "components": [
+    {
+      "id": "C-1",
+      "name": "Model",
+      "responsibility": "Dataclasses for the design, tolerant JSON loading, serialisation and the JSON Schema.",
+      "kind": "module",
+      "path": "sekkei/model.py",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-7"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-2",
+      "name": "Rules",
+      "responsibility": "The deterministic lint rules and the diagnostic type.",
+      "kind": "module",
+      "path": "sekkei/rules.py",
+      "requires": [
+        "I-1",
+        "I-3"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-3",
+      "name": "Graph",
+      "responsibility": "Dependency graphs, cycle detection, waves, critical path, traceability, scope matching.",
+      "kind": "module",
+      "path": "sekkei/graph.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-4"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-4",
+      "name": "Render",
+      "responsibility": "DESIGN.md, Mermaid/DOT graphs and the traceability matrix.",
+      "kind": "module",
+      "path": "sekkei/render.py",
+      "requires": [
+        "I-1",
+        "I-3"
+      ],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-5",
+      "name": "Brief",
+      "responsibility": "Self-contained work-package briefs, their fingerprint, and the report template.",
+      "kind": "module",
+      "path": "sekkei/brief.py",
+      "requires": [
+        "I-1",
+        "I-4",
+        "I-7"
+      ],
+      "satisfies": [
+        "R-3",
+        "R-12"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-6",
+      "name": "Drift",
+      "responsibility": "Design-versus-code checks over Python sources using ast.",
+      "kind": "module",
+      "path": "sekkei/drift.py",
+      "requires": [
+        "I-1",
+        "I-3"
+      ],
+      "satisfies": [
+        "R-5"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-7",
+      "name": "State",
+      "responsibility": "Progress state in .sekkei/state.json, brief fingerprints, and completion-report acceptance.",
+      "kind": "module",
+      "path": "sekkei/state.py",
+      "requires": [
+        "I-1",
+        "I-3"
+      ],
+      "satisfies": [
+        "R-6",
+        "R-12"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-8",
+      "name": "DSL",
+      "responsibility": "Python builder for authoring designs by hand.",
+      "kind": "module",
+      "path": "sekkei/dsl.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-9"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-9",
+      "name": "LLM",
+      "responsibility": "Optional Claude drafting loop and the architect prompt.",
+      "kind": "module",
+      "path": "sekkei/llm.py",
+      "requires": [
+        "I-1",
+        "I-2"
+      ],
+      "satisfies": [
+        "R-10"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-10",
+      "name": "CLI",
+      "responsibility": "argparse front end over every module.",
+      "kind": "cli",
+      "path": "sekkei/cli.py",
+      "requires": [
+        "I-1",
+        "I-2",
+        "I-3",
+        "I-4",
+        "I-5",
+        "I-6",
+        "I-7",
+        "I-9",
+        "I-11",
+        "I-12"
+      ],
+      "satisfies": [
+        "R-11",
+        "R-8"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-11",
+      "name": "Starter",
+      "responsibility": "The example design written by `sekkei init`.",
+      "kind": "module",
+      "path": "sekkei/examples.py",
+      "requires": [
+        "I-1",
+        "I-8"
+      ],
+      "satisfies": [
+        "R-11"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-12",
+      "name": "Diff",
+      "responsibility": "Element-level comparison of two design versions and the packages they affect.",
+      "kind": "module",
+      "path": "sekkei/diff.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-12"
+      ],
+      "tags": []
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "I-1",
+      "name": "Model API",
+      "owner": "C-1",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "from_dict",
+          "inputs": [
+            {
+              "name": "data",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Design",
+          "errors": [
+            "DesignError on type mismatch"
+          ],
+          "pre": "",
+          "post": "unknown keys are recorded in Design.unknown_keys",
+          "description": ""
+        },
+        {
+          "name": "to_dict",
+          "inputs": [
+            {
+              "name": "obj",
+              "type": "Any",
+              "description": ""
+            }
+          ],
+          "output": "JSON-compatible data",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "loads",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Design",
+          "errors": [
+            "DesignError on invalid JSON"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "load",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "str | Path",
+              "description": ""
+            }
+          ],
+          "output": "Design",
+          "errors": [
+            "DesignError",
+            "FileNotFoundError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "dumps",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "dump",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "path",
+              "type": "str | Path",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "json_schema",
+          "inputs": [],
+          "output": "dict (JSON Schema draft 2020-12)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-2",
+      "name": "Rules API",
+      "owner": "C-2",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "lint",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "disable",
+              "type": "Iterable[str]",
+              "description": ""
+            },
+            {
+              "name": "strict",
+              "type": "bool",
+              "description": ""
+            }
+          ],
+          "output": "list[Diagnostic] sorted by severity, rule, where",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "has_errors",
+          "inputs": [
+            {
+              "name": "diags",
+              "type": "Iterable[Diagnostic]",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "summary",
+          "inputs": [
+            {
+              "name": "diags",
+              "type": "Iterable[Diagnostic]",
+              "description": ""
+            }
+          ],
+          "output": "dict severity -> count",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "format_text",
+          "inputs": [
+            {
+              "name": "diags",
+              "type": "list[Diagnostic]",
+              "description": ""
+            },
+            {
+              "name": "hints",
+              "type": "bool",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "rule_table",
+          "inputs": [],
+          "output": "Markdown table of all rules",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-3",
+      "name": "Graph API",
+      "owner": "C-3",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "component_graph",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "dict[str, set[str]]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "package_graph",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "dict[str, set[str]]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "implied_package_edges",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "list[(from, to, interface)]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "find_cycle",
+          "inputs": [
+            {
+              "name": "g",
+              "type": "Graph",
+              "description": ""
+            }
+          ],
+          "output": "list[str] | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "waves",
+          "inputs": [
+            {
+              "name": "g",
+              "type": "Graph",
+              "description": ""
+            }
+          ],
+          "output": "list[list[str]]",
+          "errors": [
+            "ValueError on a cycle"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "critical_path",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "(weight, [package ids])",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "ready_packages",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "done",
+              "type": "Iterable[str]",
+              "description": ""
+            }
+          ],
+          "output": "list[str]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "traceability",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "dict requirement -> {components, packages, acceptance}",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "in_scope",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "scope_entry",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "transitive",
+          "inputs": [
+            {
+              "name": "g",
+              "type": "Graph",
+              "description": ""
+            },
+            {
+              "name": "start",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "set[str]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "layers",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "list[list[str]]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-4",
+      "name": "Render API",
+      "owner": "C-4",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "render_markdown",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "mermaid",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "which",
+              "type": "'components' | 'packages'",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "dot",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "which",
+              "type": "'components' | 'packages'",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "traceability_markdown",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "interface_table",
+          "inputs": [
+            {
+              "name": "iface",
+              "type": "Interface",
+              "description": ""
+            }
+          ],
+          "output": "Markdown table",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-5",
+      "name": "Brief API",
+      "owner": "C-5",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "render_brief",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "wp_id",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "state",
+              "type": "State | None",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [
+            "KeyError for an unknown package"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "brief_fingerprint",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "wp_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "16-hex-digit hash of the design-derived brief content",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-6",
+      "name": "Drift API",
+      "owner": "C-6",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "check",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "root",
+              "type": "str | Path",
+              "description": ""
+            }
+          ],
+          "output": "list[Finding]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "scope_violations",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "wp_id",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "files",
+              "type": "Iterable[str]",
+              "description": ""
+            }
+          ],
+          "output": "list[str]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "format_findings",
+          "inputs": [
+            {
+              "name": "findings",
+              "type": "list[Finding]",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "has_errors",
+          "inputs": [
+            {
+              "name": "findings",
+              "type": "Iterable[Finding]",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-7",
+      "name": "State API",
+      "owner": "C-7",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "State",
+          "inputs": [],
+          "output": "class: load(root), save(), status(wp), done(), set_status(wp, status, report), record_brief(wp, fp), is_stale(wp, fp)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "report_template",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "wp_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "dict",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "validate_report",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "list[str] problems (empty = acceptable)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "accept",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "state",
+              "type": "State",
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "fingerprint",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "force",
+              "type": "bool",
+              "description": ""
+            }
+          ],
+          "output": "list[str] problems; rejects a stale brief unless force; on success marks done and saves",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "next_packages",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "state",
+              "type": "State",
+              "description": ""
+            }
+          ],
+          "output": "list[str]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "status_table",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "state",
+              "type": "State",
+              "description": ""
+            }
+          ],
+          "output": "Markdown table",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-8",
+      "name": "DSL",
+      "owner": "C-8",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "DesignBuilder",
+          "inputs": [],
+          "output": "class with requirement/component/interface/.../work_package/build/save",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "op",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "inputs",
+              "type": "Sequence",
+              "description": ""
+            },
+            {
+              "name": "output",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "errors",
+              "type": "Sequence[str]",
+              "description": ""
+            }
+          ],
+          "output": "Operation",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "check",
+          "inputs": [
+            {
+              "name": "id_",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "description",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "kind",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "command",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "metric",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Acceptance",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "option",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "pros",
+              "type": "Sequence[str]",
+              "description": ""
+            },
+            {
+              "name": "cons",
+              "type": "Sequence[str]",
+              "description": ""
+            }
+          ],
+          "output": "Option",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "load_python",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "str | Path",
+              "description": ""
+            }
+          ],
+          "output": "Design",
+          "errors": [
+            "ValueError if the file defines neither `design` nor `build()`"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-9",
+      "name": "LLM API",
+      "owner": "C-9",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "architect_prompt",
+          "inputs": [
+            {
+              "name": "include_schema",
+              "type": "bool",
+              "description": ""
+            },
+            {
+              "name": "include_rules",
+              "type": "bool",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "draft",
+          "inputs": [
+            {
+              "name": "requirements_text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "client",
+              "type": "Any",
+              "description": ""
+            },
+            {
+              "name": "model",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "rounds",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "DraftResult",
+          "errors": [
+            "RuntimeError if the anthropic package is missing or the model refuses"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "extract_json",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "dict",
+          "errors": [
+            "DesignError if no JSON object"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-10",
+      "name": "Command line",
+      "owner": "C-10",
+      "kind": "cli",
+      "operations": [
+        {
+          "name": "sekkei init [dir]",
+          "inputs": [],
+          "output": "starter design.json",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei lint [-d FILE] [--json] [--strict] [--disable RULE|GROUP]",
+          "inputs": [],
+          "output": "diagnostics; exit 1 on errors",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei render / graph / matrix",
+          "inputs": [],
+          "output": "DESIGN.md, Mermaid/DOT, traceability",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei brief WP / plan [--json]",
+          "inputs": [],
+          "output": "brief; waves, critical path, ready packages",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei check [--root DIR] / scope WP FILES",
+          "inputs": [],
+          "output": "drift findings; out-of-scope files",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei accept REPORT [--force] / status / next / start WP",
+          "inputs": [],
+          "output": "state transitions; stale briefs are refused",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei diff OLD [-d NEW]",
+          "inputs": [],
+          "output": "element changes and the affected packages; exit 1 if any",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei schema / rules / prompt / draft FILE",
+          "inputs": [],
+          "output": "JSON Schema; rule table; architect prompt; drafted design",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-11",
+      "name": "Starter",
+      "owner": "C-11",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "starter_design",
+          "inputs": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Design that lints clean",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-12",
+      "name": "Diff API",
+      "owner": "C-12",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "diff",
+          "inputs": [
+            {
+              "name": "old",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "new",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "list[Change] (collection, id, added|removed|changed, fields)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "affected_packages",
+          "inputs": [
+            {
+              "name": "new",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "changes",
+              "type": "list[Change]",
+              "description": ""
+            }
+          ],
+          "output": "dict package id -> reasons",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "format_diff",
+          "inputs": [
+            {
+              "name": "changes",
+              "type": "list[Change]",
+              "description": ""
+            },
+            {
+              "name": "affected",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    }
+  ],
+  "entities": [
+    {
+      "id": "E-1",
+      "name": "Design",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "requirements",
+          "type": "list[Requirement]",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "components",
+          "type": "list[Component]",
+          "constraints": "ids unique across the document",
+          "description": ""
+        },
+        {
+          "name": "interfaces",
+          "type": "list[Interface]",
+          "constraints": "owner is a component id",
+          "description": ""
+        },
+        {
+          "name": "work_packages",
+          "type": "list[WorkPackage]",
+          "constraints": "depends_on forms a DAG",
+          "description": ""
+        }
+      ],
+      "description": "The root object; serialised with the top-level key `sekkei`."
+    },
+    {
+      "id": "E-2",
+      "name": "Diagnostic",
+      "owner": "C-2",
+      "fields": [
+        {
+          "name": "rule",
+          "type": "str",
+          "constraints": "e.g. V001",
+          "description": ""
+        },
+        {
+          "name": "severity",
+          "type": "str",
+          "constraints": "error | warning | info",
+          "description": ""
+        },
+        {
+          "name": "message",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "where",
+          "type": "str",
+          "constraints": "id or JSON path",
+          "description": ""
+        },
+        {
+          "name": "hint",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-3",
+      "name": "Completion report",
+      "owner": "C-7",
+      "fields": [
+        {
+          "name": "work_package",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "files_touched",
+          "type": "list[str]",
+          "constraints": "each inside the package's files",
+          "description": ""
+        },
+        {
+          "name": "checks",
+          "type": "list[{id, passed, output}]",
+          "constraints": "one per acceptance check, all passed",
+          "description": ""
+        },
+        {
+          "name": "deviations",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "proposed_decisions",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "notes",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "What an agent returns; validated by accept."
+    }
+  ],
+  "flows": [
+    {
+      "id": "F-1",
+      "name": "Lint from the command line",
+      "trigger": "sekkei lint",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "load the design file"
+        },
+        {
+          "from": "C-10",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "run every rule"
+        },
+        {
+          "from": "C-2",
+          "to": "C-3",
+          "via": "I-3",
+          "description": "rules query graphs, cycles and traceability"
+        }
+      ]
+    },
+    {
+      "id": "F-2",
+      "name": "Brief a work package",
+      "trigger": "sekkei brief WP-n",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-2",
+          "via": "I-2",
+          "description": "gate: refuse if the design has errors"
+        },
+        {
+          "from": "C-10",
+          "to": "C-5",
+          "via": "I-5",
+          "description": "render the brief"
+        },
+        {
+          "from": "C-5",
+          "to": "C-4",
+          "via": "I-4",
+          "description": "interface tables"
+        },
+        {
+          "from": "C-5",
+          "to": "C-7",
+          "via": "I-7",
+          "description": "dependency statuses and the report template"
+        }
+      ]
+    },
+    {
+      "id": "F-3",
+      "name": "Accept a completion report",
+      "trigger": "sekkei accept report.json",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-7",
+          "via": "I-7",
+          "description": "validate and mark done"
+        },
+        {
+          "from": "C-7",
+          "to": "C-3",
+          "via": "I-3",
+          "description": "scope matching and ready packages"
+        }
+      ]
+    },
+    {
+      "id": "F-5",
+      "name": "Design changed after a brief was issued",
+      "trigger": "sekkei diff old.json; sekkei accept report.json",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-12",
+          "via": "I-12",
+          "description": "list the changes and the packages they touch"
+        },
+        {
+          "from": "C-10",
+          "to": "C-5",
+          "via": "I-5",
+          "description": "recompute the brief fingerprint"
+        },
+        {
+          "from": "C-10",
+          "to": "C-7",
+          "via": "I-7",
+          "description": "accept compares it with the recorded one and refuses a stale brief"
+        }
+      ]
+    },
+    {
+      "id": "F-4",
+      "name": "Drift check",
+      "trigger": "sekkei check",
+      "steps": [
+        {
+          "from": "C-10",
+          "to": "C-6",
+          "via": "I-6",
+          "description": "walk component paths"
+        },
+        {
+          "from": "C-6",
+          "to": "C-3",
+          "via": "I-3",
+          "description": "prefix matching of files to components"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-1",
+      "title": "Single source of truth for interface ownership",
+      "context": "A component could list what it provides, or an interface could name its owner.",
+      "options": [
+        {
+          "name": "interface.owner only",
+          "pros": [
+            "cannot disagree with itself"
+          ],
+          "cons": [
+            "provides list must be derived"
+          ]
+        },
+        {
+          "name": "component.provides and interface.owner",
+          "pros": [
+            "explicit both ways"
+          ],
+          "cons": [
+            "two lists that must agree will not"
+          ]
+        }
+      ],
+      "choice": "interface.owner only",
+      "rationale": "Redundant bookkeeping is where LLM-written designs go wrong first.",
+      "consequences": "",
+      "affects": [
+        "C-1",
+        "C-2"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-2",
+      "title": "JSON as the design format",
+      "context": "The file is written mostly by models and read mostly by tools.",
+      "options": [
+        {
+          "name": "JSON",
+          "pros": [
+            "emitted reliably by LLMs",
+            "stdlib parser",
+            "exact round-trip"
+          ],
+          "cons": [
+            "hard for humans to read"
+          ]
+        },
+        {
+          "name": "YAML",
+          "pros": [
+            "readable"
+          ],
+          "cons": [
+            "dependency",
+            "indentation errors from models"
+          ]
+        },
+        {
+          "name": "Markdown with conventions",
+          "pros": [
+            "readable"
+          ],
+          "cons": [
+            "needs a parser that guesses"
+          ]
+        }
+      ],
+      "choice": "JSON",
+      "rationale": "Render exists for humans; the DSL exists for hand-authoring.",
+      "consequences": "",
+      "affects": [
+        "C-1",
+        "C-8"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-3",
+      "title": "Work packages carry a write scope",
+      "context": "Parallel agents must not edit the same files.",
+      "options": [
+        {
+          "name": "files per package",
+          "pros": [
+            "conflict check A002",
+            "scope check after the fact"
+          ],
+          "cons": [
+            "author must list files"
+          ]
+        },
+        {
+          "name": "no scope",
+          "pros": [
+            "less to write"
+          ],
+          "cons": [
+            "conflicts found at merge time"
+          ]
+        }
+      ],
+      "choice": "files per package",
+      "rationale": "It is the only way to make parallel waves safe.",
+      "consequences": "",
+      "affects": [
+        "C-2",
+        "C-6",
+        "C-7"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-4",
+      "title": "Python-only symbol and import checks",
+      "context": "Drift checking needs a parser per language.",
+      "options": [
+        {
+          "name": "stdlib ast, Python only",
+          "pros": [
+            "zero dependencies",
+            "exact"
+          ],
+          "cons": [
+            "other languages get presence checks only"
+          ]
+        },
+        {
+          "name": "tree-sitter",
+          "pros": [
+            "many languages"
+          ],
+          "cons": [
+            "native dependency",
+            "grammar drift"
+          ]
+        }
+      ],
+      "choice": "stdlib ast, Python only",
+      "rationale": "Honest partial coverage beats a dependency the user cannot install.",
+      "consequences": "",
+      "affects": [
+        "C-6"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-5",
+      "title": "No orchestration",
+      "context": "Agent runtimes change monthly.",
+      "options": [
+        {
+          "name": "export a JSON plan",
+          "pros": [
+            "stable contract",
+            "works with any runner"
+          ],
+          "cons": [
+            "user wires the loop"
+          ]
+        },
+        {
+          "name": "built-in runner",
+          "pros": [
+            "one command"
+          ],
+          "cons": [
+            "ties sekkei to one agent API"
+          ]
+        }
+      ],
+      "choice": "export a JSON plan",
+      "rationale": "The plan and the state file are the contract.",
+      "consequences": "",
+      "affects": [
+        "C-10",
+        "C-7"
+      ],
+      "status": "accepted"
+    }
+  ],
+  "risks": [
+    {
+      "id": "K-1",
+      "description": "Wording rules (group Q) produce false positives on legitimate text.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "They are warnings with a fixed vocabulary and can be disabled with --disable Q.",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-2",
+      "description": "Dynamic or aliased imports escape the drift check, hiding an undeclared dependency.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Documented limitation; the check is ast-based and reports only what it can prove.",
+      "affects": [
+        "C-6"
+      ]
+    },
+    {
+      "id": "K-3",
+      "description": "A model emits keys or values outside the schema.",
+      "likelihood": "high",
+      "impact": "low",
+      "mitigation": "Tolerant loader records unknown keys (S006) and invalid values (S005) instead of failing to load.",
+      "affects": [
+        "C-1",
+        "C-9"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "title": "Model",
+      "goal": "Implement the dataclasses, tolerant loader, serialiser and JSON Schema generator with round-trip tests.",
+      "components": [
+        "C-1"
+      ],
+      "implements": [
+        "I-1"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-1",
+        "R-7"
+      ],
+      "files": [
+        "sekkei/model.py",
+        "tests/test_model.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "model tests pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_model.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-2",
+      "title": "Graph",
+      "goal": "Implement dependency graphs, cycle detection, waves, critical path, traceability and scope matching.",
+      "components": [
+        "C-3"
+      ],
+      "implements": [
+        "I-3"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-4"
+      ],
+      "files": [
+        "sekkei/graph.py",
+        "tests/test_graph.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-2",
+          "description": "graph tests pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_graph.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-3",
+      "title": "Rules",
+      "goal": "Implement every lint rule with a stable id, severity and hint, plus the planted-defect battery and its meta-test.",
+      "components": [
+        "C-2"
+      ],
+      "implements": [
+        "I-2"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "files": [
+        "sekkei/rules.py",
+        "tests/test_rules.py"
+      ],
+      "size": "L",
+      "acceptance": [
+        {
+          "id": "A-3",
+          "description": "rule tests pass, including the meta-test that every rule has a planted defect",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_rules.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-4",
+      "title": "Render",
+      "goal": "Render DESIGN.md with Mermaid graphs, layers, waves and the traceability matrix.",
+      "components": [
+        "C-4"
+      ],
+      "implements": [
+        "I-4"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-1"
+      ],
+      "files": [
+        "sekkei/render.py",
+        "tests/test_render.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-4",
+          "description": "render tests pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_render.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-5",
+      "title": "State",
+      "goal": "Implement the state file, report validation and acceptance, and the ready-package query.",
+      "components": [
+        "C-7"
+      ],
+      "implements": [
+        "I-7"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-6"
+      ],
+      "files": [
+        "sekkei/state.py",
+        "tests/test_state.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-5",
+          "description": "state tests pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_state.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-6",
+      "title": "Brief",
+      "goal": "Generate self-contained briefs containing only what one package needs, with the report template.",
+      "components": [
+        "C-5"
+      ],
+      "implements": [
+        "I-5"
+      ],
+      "depends_on": [
+        "WP-4",
+        "WP-5"
+      ],
+      "satisfies": [
+        "R-3"
+      ],
+      "files": [
+        "sekkei/brief.py",
+        "tests/test_brief.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-6",
+          "description": "brief tests pass, including that a brief never names another package's components",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_brief.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-7",
+      "title": "Drift",
+      "goal": "Implement presence, symbol, parameter and import checks over Python sources, and the scope check.",
+      "components": [
+        "C-6"
+      ],
+      "implements": [
+        "I-6"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-5"
+      ],
+      "files": [
+        "sekkei/drift.py",
+        "tests/test_drift.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-7",
+          "description": "drift tests pass on a synthetic repository",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_drift.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-8",
+      "title": "DSL and starter",
+      "goal": "Provide the Python builder and the starter design that `sekkei init` writes; both must produce designs that lint clean.",
+      "components": [
+        "C-8",
+        "C-11"
+      ],
+      "implements": [
+        "I-8",
+        "I-11"
+      ],
+      "depends_on": [
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-9",
+        "R-11"
+      ],
+      "files": [
+        "sekkei/dsl.py",
+        "sekkei/examples.py",
+        "tests/test_dsl.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "DSL tests pass and the starter design has zero diagnostics",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_dsl.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-9",
+      "title": "LLM drafting",
+      "goal": "Implement the architect prompt and the draft-lint-feedback loop with an injectable client so it is testable offline.",
+      "components": [
+        "C-9"
+      ],
+      "implements": [
+        "I-9"
+      ],
+      "depends_on": [
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-10"
+      ],
+      "files": [
+        "sekkei/llm.py",
+        "tests/test_llm.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-9",
+          "description": "llm tests pass with a fake client",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_llm.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-11",
+      "title": "Diff",
+      "goal": "Compare two design versions element by element and map the changes to the work packages whose briefs are stale.",
+      "components": [
+        "C-12"
+      ],
+      "implements": [
+        "I-12"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-12"
+      ],
+      "files": [
+        "sekkei/diff.py",
+        "tests/test_diff.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-13",
+          "description": "diff tests pass, including that a stale brief blocks acceptance",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_diff.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-10",
+      "title": "CLI",
+      "goal": "Expose every operation on the command line with exit codes and JSON output, and prove the whole loop end to end.",
+      "components": [
+        "C-10"
+      ],
+      "implements": [
+        "I-10"
+      ],
+      "depends_on": [
+        "WP-6",
+        "WP-7",
+        "WP-8",
+        "WP-9",
+        "WP-11"
+      ],
+      "satisfies": [
+        "R-11",
+        "R-8",
+        "R-12"
+      ],
+      "files": [
+        "sekkei/cli.py",
+        "sekkei/__main__.py",
+        "tests/test_cli.py",
+        "tests/test_self.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-10",
+          "description": "CLI round-trip test passes: init, lint, render, plan, brief, accept, next",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_cli.py",
+          "metric": ""
+        },
+        {
+          "id": "A-11",
+          "description": "self design lints clean and drift check on the repository reports no error",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_self.py",
+          "metric": ""
+        },
+        {
+          "id": "A-12",
+          "description": "lint + check on examples/self run within the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        }
+      ],
+      "notes": ""
+    }
+  ]
+}
