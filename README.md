@@ -12,7 +12,7 @@ Pure Python standard library, 3.11+. Deterministic: same text, same design, byte
 ```
 requirements.md ──sekkei design──▶ design.json ──lint/plan──▶ brief WP-n ──(agent)──▶ accept ──▶ check
                                        │
-                                       └── DESIGN.md · REVIEW.md (what the engine could not decide) · trace.json
+                                       └── DESIGN.md · NOTES.md (answers, sizing, threats, effort) · trace.json
 ```
 
 ## Quick start
@@ -87,7 +87,7 @@ Two things an architect normally does in the meeting room, the engine does on it
 |---|---|
 | `design.json` | the checkable design: requirements (verbatim), components, interfaces with operations, entities, flows, scored decisions, risks (including the threat model), conventions, work packages with acceptance checks |
 | `DESIGN.md` | the same as a document: component graph, layers, contracts, sequence diagram per flow, ADRs with rationale and consequences, traceability matrix |
-| `NOTES.md` | **the architect's notes**: (1) questions still open, with the assumption taken meanwhile and what each answer changes; (2) capacity estimates with formula and inputs (Little's law, storage growth, outage backlog, fan-out); (3) effort and schedule from package sizes, waves and team size; (4) STRIDE-lite threat model per component with a proof for each mitigation; (5) what the engine could not decide; (6) how it read the text |
+| `NOTES.md` | **the architect's notes**: (1) the questions the text left open and the engine's answer to each, with its evidence or default and what changes if the real answer differs (or the open questions themselves with `--no-assume`); (1b) requirements placed without a pattern and how; (2) capacity estimates with formula and inputs (Little's law, storage growth, outage backlog, fan-out); (3) effort and schedule from package sizes, waves and team size; (4) STRIDE-lite threat model per component with a proof for each mitigation; (5) what the engine could not decide; (6) how it read the text |
 | `trace.json` | every element → the sentences and catalogue rules that produced it |
 
 ## The engine
@@ -112,8 +112,8 @@ output**: requirements it did not recognise, quality attributes it has no tactic
 generic components from the fallback. It says what it does not know instead of hiding it.
 Every element carries a trace to the sentences and catalogue rules that produced it.
 
-What the engine produced for the webhook spec (`examples/webhooks/`): 16 components
-including a partitioned durable queue, worker, retry scheduler carrying the backoff
+What the engine produced for the webhook spec (`examples/webhooks/`): 16 components from
+the text (plus an audit log and a retention job from its own assumed answers), including a partitioned durable queue, worker, retry scheduler carrying the backoff
 schedule from the text as a precondition, HMAC signer with a rotation-window secret store,
 SSRF-safe outbound client, health policy with notifier, admin and ingest APIs with
 operations derived from the sentences (`POST /endpoints`, `DELETE /endpoints/{id}`,
