@@ -100,13 +100,14 @@ contract, and the 90-days/5-years retention pair is mangled into one metric.
 
 ## What a human architect still adds (honest list)
 
-1. **State machines and timing rules** inside a use case (offer windows, retry-after-N,
-   threshold-for-M-minutes). The numbers are kept verbatim but no contract carries them
-   unless a pattern has a designated sink.
+1. **State machines** inside a use case (offer → accept/decline → next batch). Since the
+   debugging pass the numbers of a use-case sentence reach its operation's precondition
+   ("stated values: 15 seconds (R-2)"), but the transitions themselves are not modelled.
 2. **Pipelines implied by a non-functional sentence** ("must not block uploads" ⇒ a queue
    and a worker). The engine reacts to capability words, not to consequences.
-3. **Technology the catalogue does not know** (TimescaleDB, pgvector as a vector store,
-   Redis as a geo index). Unknown names are inert.
+3. **Technology the catalogue does not know.** TimescaleDB and pgvector now have decision
+   points (debugging pass); Redis as a geo index, and anything else unnamed in the
+   catalogue, stays inert.
 4. **Naming.** Derived operation and entity names are mechanical (`/batchs`, `Duplicate`);
    they are correct enough to brief an agent, not to publish.
 5. **Judgement about redundancy of components.** 12–16 components for a team of 3–5 is on
