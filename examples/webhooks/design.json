@@ -2611,6 +2611,196 @@
       "affects": [
         "C-10"
       ]
+    },
+    {
+      "id": "K-12",
+      "description": "[tampering] Store: Injection through query construction.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-13",
+      "description": "[information_disclosure] Store: Backups and dumps contain everything.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Encrypt backups; restrict who can take them. Check: backup file is not readable without the key",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-14",
+      "description": "[denial_of_service] Work queue: A poison item is retried forever and blocks its partition.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Attempt cap and dead-letter; per-partition concurrency cap. Check: an always-failing item ends in the dead-letter after the cap",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-15",
+      "description": "[tampering] Work queue: Items are processed twice after a crash between call and ack.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Idempotent processing with the item id; ack only after the outcome is recorded. Check: kill the worker mid-call; the item is redelivered exactly once more",
+      "affects": [
+        "C-2"
+      ]
+    },
+    {
+      "id": "K-16",
+      "description": "[information_disclosure] Secret store: Secrets readable from a database dump or a read-only breach.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Encrypt at rest with a key held outside the database; never log values. Check: database dump contains no plaintext secret; grep logs for secret prefixes finds nothing",
+      "affects": [
+        "C-3"
+      ]
+    },
+    {
+      "id": "K-17",
+      "description": "[elevation] Secret store: A rotated secret stays valid forever.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Bound the grace window; expire old secrets by time. Check: old secret rejected after the window",
+      "affects": [
+        "C-3"
+      ]
+    },
+    {
+      "id": "K-18",
+      "description": "[ssrf] Outbound HTTP client: A customer-supplied URL points at internal or metadata addresses.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Resolve and block private/link-local ranges; pin the resolved IP; forbid redirects to non-public hosts. Check: URL to 169.254.169.254 / 10.0.0.1 / localhost is refused before connecting",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-19",
+      "description": "[denial_of_service] Outbound HTTP client: A slow or infinite response body ties up a worker.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Per-request timeout; cap response size; stream and discard bodies. Check: target that stalls is cut at the timeout; 100 MB body is cut at the cap",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-20",
+      "description": "[information_disclosure] Outbound HTTP client: Secrets or internal headers leak to targets.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Send only the documented headers; never forward inbound headers. Check: captured request has exactly the documented headers",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-21",
+      "description": "[tampering] Signer: Signatures without a timestamp can be replayed.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Sign timestamp + body; document a tolerance window for verifiers. Check: replay outside the window fails verification",
+      "affects": [
+        "C-8"
+      ]
+    },
+    {
+      "id": "K-22",
+      "description": "[denial_of_service] Notifier: Notification storms and template injection.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
+      "affects": [
+        "C-9"
+      ]
+    },
+    {
+      "id": "K-23",
+      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
+      "affects": [
+        "C-11"
+      ]
+    },
+    {
+      "id": "K-24",
+      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
+      "affects": [
+        "C-11"
+      ]
+    },
+    {
+      "id": "K-25",
+      "description": "[spoofing] Admin HTTP API: Management operations reachable without authentication.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Authenticate in one middleware for every management route; deny by default. Check: every management route returns 401 unauthenticated",
+      "affects": [
+        "C-15"
+      ]
+    },
+    {
+      "id": "K-26",
+      "description": "[repudiation] Admin HTTP API: No record of who changed what.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Audit log entries for every management write with the principal. Check: each write produces an audit entry",
+      "affects": [
+        "C-15"
+      ]
+    },
+    {
+      "id": "K-27",
+      "description": "[elevation] Admin HTTP API: A customer manages another customer's resources.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Ownership check on every resource operation. Check: cross-customer access returns 404",
+      "affects": [
+        "C-15"
+      ]
+    },
+    {
+      "id": "K-28",
+      "description": "[spoofing] Ingest API: Any network peer can publish events.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Authenticate producers (service credentials); allowlist event types. Check: unauthenticated publish returns 401",
+      "affects": [
+        "C-16"
+      ]
+    },
+    {
+      "id": "K-29",
+      "description": "[tampering] Ingest API: Duplicate or replayed publishes create duplicate work.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Idempotency key per event; reject or de-duplicate replays. Check: replaying the same key does not enqueue twice",
+      "affects": [
+        "C-16"
+      ]
+    },
+    {
+      "id": "K-30",
+      "description": "[denial_of_service] Ingest API: A producer floods the ingest path.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Per-producer rate limit; back-pressure with 429 and Retry-After. Check: flood from one producer is throttled",
+      "affects": [
+        "C-16"
+      ]
     }
   ],
   "work_packages": [

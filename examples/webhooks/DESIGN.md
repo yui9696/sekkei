@@ -513,6 +513,18 @@ _Trigger:_ authenticated management request
 2. C-15 → C-6 via I-6: apply the change
 3. C-6 → C-1 via I-1: persist
 
+```mermaid
+sequenceDiagram
+  participant C_15 as C-15 Admin HTTP API
+  participant C_11 as C-11 Authentication
+  participant C_6 as C-6 Domain core
+  participant C_1 as C-1 Store
+  Note over C_15: authenticated management request
+  C_15->>C_11: I-11 authenticate and authorize
+  C_15->>C_6: I-6 apply the change
+  C_6->>C_1: I-1 persist
+```
+
 ### F-2 — Publish an event
 
 _Trigger:_ producer calls the ingest API
@@ -520,6 +532,18 @@ _Trigger:_ producer calls the ingest API
 1. C-16 → C-6 via I-6: validate the event against known types
 2. C-6 → C-1 via I-1: persist the event
 3. C-16 → C-2 via I-2: enqueue one work item per matching target; ack only after both are durable
+
+```mermaid
+sequenceDiagram
+  participant C_16 as C-16 Ingest API
+  participant C_6 as C-6 Domain core
+  participant C_1 as C-1 Store
+  participant C_2 as C-2 Work queue
+  Note over C_16: producer calls the ingest API
+  C_16->>C_6: I-6 validate the event against known types
+  C_6->>C_1: I-1 persist the event
+  C_16->>C_2: I-2 enqueue one work item per matching target; ack only after both are durable
+```
 
 ### F-3 — Deliver a work item
 
@@ -529,11 +553,30 @@ _Trigger:_ worker leases due items
 2. C-12 → C-6 via I-6: load target, secrets and payload
 3. C-12 → C-2 via I-2: ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
 
+```mermaid
+sequenceDiagram
+  participant C_12 as C-12 Worker
+  participant C_2 as C-2 Work queue
+  participant C_6 as C-6 Domain core
+  Note over C_12: worker leases due items
+  C_12->>C_2: I-2 lease items of one partition
+  C_12->>C_6: I-6 load target, secrets and payload
+  C_12->>C_2: I-2 ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
+```
+
 ### F-4 — Retry after failure
 
 _Trigger:_ scheduler tick
 
 1. C-13 → C-2 via I-2: promote items whose not_before has passed
+
+```mermaid
+sequenceDiagram
+  participant C_13 as C-13 Scheduler
+  participant C_2 as C-2 Work queue
+  Note over C_13: scheduler tick
+  C_13->>C_2: I-2 promote items whose not_before has passed
+```
 
 ### F-5 — Disable a continuously failing target
 
@@ -541,6 +584,16 @@ _Trigger:_ policy tick
 
 1. C-14 → C-6 via I-6: read failure history and disable the target
 2. C-14 → C-9 via I-9: notify the owner
+
+```mermaid
+sequenceDiagram
+  participant C_14 as C-14 Health policy
+  participant C_6 as C-6 Domain core
+  participant C_9 as C-9 Notifier
+  Note over C_14: policy tick
+  C_14->>C_6: I-6 read failure history and disable the target
+  C_14->>C_9: I-9 notify the owner
+```
 
 ## Decisions
 
@@ -793,6 +846,25 @@ _Affects:_ C-2, C-12
 | K-9 | Signing secrets in the database are exposed by a dump or a read-only breach. | medium | high | Encrypt at rest with a key outside the database; log secret reads; rotate on suspicion. |
 | K-10 | A widespread failure disables many targets and emails every owner at once. | low | medium | Rate-limit notifications per owner and batch them. |
 | K-11 | Per-target labels on metrics explode cardinality. | medium | low | Label by outcome and partition class, not by target id; expose per-target detail through the API instead. |
+| K-12 | [tampering] Store: Injection through query construction. | medium | medium | Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing |
+| K-13 | [information_disclosure] Store: Backups and dumps contain everything. | medium | high | Encrypt backups; restrict who can take them. Check: backup file is not readable without the key |
+| K-14 | [denial_of_service] Work queue: A poison item is retried forever and blocks its partition. | medium | medium | Attempt cap and dead-letter; per-partition concurrency cap. Check: an always-failing item ends in the dead-letter after the cap |
+| K-15 | [tampering] Work queue: Items are processed twice after a crash between call and ack. | medium | medium | Idempotent processing with the item id; ack only after the outcome is recorded. Check: kill the worker mid-call; the item is redelivered exactly once more |
+| K-16 | [information_disclosure] Secret store: Secrets readable from a database dump or a read-only breach. | medium | high | Encrypt at rest with a key held outside the database; never log values. Check: database dump contains no plaintext secret; grep logs for secret prefixes finds nothing |
+| K-17 | [elevation] Secret store: A rotated secret stays valid forever. | medium | high | Bound the grace window; expire old secrets by time. Check: old secret rejected after the window |
+| K-18 | [ssrf] Outbound HTTP client: A customer-supplied URL points at internal or metadata addresses. | medium | high | Resolve and block private/link-local ranges; pin the resolved IP; forbid redirects to non-public hosts. Check: URL to 169.254.169.254 / 10.0.0.1 / localhost is refused before connecting |
+| K-19 | [denial_of_service] Outbound HTTP client: A slow or infinite response body ties up a worker. | medium | medium | Per-request timeout; cap response size; stream and discard bodies. Check: target that stalls is cut at the timeout; 100 MB body is cut at the cap |
+| K-20 | [information_disclosure] Outbound HTTP client: Secrets or internal headers leak to targets. | medium | high | Send only the documented headers; never forward inbound headers. Check: captured request has exactly the documented headers |
+| K-21 | [tampering] Signer: Signatures without a timestamp can be replayed. | medium | medium | Sign timestamp + body; document a tolerance window for verifiers. Check: replay outside the window fails verification |
+| K-22 | [denial_of_service] Notifier: Notification storms and template injection. | medium | medium | Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner |
+| K-23 | [spoofing] Authentication: Credential stuffing or leaked keys. | medium | medium | Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled |
+| K-24 | [elevation] Authentication: A caller acts on another tenant's resources. | medium | high | Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation |
+| K-25 | [spoofing] Admin HTTP API: Management operations reachable without authentication. | medium | medium | Authenticate in one middleware for every management route; deny by default. Check: every management route returns 401 unauthenticated |
+| K-26 | [repudiation] Admin HTTP API: No record of who changed what. | medium | medium | Audit log entries for every management write with the principal. Check: each write produces an audit entry |
+| K-27 | [elevation] Admin HTTP API: A customer manages another customer's resources. | medium | high | Ownership check on every resource operation. Check: cross-customer access returns 404 |
+| K-28 | [spoofing] Ingest API: Any network peer can publish events. | medium | medium | Authenticate producers (service credentials); allowlist event types. Check: unauthenticated publish returns 401 |
+| K-29 | [tampering] Ingest API: Duplicate or replayed publishes create duplicate work. | medium | medium | Idempotency key per event; reject or de-duplicate replays. Check: replaying the same key does not enqueue twice |
+| K-30 | [denial_of_service] Ingest API: A producer floods the ingest path. | medium | medium | Per-producer rate limit; back-pressure with 429 and Retry-After. Check: flood from one producer is throttled |
 
 ## Work packages
 

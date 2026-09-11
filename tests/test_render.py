@@ -10,7 +10,7 @@ def test_render_markdown_has_every_section_and_graphs():
     for h in ("## Requirements", "## Components", "## Interfaces", "## Entities", "## Flows",
               "## Decisions", "## Risks", "## Work packages", "## Traceability", "## Conventions"):
         assert h in md
-    assert md.count("```mermaid") == 2
+    assert md.count("```mermaid") == 2 + len(d.flows)  # component graph, package graph, one sequence diagram per flow
     assert "C_2 -->|I-1| C_1" in md and "WP_1 --> WP_2" in md
     assert "**Layers**" in md and "**Waves**" in md and "Critical path (weight 3)" in md
     assert "✔ **in-memory list**" in md and "✘ **sqlite**" in md

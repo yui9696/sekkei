@@ -36,6 +36,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-13 | functional | must | sekkei designs a system from a requirements text without any model: it segments the text into requirement units with their numbers, recognises capability patterns and quality attributes from a catalogue, synthesises components, interfaces with operations, entities, flows, decisions, risks and work packages, scores every decision against the active qualities and constraints, repairs and lints the result, and reviews its own gaps. | — |
 | R-14 | nonfunctional | must | The design engine is deterministic: the same requirements text yields byte-identical output. | designs from two runs on the same text that differ = 0 designs |
 | R-15 | functional | must | Every element of a generated design traces to the input sentences and the catalogue rules that produced it, and the engine states which requirements it did not recognise instead of hiding them. | — |
+| R-16 | functional | must | Besides the design, the engine hands over an architect's notes: the questions the text leaves open with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a requirements template. | — |
 
 ## Components
 
@@ -60,6 +61,10 @@ graph LR
   C_17["C-17 Evaluation"]
   C_18["C-18 Repair"]
   C_19["C-19 Engine facade"]
+  C_20["C-20 Gap questions"]
+  C_21["C-21 Sizing"]
+  C_22["C-22 Threat model"]
+  C_23["C-23 Architect's notes"]
   C_2 -->|I-1| C_1
   C_2 -->|I-3| C_3
   C_3 -->|I-1| C_1
@@ -86,6 +91,7 @@ graph LR
   C_10 -->|I-11| C_11
   C_10 -->|I-12| C_12
   C_10 -->|I-19| C_19
+  C_10 -->|I-20| C_20
   C_11 -->|I-1| C_1
   C_11 -->|I-8| C_8
   C_12 -->|I-1| C_1
@@ -108,6 +114,20 @@ graph LR
   C_19 -->|I-16| C_16
   C_19 -->|I-17| C_17
   C_19 -->|I-18| C_18
+  C_19 -->|I-20| C_20
+  C_19 -->|I-22| C_22
+  C_19 -->|I-23| C_23
+  C_20 -->|I-15| C_15
+  C_21 -->|I-1| C_1
+  C_21 -->|I-3| C_3
+  C_21 -->|I-15| C_15
+  C_22 -->|I-1| C_1
+  C_23 -->|I-1| C_1
+  C_23 -->|I-15| C_15
+  C_23 -->|I-17| C_17
+  C_23 -->|I-20| C_20
+  C_23 -->|I-21| C_21
+  C_23 -->|I-22| C_22
 ```
 
 ### C-1 — Model
@@ -187,7 +207,7 @@ graph LR
 - **kind**: cli · **path**: `sekkei/cli.py`
 - **responsibility**: argparse front end over every module.
 - **provides**: I-10
-- **requires**: I-1, I-2, I-3, I-4, I-5, I-6, I-7, I-9, I-11, I-12, I-19
+- **requires**: I-1, I-2, I-3, I-4, I-5, I-6, I-7, I-9, I-11, I-12, I-19, I-20
 - **satisfies**: R-11, R-8
 
 ### C-11 — Starter
@@ -257,17 +277,49 @@ graph LR
 ### C-19 — Engine facade
 
 - **kind**: module · **path**: `sekkei/engine/__init__.py`
-- **responsibility**: design(text): analyse, synthesise, repair, review; returns the design, diagnostics, review and trace.
+- **responsibility**: design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.
 - **provides**: I-19
-- **requires**: I-1, I-2, I-15, I-16, I-17, I-18
-- **satisfies**: R-13, R-14, R-15
+- **requires**: I-1, I-2, I-15, I-16, I-17, I-18, I-20, I-22, I-23
+- **satisfies**: R-13, R-14, R-15, R-16
+
+### C-20 — Gap questions
+
+- **kind**: module · **path**: `sekkei/engine/gaps.py`
+- **responsibility**: The questions an architect asks before committing, derived from what the text does not say, each with the assumption used meanwhile.
+- **provides**: I-20
+- **requires**: I-15
+- **satisfies**: R-16
+
+### C-21 — Sizing
+
+- **kind**: module · **path**: `sekkei/engine/sizing.py`
+- **responsibility**: Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.
+- **provides**: I-21
+- **requires**: I-1, I-3, I-15
+- **satisfies**: R-16
+
+### C-22 — Threat model
+
+- **kind**: module · **path**: `sekkei/engine/threats.py`
+- **responsibility**: STRIDE-lite threats per archetype, injected into the design as risks with mitigations and proofs.
+- **provides**: I-22
+- **requires**: I-1
+- **satisfies**: R-16
+
+### C-23 — Architect's notes
+
+- **kind**: module · **path**: `sekkei/engine/report.py`
+- **responsibility**: Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.
+- **provides**: I-23
+- **requires**: I-1, I-15, I-17, I-20, I-21, I-22
+- **satisfies**: R-16
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-13, C-14
-1. C-12, C-15, C-3, C-8
-2. C-11, C-17, C-2, C-4, C-6, C-7
-3. C-16, C-18, C-5, C-9
+1. C-12, C-15, C-22, C-3, C-8
+2. C-11, C-17, C-2, C-20, C-21, C-4, C-6, C-7
+3. C-16, C-18, C-23, C-5, C-9
 4. C-19
 5. C-10
 
@@ -328,6 +380,7 @@ graph LR
 | `dot` | `design`: Design, `which`: 'components' \| 'packages' | str | — | — |
 | `traceability_markdown` | `design`: Design | str | — | — |
 | `interface_table` | `iface`: Interface | Markdown table | — | — |
+| `sequence` | `design`: Design, `flow_id`: str | Mermaid sequenceDiagram of one flow | KeyError for an unknown flow | — |
 
 ### I-5 — Brief API
 
@@ -454,7 +507,48 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `design` | `text`: str | EngineResult: design, analysis, review, diagnostics, trace; ok when no lint error | — | — |
+| `design` | `text`: str | EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error | — | — |
+| `ask` | `text`: str | list[Question] | — | — |
+
+### I-20 — Gap questions API
+
+- **kind**: module · **owner**: C-20 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `questions` | `an`: Analysis | list[Question] (id, topic, question, why, assumption, affects) | — | — |
+| `questions_markdown` | `qs`: list[Question] | Markdown table | — | — |
+
+### I-21 — Sizing API
+
+- **kind**: module · **owner**: C-21 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `capacity` | `an`: Analysis | Capacity: estimates with formula and inputs, assumptions, missing inputs | — | — |
+| `effort` | `design`: Design, `an`: Analysis | Effort: person-days, critical path, calendar, waves | — | — |
+| `capacity_markdown` | `cap`: Capacity | str | — | — |
+| `effort_markdown` | `e`: Effort | str | — | — |
+
+### I-22 — Threat model API
+
+- **kind**: module · **owner**: C-22 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `threat_table` | `design`: Design | list[(component id, name, Threat)] | — | — |
+| `inject_risks` | `design`: Design | int risks added (idempotent) | — | — |
+| `threats_markdown` | `design`: Design | str | — | — |
+
+### I-23 — Notes API
+
+- **kind**: module · **owner**: C-23 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `notes` | `design`: Design, `an`: Analysis, `review`: Review | Notes with to_markdown() | — | — |
+| `analysis_markdown` | `an`: Analysis | str | — | — |
+| | the module also exports the constant REQUIREMENTS_TEMPLATE | | | |
 
 ### I-10 — Command line
 
@@ -470,7 +564,8 @@ graph LR
 | `sekkei accept REPORT [--force] / status / next / start WP` | — | state transitions; stale briefs are refused | — | — |
 | `sekkei diff OLD [-d NEW]` | — | element changes and the affected packages; exit 1 if any | — | — |
 | `sekkei schema / rules / prompt` | — | JSON Schema; rule table; architect prompt | — | — |
-| `sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review REVIEW.md] [--trace TRACE.json]` | — | a complete, lint-clean design without any model | — | — |
+| `sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]` | — | a complete, lint-clean design without any model, plus the architect's notes | — | — |
+| `sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]` | — | the open questions; the requirements template | — | — |
 | `sekkei draft REQ.md [--review] [--backend claude-code\|anthropic]` | — | optional model-based draft | — | — |
 
 ### I-11 — Starter
@@ -537,6 +632,18 @@ _Trigger:_ sekkei lint
 2. C-10 → C-2 via I-2: run every rule
 3. C-2 → C-3 via I-3: rules query graphs, cycles and traceability
 
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_1 as C-1 Model
+  participant C_2 as C-2 Rules
+  participant C_3 as C-3 Graph
+  Note over C_10: sekkei lint
+  C_10->>C_1: I-1 load the design file
+  C_10->>C_2: I-2 run every rule
+  C_2->>C_3: I-3 rules query graphs, cycles and traceability
+```
+
 ### F-2 — Brief a work package
 
 _Trigger:_ sekkei brief WP-n
@@ -546,12 +653,36 @@ _Trigger:_ sekkei brief WP-n
 3. C-5 → C-4 via I-4: interface tables
 4. C-5 → C-7 via I-7: dependency statuses and the report template
 
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_2 as C-2 Rules
+  participant C_5 as C-5 Brief
+  participant C_4 as C-4 Render
+  participant C_7 as C-7 State
+  Note over C_10: sekkei brief WP-n
+  C_10->>C_2: I-2 gate - refuse if the design has errors
+  C_10->>C_5: I-5 render the brief
+  C_5->>C_4: I-4 interface tables
+  C_5->>C_7: I-7 dependency statuses and the report template
+```
+
 ### F-3 — Accept a completion report
 
 _Trigger:_ sekkei accept report.json
 
 1. C-10 → C-7 via I-7: validate and mark done
 2. C-7 → C-3 via I-3: scope matching and ready packages
+
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_7 as C-7 State
+  participant C_3 as C-3 Graph
+  Note over C_10: sekkei accept report.json
+  C_10->>C_7: I-7 validate and mark done
+  C_7->>C_3: I-3 scope matching and ready packages
+```
 
 ### F-5 — Design changed after a brief was issued
 
@@ -560,6 +691,18 @@ _Trigger:_ sekkei diff old.json; sekkei accept report.json
 1. C-10 → C-12 via I-12: list the changes and the packages they touch
 2. C-10 → C-5 via I-5: recompute the brief fingerprint
 3. C-10 → C-7 via I-7: accept compares it with the recorded one and refuses a stale brief
+
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_12 as C-12 Diff
+  participant C_5 as C-5 Brief
+  participant C_7 as C-7 State
+  Note over C_10: sekkei diff old.json; sekkei accept report.json
+  C_10->>C_12: I-12 list the changes and the packages they touch
+  C_10->>C_5: I-5 recompute the brief fingerprint
+  C_10->>C_7: I-7 accept compares it with the recorded one and refuses a stale brief
+```
 
 ### F-6 — Design from a requirements text
 
@@ -574,12 +717,43 @@ _Trigger:_ sekkei design REQ.md
 7. C-19 → C-18 via I-18: lint and repair
 8. C-19 → C-17 via I-17: review the gaps
 
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_19 as C-19 Engine facade
+  participant C_15 as C-15 Requirements analysis
+  participant C_13 as C-13 Text analysis
+  participant C_14 as C-14 Catalogue
+  participant C_16 as C-16 Synthesis
+  participant C_17 as C-17 Evaluation
+  participant C_18 as C-18 Repair
+  Note over C_10: sekkei design REQ.md
+  C_10->>C_19: I-19 run the engine
+  C_19->>C_15: I-15 analyse the text
+  C_15->>C_13: I-13 segment sentences, quantities, modality
+  C_15->>C_14: I-14 match patterns, qualities, constraints
+  C_19->>C_16: I-16 synthesise the design
+  C_16->>C_17: I-17 score every decision point
+  C_19->>C_18: I-18 lint and repair
+  C_19->>C_17: I-17 review the gaps
+```
+
 ### F-4 — Drift check
 
 _Trigger:_ sekkei check
 
 1. C-10 → C-6 via I-6: walk component paths
 2. C-6 → C-3 via I-3: prefix matching of files to components
+
+```mermaid
+sequenceDiagram
+  participant C_10 as C-10 CLI
+  participant C_6 as C-6 Drift
+  participant C_3 as C-3 Graph
+  Note over C_10: sekkei check
+  C_10->>C_6: I-6 walk component paths
+  C_6->>C_3: I-3 prefix matching of files to components
+```
 
 ## Decisions
 
@@ -719,6 +893,7 @@ graph LR
   WP_9["WP-9 Design engine (M)"]
   WP_12["WP-12 Engine: text and catalogue (L)"]
   WP_13["WP-13 Engine: analysis and evaluation (M)"]
+  WP_15["WP-15 Engine: architect's notes (M)"]
   WP_14["WP-14 Engine: synthesis, repair and facade (L)"]
   WP_11["WP-11 Diff (S)"]
   WP_10["WP-10 CLI (M)"]
@@ -734,8 +909,11 @@ graph LR
   WP_3 --> WP_9
   WP_1 --> WP_12
   WP_12 --> WP_13
+  WP_2 --> WP_15
+  WP_13 --> WP_15
   WP_3 --> WP_14
   WP_13 --> WP_14
+  WP_15 --> WP_14
   WP_1 --> WP_11
   WP_6 --> WP_10
   WP_7 --> WP_10
@@ -750,10 +928,11 @@ graph LR
 1. WP-1
 2. WP-11, WP-12, WP-2
 3. WP-13, WP-3, WP-4, WP-5, WP-7
-4. WP-14, WP-6, WP-8, WP-9
-5. WP-10
+4. WP-15, WP-6, WP-8, WP-9
+5. WP-14
+6. WP-10
 
-_Critical path (weight 14):_ WP-1 → WP-2 → WP-3 → WP-14 → WP-10
+_Critical path (weight 16):_ WP-1 → WP-12 → WP-13 → WP-15 → WP-14 → WP-10
 
 ### WP-1 — Model (M)
 
@@ -865,12 +1044,22 @@ Implement requirement-unit analysis with pattern/quality/constraint matching, de
 - **acceptance**:
   - A-15 (test) analysis tests pass on the fixtures — `python -m pytest -q tests/test_engine.py -k analysis`
 
+### WP-15 — Engine: architect's notes (M)
+
+Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.
+
+- **components**: C-20, C-21, C-22, C-23 · **implements**: I-20, I-21, I-22, I-23
+- **depends on**: WP-2, WP-13 · **satisfies**: R-16
+- **write scope**: `sekkei/engine/gaps.py`, `sekkei/engine/sizing.py`, `sekkei/engine/threats.py`, `sekkei/engine/report.py`, `tests/test_notes.py`
+- **acceptance**:
+  - A-18 (test) notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks — `python -m pytest -q tests/test_notes.py`
+
 ### WP-14 — Engine: synthesis, repair and facade (L)
 
 Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.
 
 - **components**: C-16, C-18, C-19 · **implements**: I-16, I-18, I-19
-- **depends on**: WP-3, WP-13 · **satisfies**: R-13, R-14, R-15
+- **depends on**: WP-3, WP-13, WP-15 · **satisfies**: R-13, R-14, R-15, R-16
 - **write scope**: `sekkei/engine/synthesis.py`, `sekkei/engine/repair.py`, `sekkei/engine/__init__.py`
 - **acceptance**:
   - A-16 (test) engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture — `python -m pytest -q tests/test_engine.py`
@@ -917,6 +1106,7 @@ Expose every operation on the command line with exit codes and JSON output, and 
 | R-13 | must | C-13, C-14, C-15, C-16, C-17, C-18, C-19 | WP-12, WP-13, WP-14 | A-14, A-15, A-16, A-17 |
 | R-14 | must | C-19 | WP-14 | A-16, A-17 |
 | R-15 | must | C-15, C-16, C-17, C-19 | WP-13, WP-14 | A-15, A-16, A-17 |
+| R-16 | must | C-19, C-20, C-21, C-22, C-23 | WP-15, WP-14 | A-18, A-16, A-17 |
 
 ## Conventions
 

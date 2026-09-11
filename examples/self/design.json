@@ -145,6 +145,13 @@
       "kind": "functional",
       "priority": "must",
       "rationale": ""
+    },
+    {
+      "id": "R-16",
+      "statement": "Besides the design, the engine hands over an architect's notes: the questions the text leaves open with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a requirements template.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
     }
   ],
   "components": [
@@ -299,7 +306,8 @@
         "I-9",
         "I-11",
         "I-12",
-        "I-19"
+        "I-19",
+        "I-20"
       ],
       "satisfies": [
         "R-11",
@@ -431,7 +439,7 @@
     {
       "id": "C-19",
       "name": "Engine facade",
-      "responsibility": "design(text): analyse, synthesise, repair, review; returns the design, diagnostics, review and trace.",
+      "responsibility": "design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.",
       "kind": "module",
       "path": "sekkei/engine/__init__.py",
       "requires": [
@@ -440,12 +448,79 @@
         "I-15",
         "I-16",
         "I-17",
-        "I-18"
+        "I-18",
+        "I-20",
+        "I-22",
+        "I-23"
       ],
       "satisfies": [
         "R-13",
         "R-14",
-        "R-15"
+        "R-15",
+        "R-16"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-20",
+      "name": "Gap questions",
+      "responsibility": "The questions an architect asks before committing, derived from what the text does not say, each with the assumption used meanwhile.",
+      "kind": "module",
+      "path": "sekkei/engine/gaps.py",
+      "requires": [
+        "I-15"
+      ],
+      "satisfies": [
+        "R-16"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-21",
+      "name": "Sizing",
+      "responsibility": "Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.",
+      "kind": "module",
+      "path": "sekkei/engine/sizing.py",
+      "requires": [
+        "I-1",
+        "I-3",
+        "I-15"
+      ],
+      "satisfies": [
+        "R-16"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-22",
+      "name": "Threat model",
+      "responsibility": "STRIDE-lite threats per archetype, injected into the design as risks with mitigations and proofs.",
+      "kind": "module",
+      "path": "sekkei/engine/threats.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-16"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-23",
+      "name": "Architect's notes",
+      "responsibility": "Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.",
+      "kind": "module",
+      "path": "sekkei/engine/report.py",
+      "requires": [
+        "I-1",
+        "I-15",
+        "I-17",
+        "I-20",
+        "I-21",
+        "I-22"
+      ],
+      "satisfies": [
+        "R-16"
       ],
       "tags": []
     }
@@ -945,6 +1020,28 @@
           ],
           "output": "Markdown table",
           "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sequence",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "flow_id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Mermaid sequenceDiagram of one flow",
+          "errors": [
+            "KeyError for an unknown flow"
+          ],
           "pre": "",
           "post": "",
           "description": ""
@@ -1891,7 +1988,22 @@
               "description": ""
             }
           ],
-          "output": "EngineResult: design, analysis, review, diagnostics, trace; ok when no lint error",
+          "output": "EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "ask",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "list[Question]",
           "errors": [],
           "pre": "",
           "post": "",
@@ -1899,6 +2011,226 @@
         }
       ],
       "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-20",
+      "name": "Gap questions API",
+      "owner": "C-20",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "questions",
+          "inputs": [
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "list[Question] (id, topic, question, why, assumption, affects)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "questions_markdown",
+          "inputs": [
+            {
+              "name": "qs",
+              "type": "list[Question]",
+              "description": ""
+            }
+          ],
+          "output": "Markdown table",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-21",
+      "name": "Sizing API",
+      "owner": "C-21",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "capacity",
+          "inputs": [
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "Capacity: estimates with formula and inputs, assumptions, missing inputs",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "effort",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "Effort: person-days, critical path, calendar, waves",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "capacity_markdown",
+          "inputs": [
+            {
+              "name": "cap",
+              "type": "Capacity",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "effort_markdown",
+          "inputs": [
+            {
+              "name": "e",
+              "type": "Effort",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-22",
+      "name": "Threat model API",
+      "owner": "C-22",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "threat_table",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "list[(component id, name, Threat)]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "inject_risks",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "int risks added (idempotent)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "threats_markdown",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-23",
+      "name": "Notes API",
+      "owner": "C-23",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "notes",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            },
+            {
+              "name": "review",
+              "type": "Review",
+              "description": ""
+            }
+          ],
+          "output": "Notes with to_markdown()",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "analysis_markdown",
+          "inputs": [
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "the module also exports the constant REQUIREMENTS_TEMPLATE"
+        }
+      ],
+      "stability": "draft",
       "description": ""
     },
     {
@@ -1980,9 +2312,18 @@
           "description": ""
         },
         {
-          "name": "sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review REVIEW.md] [--trace TRACE.json]",
+          "name": "sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]",
           "inputs": [],
-          "output": "a complete, lint-clean design without any model",
+          "output": "a complete, lint-clean design without any model, plus the architect's notes",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]",
+          "inputs": [],
+          "output": "the open questions; the requirements template",
           "errors": [],
           "pre": "",
           "post": "",
@@ -3041,6 +3382,48 @@
       "notes": ""
     },
     {
+      "id": "WP-15",
+      "title": "Engine: architect's notes",
+      "goal": "Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
+      "components": [
+        "C-20",
+        "C-21",
+        "C-22",
+        "C-23"
+      ],
+      "implements": [
+        "I-20",
+        "I-21",
+        "I-22",
+        "I-23"
+      ],
+      "depends_on": [
+        "WP-2",
+        "WP-13"
+      ],
+      "satisfies": [
+        "R-16"
+      ],
+      "files": [
+        "sekkei/engine/gaps.py",
+        "sekkei/engine/sizing.py",
+        "sekkei/engine/threats.py",
+        "sekkei/engine/report.py",
+        "tests/test_notes.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-18",
+          "description": "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_notes.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
       "id": "WP-14",
       "title": "Engine: synthesis, repair and facade",
       "goal": "Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
@@ -3056,12 +3439,14 @@
       ],
       "depends_on": [
         "WP-3",
-        "WP-13"
+        "WP-13",
+        "WP-15"
       ],
       "satisfies": [
         "R-13",
         "R-14",
-        "R-15"
+        "R-15",
+        "R-16"
       ],
       "files": [
         "sekkei/engine/synthesis.py",

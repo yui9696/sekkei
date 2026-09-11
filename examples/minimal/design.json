@@ -1,0 +1,794 @@
+{
+  "sekkei": "1",
+  "name": "newsletter-signup",
+  "version": "0.1.0",
+  "summary": "Visitors can subscribe with an email address and confirm through a link sent by email.",
+  "goals": [
+    "The system notifies people through an external channel.",
+    "Records move in and out as files."
+  ],
+  "non_goals": [],
+  "conventions": {
+    "language": "python",
+    "test_command": "python -m pytest -q",
+    "lint_command": "ruff check .",
+    "rules": [
+      "Type hints on every public function; dataclasses or pydantic for records.",
+      "No business logic in the HTTP layer."
+    ],
+    "definition_of_done": [
+      "Acceptance checks of the package pass.",
+      "No file outside the write scope changed.",
+      "Every public operation of the implemented interfaces exists with the declared inputs."
+    ]
+  },
+  "requirements": [
+    {
+      "id": "R-1",
+      "statement": "Visitors can subscribe with an email address and confirm through a link sent by email.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-2",
+      "statement": "Admins can export the subscriber list as CSV.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    }
+  ],
+  "components": [
+    {
+      "id": "C-1",
+      "name": "Store",
+      "responsibility": "Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
+      "kind": "datastore",
+      "path": "app/store.py",
+      "requires": [],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:store"
+      ]
+    },
+    {
+      "id": "C-2",
+      "name": "Email provider",
+      "responsibility": "External email delivery service.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:email"
+      ]
+    },
+    {
+      "id": "C-3",
+      "name": "Domain core",
+      "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "kind": "module",
+      "path": "app/core.py",
+      "requires": [
+        "I-1",
+        "I-4"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:core"
+      ]
+    },
+    {
+      "id": "C-4",
+      "name": "Notifier",
+      "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "kind": "module",
+      "path": "app/notifier.py",
+      "requires": [
+        "I-2"
+      ],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:notifier"
+      ]
+    },
+    {
+      "id": "C-5",
+      "name": "Import/export",
+      "responsibility": "Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "kind": "module",
+      "path": "app/exporter.py",
+      "requires": [
+        "I-3"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:exporter"
+      ]
+    },
+    {
+      "id": "C-6",
+      "name": "Public HTTP API",
+      "responsibility": "Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
+      "kind": "service",
+      "path": "app/surface_api.py",
+      "requires": [
+        "I-3",
+        "I-5"
+      ],
+      "satisfies": [
+        "R-1"
+      ],
+      "tags": [
+        "layer:3",
+        "archetype:surface_api"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "I-1",
+      "name": "Store interface",
+      "owner": "C-1",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "save",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "record",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "id",
+          "errors": [
+            "ConflictError on duplicate key"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": ""
+        },
+        {
+          "name": "get",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "record | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "list",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "filter",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "list[record], next page token",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "delete",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Store. "
+    },
+    {
+      "id": "I-2",
+      "name": "Email provider interface",
+      "owner": "C-2",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "send",
+          "inputs": [
+            {
+              "name": "to",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "subject",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "body",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "provider message id",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Email provider. External; contract is theirs."
+    },
+    {
+      "id": "I-3",
+      "name": "Domain core interface",
+      "owner": "C-3",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "export_subscriber",
+          "inputs": [
+            {
+              "name": "subscriber",
+              "type": "Subscriber | id",
+              "description": ""
+            }
+          ],
+          "output": "Subscriber | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Admins can export the subscriber list as CSV."
+        },
+        {
+          "name": "list_subscriber",
+          "inputs": [
+            {
+              "name": "subscriber",
+              "type": "Subscriber | id",
+              "description": ""
+            }
+          ],
+          "output": "Subscriber | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Admins can export the subscriber list as CSV."
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Domain core. "
+    },
+    {
+      "id": "I-4",
+      "name": "Notifier interface",
+      "owner": "C-4",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "notify",
+          "inputs": [
+            {
+              "name": "recipient",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "template",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "context",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "message id",
+          "errors": [
+            "NotifyError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Notifier. "
+    },
+    {
+      "id": "I-5",
+      "name": "Import/export interface",
+      "owner": "C-5",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "export",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "filter",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
+            }
+          ],
+          "output": "byte stream",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "import_",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "stream",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
+            }
+          ],
+          "output": "ImportReport with per-row errors",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Import/export. "
+    },
+    {
+      "id": "I-6",
+      "name": "Public HTTP API interface",
+      "owner": "C-6",
+      "kind": "http",
+      "operations": [],
+      "stability": "draft",
+      "description": "Provided by Public HTTP API. "
+    }
+  ],
+  "entities": [
+    {
+      "id": "E-1",
+      "name": "Email",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Generic record named after the most frequent noun ('email'); refine the fields."
+    }
+  ],
+  "flows": [
+    {
+      "id": "F-1",
+      "name": "Serve a request",
+      "trigger": "client calls the API",
+      "steps": [
+        {
+          "from": "C-6",
+          "to": "C-3",
+          "via": "I-3",
+          "description": "validate and apply"
+        },
+        {
+          "from": "C-3",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "read/write"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-1",
+      "title": "Primary store",
+      "context": "Domain records need durable, queryable storage.",
+      "options": [
+        {
+          "name": "PostgreSQL",
+          "pros": [
+            "transactions",
+            "indexes and JSON",
+            "already available"
+          ],
+          "cons": [
+            "operational dependency"
+          ]
+        },
+        {
+          "name": "SQLite",
+          "pros": [
+            "zero operations",
+            "single file"
+          ],
+          "cons": [
+            "one writer at a time",
+            "no network access"
+          ]
+        },
+        {
+          "name": "Files (JSON/CSV on disk)",
+          "pros": [
+            "no dependencies",
+            "human readable"
+          ],
+          "cons": [
+            "no transactions or concurrency"
+          ]
+        },
+        {
+          "name": "In-memory",
+          "pros": [
+            "fastest",
+            "trivial"
+          ],
+          "cons": [
+            "lost on restart"
+          ]
+        }
+      ],
+      "choice": "SQLite",
+      "rationale": "Scored against the active qualities; decided by simplicity (no qualities stated). SQLite: 3.00; Files: 3.00; In-memory: 3.00; PostgreSQL: unavailable (needs postgres, not in the constraints)",
+      "consequences": "Not choosing 'Files' gives up: no dependencies, human readable. Not choosing 'In-memory' gives up: fastest, trivial.",
+      "affects": [
+        "C-1"
+      ],
+      "status": "accepted"
+    }
+  ],
+  "risks": [
+    {
+      "id": "K-1",
+      "description": "A widespread failure disables many targets and emails every owner at once.",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "Rate-limit notifications per owner and batch them.",
+      "affects": [
+        "C-4"
+      ]
+    },
+    {
+      "id": "K-2",
+      "description": "Payloads or uploads without size limits exhaust memory or disk.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
+      "affects": [
+        "C-6"
+      ]
+    },
+    {
+      "id": "K-3",
+      "description": "A single-writer store becomes the ceiling under concurrent load.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Keep write transactions short; measure before sharding.",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-4",
+      "description": "[tampering] Store: Injection through query construction.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-5",
+      "description": "[information_disclosure] Store: Backups and dumps contain everything.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Encrypt backups; restrict who can take them. Check: backup file is not readable without the key",
+      "affects": [
+        "C-1"
+      ]
+    },
+    {
+      "id": "K-6",
+      "description": "[denial_of_service] Notifier: Notification storms and template injection.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
+      "affects": [
+        "C-4"
+      ]
+    },
+    {
+      "id": "K-7",
+      "description": "[spoofing] Public HTTP API: Requests without a verified caller identity reach domain operations.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials",
+      "affects": [
+        "C-6"
+      ]
+    },
+    {
+      "id": "K-8",
+      "description": "[tampering] Public HTTP API: Malformed or oversized bodies reach the core.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413",
+      "affects": [
+        "C-6"
+      ]
+    },
+    {
+      "id": "K-9",
+      "description": "[denial_of_service] Public HTTP API: A single caller saturates the service.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected",
+      "affects": [
+        "C-6"
+      ]
+    },
+    {
+      "id": "K-10",
+      "description": "[information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
+      "affects": [
+        "C-6"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "title": "Store",
+      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
+      "components": [
+        "C-1"
+      ],
+      "implements": [
+        "I-1"
+      ],
+      "depends_on": [],
+      "satisfies": [],
+      "files": [
+        "app/store.py",
+        "tests/test_store.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Store pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_store.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: infra"
+    },
+    {
+      "id": "WP-2",
+      "title": "Notifier",
+      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "components": [
+        "C-4"
+      ],
+      "implements": [
+        "I-4"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-1"
+      ],
+      "files": [
+        "app/notifier.py",
+        "tests/test_notifier.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-2",
+          "description": "unit tests of Notifier pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_notifier.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: notification"
+    },
+    {
+      "id": "WP-3",
+      "title": "Domain core",
+      "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
+      "components": [
+        "C-3"
+      ],
+      "implements": [
+        "I-3"
+      ],
+      "depends_on": [
+        "WP-1",
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "files": [
+        "app/core.py",
+        "tests/test_core.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-3",
+          "description": "unit tests of Domain core pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_core.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: import_export"
+    },
+    {
+      "id": "WP-4",
+      "title": "Import/export",
+      "goal": "Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "components": [
+        "C-5"
+      ],
+      "implements": [
+        "I-5"
+      ],
+      "depends_on": [
+        "WP-3"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "files": [
+        "app/exporter.py",
+        "tests/test_exporter.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-4",
+          "description": "unit tests of Import/export pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_exporter.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: import_export"
+    },
+    {
+      "id": "WP-5",
+      "title": "Public HTTP API",
+      "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
+      "components": [
+        "C-6"
+      ],
+      "implements": [
+        "I-6"
+      ],
+      "depends_on": [
+        "WP-3",
+        "WP-4"
+      ],
+      "satisfies": [],
+      "files": [
+        "app/surface_api.py",
+        "tests/test_surface_api.py"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-5",
+          "description": "unit tests of Public HTTP API pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_surface_api.py",
+          "metric": ""
+        }
+      ],
+      "notes": "family: infra"
+    }
+  ]
+}

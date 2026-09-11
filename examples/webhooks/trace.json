@@ -824,6 +824,120 @@
       "rules": [
         "package:layer3:health_policy"
       ]
+    },
+    "K-12": {
+      "sentences": [],
+      "rules": [
+        "threat:tampering"
+      ]
+    },
+    "K-13": {
+      "sentences": [],
+      "rules": [
+        "threat:information_disclosure"
+      ]
+    },
+    "K-14": {
+      "sentences": [],
+      "rules": [
+        "threat:denial_of_service"
+      ]
+    },
+    "K-15": {
+      "sentences": [],
+      "rules": [
+        "threat:tampering"
+      ]
+    },
+    "K-16": {
+      "sentences": [],
+      "rules": [
+        "threat:information_disclosure"
+      ]
+    },
+    "K-17": {
+      "sentences": [],
+      "rules": [
+        "threat:elevation"
+      ]
+    },
+    "K-18": {
+      "sentences": [],
+      "rules": [
+        "threat:ssrf"
+      ]
+    },
+    "K-19": {
+      "sentences": [],
+      "rules": [
+        "threat:denial_of_service"
+      ]
+    },
+    "K-20": {
+      "sentences": [],
+      "rules": [
+        "threat:information_disclosure"
+      ]
+    },
+    "K-21": {
+      "sentences": [],
+      "rules": [
+        "threat:tampering"
+      ]
+    },
+    "K-22": {
+      "sentences": [],
+      "rules": [
+        "threat:denial_of_service"
+      ]
+    },
+    "K-23": {
+      "sentences": [],
+      "rules": [
+        "threat:spoofing"
+      ]
+    },
+    "K-24": {
+      "sentences": [],
+      "rules": [
+        "threat:elevation"
+      ]
+    },
+    "K-25": {
+      "sentences": [],
+      "rules": [
+        "threat:spoofing"
+      ]
+    },
+    "K-26": {
+      "sentences": [],
+      "rules": [
+        "threat:repudiation"
+      ]
+    },
+    "K-27": {
+      "sentences": [],
+      "rules": [
+        "threat:elevation"
+      ]
+    },
+    "K-28": {
+      "sentences": [],
+      "rules": [
+        "threat:spoofing"
+      ]
+    },
+    "K-29": {
+      "sentences": [],
+      "rules": [
+        "threat:tampering"
+      ]
+    },
+    "K-30": {
+      "sentences": [],
+      "rules": [
+        "threat:denial_of_service"
+      ]
     }
   },
   "sentences": [

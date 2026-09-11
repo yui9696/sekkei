@@ -288,7 +288,7 @@ def cmd_design(args: argparse.Namespace) -> int:
         Path(args.render).write_text(RD.render_markdown(result.design), encoding="utf-8")
         print(f"wrote {args.render}")
     if args.review:
-        Path(args.review).write_text(result.review.to_markdown(), encoding="utf-8")
+        Path(args.review).write_text(result.notes.to_markdown(), encoding="utf-8")
         print(f"wrote {args.review}")
     if args.trace:
         Path(args.trace).write_text(json.dumps(result.trace_json(), indent=2, ensure_ascii=False), encoding="utf-8")
@@ -301,12 +301,34 @@ def cmd_design(args: argparse.Namespace) -> int:
     print("active qualities: " + (", ".join(f"{q}={w}" for q, w in an.qualities.items()) or "(none)"))
     for x in result.design.decisions:
         print(f"  {x.id} {x.title}: {x.choice}")
+    if result.notes.questions:
+        print(f"open questions: {len(result.notes.questions)} (see --review); assumptions taken meanwhile")
     if result.review.needs_human:
         print("needs a human: " + "; ".join(
             [f"{len(result.review.unrecognised)} unrecognised requirement(s)"] * bool(result.review.unrecognised)
             + [f"{len(result.review.unaddressed)} unaddressed quality(ies)"] * bool(result.review.unaddressed)
             + [f"{len(result.review.generic)} generic component(s)"] * bool(result.review.generic)))
     return 0 if result.ok else 1
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    """Only the questions an architect would ask about a requirements text."""
+    from .engine import ask
+    from .engine.gaps import questions_markdown
+
+    qs = ask(Path(args.input).read_text(encoding="utf-8"))
+    if args.json:
+        print(json.dumps([q.__dict__ for q in qs], indent=2, ensure_ascii=False))
+    else:
+        sys.stdout.write(questions_markdown(qs))
+    return 0
+
+
+def cmd_template(args: argparse.Namespace) -> int:
+    from .engine import REQUIREMENTS_TEMPLATE
+
+    _out(REQUIREMENTS_TEMPLATE, args.output)
+    return 0
 
 
 def cmd_draft_model(args: argparse.Namespace) -> int:
@@ -431,8 +453,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("input", help="requirements text file (Markdown or plain text)")
     sp.add_argument("-o", "--output", default="design.json")
     sp.add_argument("--render", metavar="DESIGN.md", help="also write the Markdown design document")
-    sp.add_argument("--review", metavar="REVIEW.md", help="also write the engine's review of its own design")
+    sp.add_argument("--review", metavar="NOTES.md", help="also write the architect's notes: questions, capacity, effort, threats, self-review")
     sp.add_argument("--trace", metavar="TRACE.json", help="also write the element-to-sentence/rule trace")
+
+    sp = add("ask", cmd_ask, "print the questions an architect would ask about a requirements text", design=False)
+    sp.add_argument("input", help="requirements text file")
+    sp.add_argument("--json", action="store_true")
+
+    sp = add("template", cmd_template, "print a requirements template that makes the engine's job easiest", design=False)
+    sp.add_argument("-o", "--output", help="write to a file, e.g. requirements.md")
 
     sp = add("draft", cmd_draft_model, "optional: draft a design with a model, lint with feedback; --review adds the architect review", design=False)
     sp.add_argument("input", help="requirements text file")

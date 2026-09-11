@@ -19,18 +19,56 @@ requirements.md ──sekkei design──▶ design.json ──lint/plan──�
 
 ```sh
 pip install git+https://github.com/yui9696/sekkei
-sekkei design requirements.md --render DESIGN.md --review REVIEW.md
+sekkei template -o requirements.md          # fill in the blanks (or write free text)
+sekkei design requirements.md --render DESIGN.md --review NOTES.md
 sekkei plan             # waves of work packages, critical path, what is ready now
 sekkei brief WP-1       # hand this to a coding agent
 sekkei accept report.json
 sekkei check --root .   # does the code still match the design?
 ```
 
-Try it on the bundled webhook-delivery spec:
+Try it on the bundled specs — a page ([`examples/webhooks/requirements.md`](examples/webhooks/requirements.md))
+and two lines ([`examples/minimal/requirements.md`](examples/minimal/requirements.md)):
 
 ```sh
-sekkei design examples/webhooks/requirements.md --render /tmp/DESIGN.md --review /tmp/REVIEW.md
+sekkei design examples/webhooks/requirements.md --render /tmp/DESIGN.md --review /tmp/NOTES.md
+sekkei ask examples/minimal/requirements.md   # just the questions an architect would ask
 ```
+
+## What to write
+
+The engine reads **structure, modality and numbers**, not prose
+([docs/WRITING_REQUIREMENTS.md](docs/WRITING_REQUIREMENTS.md)). The shape that works:
+
+```markdown
+# Warehouse inventory service
+## Functional
+- Staff can add, move and remove stock items (SKU, quantity, warehouse, bin) through a REST API.
+- Managers receive an email when any SKU falls below its reorder level.
+## Non-functional
+- Search returns within 300 ms p95 for a catalogue of 200,000 items.
+- Stock counts are never lost or double-applied under concurrent updates.
+## Constraints
+- TypeScript on Node 20, PostgreSQL available. Team of 2. Containers behind an existing ingress.
+## Out of scope
+- Purchasing and supplier management.
+```
+
+One bullet per requirement; an actor at the front makes it an operation; numbers with
+units become metrics and contract preconditions; technology and team constraints steer
+every decision. Two lines are enough to start: the engine designs what it can and the
+notes list the questions it would have asked, each with the assumption it used meanwhile.
+Answer a question by adding a bullet and run again; only the parts the answer touches
+change.
+
+## What you get
+
+| file | contents |
+|---|---|
+| `design.json` | the checkable design: requirements (verbatim), components, interfaces with operations, entities, flows, scored decisions, risks (including the threat model), conventions, work packages with acceptance checks |
+| `DESIGN.md` | the same as a document: component graph, layers, contracts, sequence diagram per flow, ADRs with rationale and consequences, traceability matrix |
+| `NOTES.md` | **the architect's notes**: (1) questions still open, with the assumption taken meanwhile and what each answer changes; (2) capacity estimates with formula and inputs (Little's law, storage growth, outage backlog, fan-out); (3) effort and schedule from package sizes, waves and team size; (4) STRIDE-lite threat model per component with a proof for each mitigation; (5) what the engine could not decide; (6) how it read the text |
+| `trace.json` | every element → the sentences and catalogue rules that produced it |
 
 ## The engine
 
@@ -45,10 +83,14 @@ A solution architect's job, mechanised into five deterministic steps
 | decide | 12 decision points with 36 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
 | package | components are layered, cut into ≤3-component work packages with unique write scopes, ordered by the interfaces they consume; acceptance checks derived from the metrics | `engine/synthesis.py` |
 
-Then the engine **reviews its own output**: requirements it did not recognise, quality
-attributes it has no tactic for, generic components from the fallback, assumptions made.
-It says what it does not know instead of hiding it. Every element carries a trace to the
-sentences and catalogue rules that produced it (`--trace`).
+Then the engine does the rest of the architect's job (`--review NOTES.md`): asks the
+questions the text left open (`engine/gaps.py`, 19 gap rules with the default taken
+meanwhile), sizes the system from the stated numbers (`engine/sizing.py`), estimates
+effort and calendar, builds a STRIDE-lite threat model whose threats become risks in the
+design (`engine/threats.py`, 29 threat rules over 15 archetypes), and **reviews its own
+output**: requirements it did not recognise, quality attributes it has no tactic for,
+generic components from the fallback. It says what it does not know instead of hiding it.
+Every element carries a trace to the sentences and catalogue rules that produced it.
 
 What the engine produced for the webhook spec (`examples/webhooks/`): 16 components
 including a partitioned durable queue, worker, retry scheduler carrying the backoff
@@ -82,7 +124,7 @@ Hand-authoring is also possible: JSON (`sekkei schema`) or a Python DSL (`sekkei
 ## Dogfood and numbers
 
 sekkei's own architecture is [`examples/self/design.json`](examples/self/design.json)
-(19 components including the engine's seven; prose in [DESIGN.md](DESIGN.md)). The
+(23 components including the engine's eleven; prose in [DESIGN.md](DESIGN.md)). The
 test-suite lints it in strict mode and runs `sekkei check` against this repository, so an
 import that violates the declared dependency direction fails the build.
 
@@ -90,8 +132,8 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 153 |
-| engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) |
+| tests | 161 |
+| engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) + the two-line minimal spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
 | catalogue | 22 patterns, 31 archetypes, 12 decision points / 36 options, 12 quality tactics, 13 risks, 9 language layouts |

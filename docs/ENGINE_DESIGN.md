@@ -116,6 +116,22 @@ attach a consumer or drop; an implicit package dependency → make it explicit).
 else is left as a diagnostic in the review. The final design must have zero errors or
 the engine reports failure rather than returning a broken file.
 
+## 7b. The architect's notes (what an architect delivers besides the diagram)
+
+A design document is not the whole job. The engine also produces, deterministically:
+
+| deliverable | module | method |
+|---|---|---|
+| **Questions** — what the requirements do not say and an architect would ask before committing | `engine/gaps.py` | gap rules over the analysis (no language, no store, no rate, no latency/availability target, no retention, no auth statement, no team size, no deployment target, external calls without failure policy, PII without compliance statement, …). Each question states the default assumption the engine used, so the design is usable before the answer arrives and the answer changes exactly one thing. |
+| **Capacity estimates** — how big is this | `engine/sizing.py` | the stated rates, counts, latencies and durations run through Little's law and storage arithmetic under stated assumptions (payload size, mean service time, fan-out). Every number shows its formula and inputs; if a rate is missing, the estimate says so and the question above asks for it. |
+| **Threat model** — STRIDE-lite | `engine/threats.py` | a table of threats per archetype (surfaces: spoofing, tampering, DoS, information disclosure; outbound client: SSRF, redirects, DNS rebinding; secrets: exposure at rest/in logs; queue: poison and replay; files: content-type and traversal; …). Threats become risks in the design with mitigations, so they reach the briefs. |
+| **Effort and schedule** | `engine/sizing.py` | package sizes (S/M/L → person-days, an assumption), waves, critical path and team size → total effort and calendar length. |
+| **Sequence diagrams** | `render.py` | every flow as a Mermaid `sequenceDiagram`. |
+
+`sekkei design --review NOTES.md` writes all of these with the self-review;
+`sekkei ask REQ.md` prints the questions alone; `sekkei template` prints the
+requirements template that makes the engine's job easiest.
+
 ## 8. Tests
 
 - Determinism: `design(text)` twice → identical JSON.

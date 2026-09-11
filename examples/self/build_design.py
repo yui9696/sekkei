@@ -79,6 +79,10 @@ b.requirement("R-14", "The design engine is deterministic: the same requirements
               kind="nonfunctional", priority="must", metric=("designs from two runs on the same text that differ", "= 0", "designs"))
 b.requirement("R-15", "Every element of a generated design traces to the input sentences and the catalogue rules that "
                       "produced it, and the engine states which requirements it did not recognise instead of hiding them.")
+b.requirement("R-16", "Besides the design, the engine hands over an architect's notes: the questions the text leaves open "
+                      "with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and "
+                      "schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a "
+                      "requirements template.")
 
 # --- components -------------------------------------------------------------
 b.component("C-1", "Model", "Dataclasses for the design, tolerant JSON loading, serialisation and the JSON Schema.",
@@ -101,7 +105,7 @@ b.component("C-9", "Design engine", "Model backends (Claude Code CLI, anthropic 
             "review prompts, and the draft/review/revise pipeline.",
             path="sekkei/llm.py", requires=["I-1", "I-2"], satisfies=["R-10"])
 b.component("C-10", "CLI", "argparse front end over every module.", kind="cli",
-            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12", "I-19"],
+            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12", "I-19", "I-20"],
             satisfies=["R-11", "R-8"])
 b.component("C-11", "Starter", "The example design written by `sekkei init`.",
             path="sekkei/examples.py", requires=["I-1", "I-8"], satisfies=["R-11"])
@@ -124,8 +128,17 @@ b.component("C-17", "Evaluation", "Scores decision options against the active qu
             path="sekkei/engine/evaluate.py", requires=["I-1", "I-14", "I-15"], satisfies=["R-13", "R-15"])
 b.component("C-18", "Repair", "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
             path="sekkei/engine/repair.py", requires=["I-1", "I-2"], satisfies=["R-13"])
-b.component("C-19", "Engine facade", "design(text): analyse, synthesise, repair, review; returns the design, diagnostics, review and trace.",
-            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18"], satisfies=["R-13", "R-14", "R-15"])
+b.component("C-19", "Engine facade", "design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.",
+            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23"],
+            satisfies=["R-13", "R-14", "R-15", "R-16"])
+b.component("C-20", "Gap questions", "The questions an architect asks before committing, derived from what the text does not say, each with the assumption used meanwhile.",
+            path="sekkei/engine/gaps.py", requires=["I-15"], satisfies=["R-16"])
+b.component("C-21", "Sizing", "Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.",
+            path="sekkei/engine/sizing.py", requires=["I-1", "I-3", "I-15"], satisfies=["R-16"])
+b.component("C-22", "Threat model", "STRIDE-lite threats per archetype, injected into the design as risks with mitigations and proofs.",
+            path="sekkei/engine/threats.py", requires=["I-1"], satisfies=["R-16"])
+b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.",
+            path="sekkei/engine/report.py", requires=["I-1", "I-15", "I-17", "I-20", "I-21", "I-22"], satisfies=["R-16"])
 
 # --- interfaces (operation names are the real function names; sekkei check verifies them) ---
 b.interface("I-1", "Model API", owner="C-1", kind="module", stability="stable", operations=[
@@ -164,6 +177,7 @@ b.interface("I-4", "Render API", owner="C-4", kind="module", operations=[
     op("dot", [("design", "Design"), ("which", "'components' | 'packages'")], "str"),
     op("traceability_markdown", [("design", "Design")], "str"),
     op("interface_table", [("iface", "Interface")], "Markdown table"),
+    op("sequence", [("design", "Design"), ("flow_id", "str")], "Mermaid sequenceDiagram of one flow", ["KeyError for an unknown flow"]),
 ])
 b.interface("I-5", "Brief API", owner="C-5", kind="module", operations=[
     op("render_brief", [("design", "Design"), ("wp_id", "str"), ("state", "State | None")], "str", ["KeyError for an unknown package"]),
@@ -231,7 +245,27 @@ b.interface("I-18", "Repair API", owner="C-18", kind="module", operations=[
     op("repair", [("design", "Design"), ("max_passes", "int")], "(design, remaining diagnostics, repairs applied)"),
 ])
 b.interface("I-19", "Engine API", owner="C-19", kind="module", stability="stable", operations=[
-    op("design", [("text", "str")], "EngineResult: design, analysis, review, diagnostics, trace; ok when no lint error"),
+    op("design", [("text", "str")], "EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error"),
+    op("ask", [("text", "str")], "list[Question]"),
+])
+b.interface("I-20", "Gap questions API", owner="C-20", kind="module", operations=[
+    op("questions", [("an", "Analysis")], "list[Question] (id, topic, question, why, assumption, affects)"),
+    op("questions_markdown", [("qs", "list[Question]")], "Markdown table"),
+])
+b.interface("I-21", "Sizing API", owner="C-21", kind="module", operations=[
+    op("capacity", [("an", "Analysis")], "Capacity: estimates with formula and inputs, assumptions, missing inputs"),
+    op("effort", [("design", "Design"), ("an", "Analysis")], "Effort: person-days, critical path, calendar, waves"),
+    op("capacity_markdown", [("cap", "Capacity")], "str"),
+    op("effort_markdown", [("e", "Effort")], "str"),
+])
+b.interface("I-22", "Threat model API", owner="C-22", kind="module", operations=[
+    op("threat_table", [("design", "Design")], "list[(component id, name, Threat)]"),
+    op("inject_risks", [("design", "Design")], "int risks added (idempotent)"),
+    op("threats_markdown", [("design", "Design")], "str"),
+])
+b.interface("I-23", "Notes API", owner="C-23", kind="module", operations=[
+    op("notes", [("design", "Design"), ("an", "Analysis"), ("review", "Review")], "Notes with to_markdown()"),
+    op("analysis_markdown", [("an", "Analysis")], "str", description="the module also exports the constant REQUIREMENTS_TEMPLATE"),
 ])
 b.interface("I-10", "Command line", owner="C-10", kind="cli", operations=[
     op("sekkei init [dir]", output="starter design.json"),
@@ -242,7 +276,8 @@ b.interface("I-10", "Command line", owner="C-10", kind="cli", operations=[
     op("sekkei accept REPORT [--force] / status / next / start WP", output="state transitions; stale briefs are refused"),
     op("sekkei diff OLD [-d NEW]", output="element changes and the affected packages; exit 1 if any"),
     op("sekkei schema / rules / prompt", output="JSON Schema; rule table; architect prompt"),
-    op("sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review REVIEW.md] [--trace TRACE.json]", output="a complete, lint-clean design without any model"),
+    op("sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]", output="a complete, lint-clean design without any model, plus the architect's notes"),
+    op("sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]", output="the open questions; the requirements template"),
     op("sekkei draft REQ.md [--review] [--backend claude-code|anthropic]", output="optional model-based draft"),
 ])
 b.interface("I-11", "Starter", owner="C-11", kind="module", operations=[
@@ -401,8 +436,12 @@ b.work_package("WP-13", "Engine: analysis and evaluation", goal="Implement requi
                components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12"], satisfies=["R-13", "R-15"], size="M",
                files=["sekkei/engine/analysis.py", "sekkei/engine/evaluate.py"],
                acceptance=[check("A-15", "analysis tests pass on the fixtures", command=T + "tests/test_engine.py -k analysis")])
+b.work_package("WP-15", "Engine: architect's notes", goal="Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
+               components=["C-20", "C-21", "C-22", "C-23"], implements=["I-20", "I-21", "I-22", "I-23"], depends_on=["WP-2", "WP-13"], satisfies=["R-16"], size="M",
+               files=["sekkei/engine/gaps.py", "sekkei/engine/sizing.py", "sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
+               acceptance=[check("A-18", "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks", command=T + "tests/test_notes.py")])
 b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
-               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13"], satisfies=["R-13", "R-14", "R-15"], size="L",
+               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15"], satisfies=["R-13", "R-14", "R-15", "R-16"], size="L",
                files=["sekkei/engine/synthesis.py", "sekkei/engine/repair.py", "sekkei/engine/__init__.py"],
                acceptance=[check("A-16", "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture", command=T + "tests/test_engine.py"),
                            check("A-17", "R-14: two runs on the same text produce identical JSON", kind="metric", metric="R-14")])

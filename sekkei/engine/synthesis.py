@@ -114,6 +114,13 @@ def _active_archetypes(an: Analysis) -> tuple[list[str], list[str], dict[str, li
                 active.setdefault(a, None)
                 reasons.setdefault(a, []).append(f"tactic:{t.quality}")
     generic: list[str] = []
+    human = {"staff", "manager", "managers", "grower", "owner", "owners", "member", "members", "employee", "employees",
+             "customer", "customers", "user", "users", "admin", "admins", "administrator", "operator", "operators",
+             "visitor", "visitors", "client", "clients", "subscriber", "subscribers", "anyone", "people", "developer", "developers"}
+    if pats and not any(a in active for a in (*_HTTP_SURFACES, "cli", "push")) \
+            and any(set(u.sentence.actors) & human for u in an.requirements if u.kind == "functional"):
+        active.setdefault("surface_api", None)
+        reasons.setdefault("surface_api", []).append("inference:human-actors-need-a-surface")
     if not pats:
         low = " ".join(s.lower for s in an.sentences)
         surface = "cli" if re.search(r"\bcli\b|command[- ]line|\bstdin\b|\bterminal\b", low) else "surface_api"

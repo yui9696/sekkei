@@ -51,6 +51,29 @@ def mermaid(design: Design, which: str = "components") -> str:
     return "\n".join(out) + "\n"
 
 
+def sequence(design: Design, flow_id: str) -> str:
+    """A flow as a Mermaid sequence diagram (participants are the components it touches)."""
+    f = next((x for x in design.flows if x.id == flow_id), None)
+    if f is None:
+        raise KeyError(flow_id)
+    out = ["sequenceDiagram"]
+    seen: list[str] = []
+    for st in f.steps:
+        for c in (st.from_, st.to):
+            if c not in seen:
+                seen.append(c)
+    for c in seen:
+        comp = design.component(c)
+        label = (comp.name if comp else c).replace('"', "'")
+        out.append(f"  participant {_mid(c)} as {c} {label}")
+    if f.trigger:
+        out.append(f"  Note over {_mid(seen[0])}: {f.trigger.replace(':', ' -')}")
+    for st in f.steps:
+        desc = (st.description or st.via).replace(":", " -")
+        out.append(f"  {_mid(st.from_)}->>{_mid(st.to)}: {st.via} {desc}")
+    return "\n".join(out) + "\n"
+
+
 def dot(design: Design, which: str = "components") -> str:
     out = ["digraph G {", "  rankdir=LR;", "  node [shape=box];"]
     if which == "components":
@@ -160,6 +183,7 @@ def render_markdown(design: Design) -> str:
             for n, st in enumerate(f.steps, 1):
                 s.append(f"{n}. {st.from_} → {st.to} via {st.via}" + (f": {st.description}" if st.description else ""))
             s.append("")
+            s.append("```mermaid\n" + sequence(d, f.id) + "```\n")
 
     if d.decisions:
         s.append("## Decisions\n")
