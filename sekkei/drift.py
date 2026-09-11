@@ -100,11 +100,9 @@ def _imports(file: Path, root: Path) -> list[tuple[str, Path]]:
                         break
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
-            resolved = False
             for cand in _module_candidates(mod, node.level, file, root):
                 if cand.exists():
                     out.append((mod or ".", cand))
-                    resolved = True
                     break
             # `from pkg import submodule` resolves per name
             for alias in node.names:
@@ -113,8 +111,6 @@ def _imports(file: Path, root: Path) -> list[tuple[str, Path]]:
                     if cand.exists():
                         out.append((sub, cand))
                         break
-            if not resolved and not out:
-                continue
     return out
 
 
