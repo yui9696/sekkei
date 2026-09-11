@@ -143,6 +143,7 @@ class Sentence:
     verbs: list[str] = field(default_factory=list)
     nouns: list[str] = field(default_factory=list)
     words: list[str] = field(default_factory=list)
+    assumed: bool = False      # came from an engine-generated "(Assumed by the engine)" section
 
     @property
     def lower(self) -> str:
@@ -165,7 +166,7 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"'])")
 def _section_of(line: str) -> str:
     """If ``line`` is a section heading, return its kind; else ''."""
     m = _HEADING_RE.match(line)
-    title = (m.group(1) if m else line).strip().rstrip(":").lower()
+    title = re.sub(r"\s*\(.*?\)\s*$", "", (m.group(1) if m else line).strip().rstrip(":")).lower()
     if len(title.split()) > 4 or not title:
         return ""
     if not m and (line.strip().endswith((".", "?", "!")) or len(title) > 40):
@@ -315,18 +316,23 @@ def segment(text: str) -> list[Sentence]:
     """Split a requirements document into analysed requirement units."""
     out: list[Sentence] = []
     section = ""
+    assumed = False
     n = 0
     for unit, is_bullet in _units(text):
         if not unit:
             continue
         if unit.startswith("#"):
             section = _section_of(unit[1:]) or ""
+            assumed = "assumed by the engine" in unit.lower()
             continue
         sec = _section_of(unit) if not is_bullet else ""
         if sec:
             section = sec
+            assumed = "assumed by the engine" in unit.lower()
             continue
-        out.append(analyse_sentence(n, unit, section, is_bullet))
+        sent = analyse_sentence(n, unit, section, is_bullet)
+        sent.assumed = assumed
+        out.append(sent)
         n += 1
     return out
 

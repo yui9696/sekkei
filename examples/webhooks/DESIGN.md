@@ -14,6 +14,9 @@ _version 0.1.0 · schema sekkei/1_
 - The system notifies people through an external channel.
 - Targets that keep failing are disabled by policy and the owner is told.
 - Metrics, structured logs and health endpoints for operations.
+- Callers are authenticated and authorized.
+- Scheduled jobs process stored records in windows.
+- Changes are recorded append-only with the actor.
 
 ## Requirements
 
@@ -32,6 +35,15 @@ _version 0.1.0 · schema sekkei/1_
 | R-11 | nonfunctional | should | Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs. | required metrics exposed = all listed |
 | R-12 | constraint | must | Python 3.12, PostgreSQL available, Redis available. Single region. Team of 3. | — |
 | R-13 | constraint | must | Must run as a set of stateless containers behind our existing ingress. | — |
+| R-14 | functional | must | Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
+| R-15 | functional | must | Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine). | — |
+| R-16 | nonfunctional | should | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb kb |
+| R-17 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % % |
+| R-18 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
+| R-19 | nonfunctional | should | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % % |
+| R-20 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-21 | constraint | must | Authentication by API keys per customer (assumed by the engine). | — |
+| R-22 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
 ## Components
 
@@ -42,45 +54,52 @@ graph LR
   C_3[("C-3 Secret store")]
   C_4[["C-4 Email provider"]]
   C_5[["C-5 Customer endpoint"]]
-  C_6["C-6 Domain core"]
-  C_7["C-7 Outbound HTTP client"]
-  C_8["C-8 Signer"]
-  C_9["C-9 Notifier"]
-  C_10["C-10 Observability"]
-  C_11["C-11 Authentication"]
-  C_12["C-12 Worker"]
-  C_13["C-13 Scheduler"]
-  C_14["C-14 Health policy"]
-  C_15["C-15 Admin HTTP API"]
-  C_16["C-16 Ingest API"]
-  C_6 -->|I-1| C_1
-  C_6 -->|I-10| C_10
-  C_6 -->|I-3| C_3
-  C_6 -->|I-9| C_9
+  C_6[("C-6 Audit log")]
+  C_7["C-7 Domain core"]
+  C_8["C-8 Outbound HTTP client"]
+  C_9["C-9 Signer"]
+  C_10["C-10 Notifier"]
+  C_11["C-11 Observability"]
+  C_12["C-12 Authentication"]
+  C_13["C-13 Worker"]
+  C_14["C-14 Scheduler"]
+  C_15["C-15 Health policy"]
+  C_16["C-16 Batch job"]
+  C_17["C-17 Admin HTTP API"]
+  C_18["C-18 Ingest API"]
+  C_7 -->|I-1| C_1
+  C_7 -->|I-11| C_11
+  C_7 -->|I-3| C_3
+  C_7 -->|I-6| C_6
   C_7 -->|I-10| C_10
-  C_8 -->|I-3| C_3
-  C_9 -->|I-4| C_4
-  C_9 -->|I-10| C_10
-  C_11 -->|I-1| C_1
-  C_12 -->|I-2| C_2
-  C_12 -->|I-6| C_6
-  C_12 -->|I-13| C_13
-  C_12 -->|I-10| C_10
-  C_12 -->|I-7| C_7
-  C_12 -->|I-8| C_8
-  C_13 -->|I-10| C_10
+  C_8 -->|I-11| C_11
+  C_9 -->|I-3| C_3
+  C_10 -->|I-4| C_4
+  C_10 -->|I-11| C_11
+  C_12 -->|I-1| C_1
   C_13 -->|I-2| C_2
-  C_14 -->|I-6| C_6
-  C_14 -->|I-9| C_9
-  C_14 -->|I-10| C_10
-  C_15 -->|I-6| C_6
-  C_15 -->|I-11| C_11
+  C_13 -->|I-7| C_7
+  C_13 -->|I-14| C_14
+  C_13 -->|I-11| C_11
+  C_13 -->|I-8| C_8
+  C_13 -->|I-9| C_9
+  C_14 -->|I-11| C_11
+  C_14 -->|I-2| C_2
+  C_15 -->|I-7| C_7
   C_15 -->|I-10| C_10
-  C_15 -->|I-3| C_3
-  C_16 -->|I-6| C_6
-  C_16 -->|I-2| C_2
-  C_16 -->|I-10| C_10
+  C_15 -->|I-11| C_11
+  C_16 -->|I-1| C_1
+  C_16 -->|I-14| C_14
   C_16 -->|I-11| C_11
+  C_16 -->|I-7| C_7
+  C_17 -->|I-7| C_7
+  C_17 -->|I-12| C_12
+  C_17 -->|I-11| C_11
+  C_17 -->|I-3| C_3
+  C_18 -->|I-7| C_7
+  C_18 -->|I-2| C_2
+  C_18 -->|I-11| C_11
+  C_18 -->|I-12| C_12
 ```
 
 ### C-1 — Store
@@ -89,7 +108,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-9, R-12
+- **satisfies**: R-9, R-12, R-17
 
 ### C-2 — Work queue
 
@@ -97,7 +116,7 @@ graph LR
 - **responsibility**: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.
 - **provides**: I-2
 - **requires**: —
-- **satisfies**: R-1, R-3, R-4, R-5, R-6, R-8, R-9, R-10
+- **satisfies**: R-1, R-3, R-4, R-5, R-6, R-8, R-9, R-10, R-17
 
 ### C-3 — Secret store
 
@@ -123,100 +142,116 @@ graph LR
 - **requires**: —
 - **satisfies**: R-1, R-4, R-5, R-6
 
-### C-6 — Domain core
+### C-6 — Audit log
+
+- **kind**: datastore · **path**: `app/audit.py`
+- **responsibility**: Append-only record of who did what to which resource, queryable by resource and actor.
+- **provides**: I-6
+- **requires**: —
+- **satisfies**: R-15
+
+### C-7 — Domain core
 
 - **kind**: module · **path**: `app/core.py`
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
-- **provides**: I-6
-- **requires**: I-1, I-10, I-3, I-9
-- **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-12
+- **provides**: I-7
+- **requires**: I-1, I-11, I-3, I-6, I-10
+- **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-12, R-20, R-22
 
-### C-7 — Outbound HTTP client
+### C-8 — Outbound HTTP client
 
 - **kind**: module · **path**: `app/dispatcher.py`
 - **responsibility**: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome.
-- **provides**: I-7
-- **requires**: I-10
+- **provides**: I-8
+- **requires**: I-11
 - **satisfies**: R-1, R-4, R-5, R-6
 
-### C-8 — Signer
+### C-9 — Signer
 
 - **kind**: module · **path**: `app/signer.py`
 - **responsibility**: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.
-- **provides**: I-8
+- **provides**: I-9
 - **requires**: I-3
 - **satisfies**: R-1, R-2, R-5
 
-### C-9 — Notifier
+### C-10 — Notifier
 
 - **kind**: module · **path**: `app/notifier.py`
 - **responsibility**: Sends operator/customer notifications through the configured channel with templating and rate limiting.
-- **provides**: I-9
-- **requires**: I-4, I-10
+- **provides**: I-10
+- **requires**: I-4, I-11
 - **satisfies**: R-7
 
-### C-10 — Observability
+### C-11 — Observability
 
 - **kind**: module · **path**: `app/observability.py`
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
-- **provides**: I-10
+- **provides**: I-11
 - **requires**: —
-- **satisfies**: R-8, R-11
+- **satisfies**: R-8, R-11, R-17, R-19
 
-### C-11 — Authentication
+### C-12 — Authentication
 
 - **kind**: module · **path**: `app/auth.py`
 - **responsibility**: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.
-- **provides**: I-11
+- **provides**: I-12
 - **requires**: I-1
-- **satisfies**: R-1, R-2, R-6
+- **satisfies**: R-1, R-2, R-6, R-21
 
-### C-12 — Worker
+### C-13 — Worker
 
 - **kind**: job · **path**: `app/worker.py`
 - **responsibility**: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.
-- **provides**: I-12
-- **requires**: I-2, I-6, I-13, I-10, I-7, I-8
+- **provides**: I-13
+- **requires**: I-2, I-7, I-14, I-11, I-8, I-9
 - **satisfies**: R-1, R-4, R-5, R-6, R-8, R-10, R-11, R-13
 
-### C-13 — Scheduler
+### C-14 — Scheduler
 
 - **kind**: job · **path**: `app/scheduler.py`
 - **responsibility**: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
-- **provides**: I-13
-- **requires**: I-10, I-2
-- **satisfies**: R-1, R-4, R-5, R-6
+- **provides**: I-14
+- **requires**: I-11, I-2
+- **satisfies**: R-1, R-4, R-5, R-6, R-14
 
-### C-14 — Health policy
+### C-15 — Health policy
 
 - **kind**: job · **path**: `app/policy.py`
 - **responsibility**: Evaluates per-target failure history against the disable policy and applies the consequence.
-- **provides**: I-14
-- **requires**: I-6, I-9, I-10
+- **provides**: I-15
+- **requires**: I-7, I-10, I-11
 - **satisfies**: R-7
 
-### C-15 — Admin HTTP API
+### C-16 — Batch job
+
+- **kind**: job · **path**: `app/batch.py`
+- **responsibility**: Scheduled processing over stored records: extract, transform, aggregate, write results.
+- **provides**: I-16
+- **requires**: I-1, I-14, I-11, I-7
+- **satisfies**: R-14
+
+### C-17 — Admin HTTP API
 
 - **kind**: service · **path**: `app/admin_api.py`
 - **responsibility**: Management surface for operators/customers: resource lifecycle and configuration; authenticated.
-- **provides**: I-15
-- **requires**: I-6, I-11, I-10, I-3
-- **satisfies**: R-1, R-2, R-6, R-8, R-11, R-13
+- **provides**: I-17
+- **requires**: I-7, I-12, I-11, I-3
+- **satisfies**: R-1, R-2, R-6, R-8, R-11, R-13, R-16, R-18
 
-### C-16 — Ingest API
+### C-18 — Ingest API
 
 - **kind**: service · **path**: `app/ingest_api.py`
 - **responsibility**: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.
-- **provides**: I-16
-- **requires**: I-6, I-2, I-10, I-11
-- **satisfies**: R-3, R-8, R-9, R-11, R-13
+- **provides**: I-18
+- **requires**: I-7, I-2, I-11, I-12
+- **satisfies**: R-3, R-8, R-9, R-11, R-13, R-17
 
 **Layers** (each layer depends only on earlier ones):
 
-0. C-1, C-10, C-2, C-3, C-4, C-5
-1. C-11, C-13, C-7, C-8, C-9
-2. C-6
-3. C-12, C-14, C-15, C-16
+0. C-1, C-11, C-2, C-3, C-4, C-5, C-6
+1. C-10, C-12, C-14, C-8, C-9
+2. C-7
+3. C-13, C-15, C-16, C-17, C-18
 
 ## Interfaces
 
@@ -274,9 +309,19 @@ graph LR
 |---|---|---|---|---|
 | `POST <url>` | `body`: json, `signature headers`: str | 2xx on acceptance | 4xx final, 5xx retry, 429 with Retry-After | — |
 
-### I-6 — Domain core interface
+### I-6 — Audit log interface
 
-- **kind**: module · **owner**: C-6 · **stability**: draft
+- **kind**: class · **owner**: C-6 · **stability**: stable
+- Provided by Audit log. 
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `append` | `actor`: str, `action`: str, `resource`: str, `details`: dict | None | — | — |
+| `query` | `resource`: str \| None, `actor`: str \| None, `page`: Page | entries | — | — |
+
+### I-7 — Domain core interface
+
+- **kind**: module · **owner**: C-7 · **stability**: draft
 - Provided by Domain core. 
 
 | operation | inputs | output | errors | pre / post |
@@ -311,19 +356,23 @@ graph LR
 | | from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is | | | |
 | `notify_customer` | `customer`: Customer \| id | Customer \| None | ValidationError, NotFound | — |
 | | from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is | | | |
+| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
+| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | — |
+| | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
-### I-7 — Outbound HTTP client interface
+### I-8 — Outbound HTTP client interface
 
-- **kind**: module · **owner**: C-7 · **stability**: draft
+- **kind**: module · **owner**: C-8 · **stability**: draft
 - Provided by Outbound HTTP client. 
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
 | `post` | `url`: str, `body`: bytes, `headers`: dict, `timeout`: float | Outcome(status, latency, retry_after) | TimeoutError, ConnectionError, BlockedAddressError | url resolves to a public address |
 
-### I-8 — Signer interface
+### I-9 — Signer interface
 
-- **kind**: module · **owner**: C-8 · **stability**: draft
+- **kind**: module · **owner**: C-9 · **stability**: draft
 - Provided by Signer. 
 
 | operation | inputs | output | errors | pre / post |
@@ -332,18 +381,18 @@ graph LR
 | `headers` | `body`: bytes, `secrets`: list[bytes] | dict of signature headers | — | — |
 | | one header per valid secret during a rotation window | | | |
 
-### I-9 — Notifier interface
+### I-10 — Notifier interface
 
-- **kind**: module · **owner**: C-9 · **stability**: draft
+- **kind**: module · **owner**: C-10 · **stability**: draft
 - Provided by Notifier. 
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
 | `notify` | `recipient`: str, `template`: str, `context`: dict | message id | NotifyError | — |
 
-### I-10 — Observability interface
+### I-11 — Observability interface
 
-- **kind**: module · **owner**: C-10 · **stability**: draft
+- **kind**: module · **owner**: C-11 · **stability**: draft
 - Provided by Observability. 
 
 | operation | inputs | output | errors | pre / post |
@@ -356,9 +405,9 @@ graph LR
 | `log` | `event`: str, `fields`: dict | None | — | — |
 | | one JSON line per event | | | |
 
-### I-11 — Authentication interface
+### I-12 — Authentication interface
 
-- **kind**: module · **owner**: C-11 · **stability**: draft
+- **kind**: module · **owner**: C-12 · **stability**: draft
 - Provided by Authentication. 
 
 | operation | inputs | output | errors | pre / post |
@@ -366,9 +415,9 @@ graph LR
 | `authenticate` | `credentials`: str | Principal | AuthError | — |
 | `authorize` | `principal`: Principal, `action`: str, `resource`: str | None | Forbidden | — |
 
-### I-12 — Worker interface
+### I-13 — Worker interface
 
-- **kind**: module · **owner**: C-12 · **stability**: draft
+- **kind**: module · **owner**: C-13 · **stability**: draft
 - Provided by Worker. 
 
 | operation | inputs | output | errors | pre / post |
@@ -377,9 +426,9 @@ graph LR
 | | one lease/process/ack cycle; the loop and concurrency live in the process entry point | | | |
 | `process` | `item`: WorkItem | Outcome | DeliveryError | outcome recorded through core before ack |
 
-### I-13 — Scheduler interface
+### I-14 — Scheduler interface
 
-- **kind**: module · **owner**: C-13 · **stability**: draft
+- **kind**: module · **owner**: C-14 · **stability**: draft
 - Provided by Scheduler. 
 
 | operation | inputs | output | errors | pre / post |
@@ -388,9 +437,9 @@ graph LR
 | | None when attempts are exhausted | | | |
 | `promote_due` | `now`: datetime | int moved | — | — |
 
-### I-14 — Health policy interface
+### I-15 — Health policy interface
 
-- **kind**: module · **owner**: C-14 · **stability**: draft
+- **kind**: module · **owner**: C-15 · **stability**: draft
 - Provided by Health policy. 
 
 | operation | inputs | output | errors | pre / post |
@@ -398,9 +447,18 @@ graph LR
 | `evaluate` | `now`: datetime | list[action taken] | — | stated values: 3 days (R-7) |
 | | disables targets failing continuously beyond the window and notifies | | | |
 
-### I-15 — Admin HTTP API interface
+### I-16 — Batch job interface
 
-- **kind**: http · **owner**: C-15 · **stability**: draft
+- **kind**: module · **owner**: C-16 · **stability**: draft
+- Provided by Batch job. 
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `run` | `window`: DateRange | JobReport | JobError | stated values: 90 days (R-14); 1 year (R-14) |
+
+### I-17 — Admin HTTP API interface
+
+- **kind**: http · **owner**: C-17 · **stability**: draft
 - Provided by Admin HTTP API. 
 
 | operation | inputs | output | errors | pre / post |
@@ -418,9 +476,9 @@ graph LR
 | `POST /timestamps/{id}/redeliver` | `id`: str | 202 redeliver accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
 
-### I-16 — Ingest API interface
+### I-18 — Ingest API interface
 
-- **kind**: http · **owner**: C-16 · **stability**: draft
+- **kind**: http · **owner**: C-18 · **stability**: draft
 - Provided by Ingest API. 
 
 | operation | inputs | output | errors | pre / post |
@@ -503,96 +561,133 @@ Generic domain record; refine per entity found in the requirements.
 | `created_at` | timestamp |  |
 | `valid_until` | timestamp \| null | set on rotation |
 
+### E-8 — JobRun (owner C-1)
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `job` | str |  |
+| `window_start` | timestamp |  |
+| `window_end` | timestamp |  |
+| `status` | enum |  |
+| `report` | json |  |
+
+### E-9 — AuditEntry (owner C-6)
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `actor` | str |  |
+| `action` | str |  |
+| `resource` | str | indexed |
+| `at` | timestamp |  |
+
 ## Flows
 
 ### F-1 — Manage a resource
 
 _Trigger:_ authenticated management request
 
-1. C-15 → C-11 via I-11: authenticate and authorize
-2. C-15 → C-6 via I-6: apply the change
-3. C-6 → C-1 via I-1: persist
+1. C-17 → C-12 via I-12: authenticate and authorize
+2. C-17 → C-7 via I-7: apply the change
+3. C-7 → C-1 via I-1: persist
 
 ```mermaid
 sequenceDiagram
-  participant C_15 as C-15 Admin HTTP API
-  participant C_11 as C-11 Authentication
-  participant C_6 as C-6 Domain core
+  participant C_17 as C-17 Admin HTTP API
+  participant C_12 as C-12 Authentication
+  participant C_7 as C-7 Domain core
   participant C_1 as C-1 Store
-  Note over C_15: authenticated management request
-  C_15->>C_11: I-11 authenticate and authorize
-  C_15->>C_6: I-6 apply the change
-  C_6->>C_1: I-1 persist
+  Note over C_17: authenticated management request
+  C_17->>C_12: I-12 authenticate and authorize
+  C_17->>C_7: I-7 apply the change
+  C_7->>C_1: I-1 persist
 ```
 
 ### F-2 — Publish an event
 
 _Trigger:_ producer calls the ingest API
 
-1. C-16 → C-6 via I-6: validate the event against known types
-2. C-6 → C-1 via I-1: persist the event
-3. C-16 → C-2 via I-2: enqueue one work item per matching target; ack only after both are durable
+1. C-18 → C-7 via I-7: validate the event against known types
+2. C-7 → C-1 via I-1: persist the event
+3. C-18 → C-2 via I-2: enqueue one work item per matching target; ack only after both are durable
 
 ```mermaid
 sequenceDiagram
-  participant C_16 as C-16 Ingest API
-  participant C_6 as C-6 Domain core
+  participant C_18 as C-18 Ingest API
+  participant C_7 as C-7 Domain core
   participant C_1 as C-1 Store
   participant C_2 as C-2 Work queue
-  Note over C_16: producer calls the ingest API
-  C_16->>C_6: I-6 validate the event against known types
-  C_6->>C_1: I-1 persist the event
-  C_16->>C_2: I-2 enqueue one work item per matching target; ack only after both are durable
+  Note over C_18: producer calls the ingest API
+  C_18->>C_7: I-7 validate the event against known types
+  C_7->>C_1: I-1 persist the event
+  C_18->>C_2: I-2 enqueue one work item per matching target; ack only after both are durable
 ```
 
 ### F-3 — Deliver a work item
 
 _Trigger:_ worker leases due items
 
-1. C-12 → C-2 via I-2: lease items of one partition
-2. C-12 → C-6 via I-6: load target, secrets and payload
-3. C-12 → C-2 via I-2: ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
+1. C-13 → C-2 via I-2: lease items of one partition
+2. C-13 → C-7 via I-7: load target, secrets and payload
+3. C-13 → C-2 via I-2: ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
 
 ```mermaid
 sequenceDiagram
-  participant C_12 as C-12 Worker
+  participant C_13 as C-13 Worker
   participant C_2 as C-2 Work queue
-  participant C_6 as C-6 Domain core
-  Note over C_12: worker leases due items
-  C_12->>C_2: I-2 lease items of one partition
-  C_12->>C_6: I-6 load target, secrets and payload
-  C_12->>C_2: I-2 ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
+  participant C_7 as C-7 Domain core
+  Note over C_13: worker leases due items
+  C_13->>C_2: I-2 lease items of one partition
+  C_13->>C_7: I-7 load target, secrets and payload
+  C_13->>C_2: I-2 ack on success, nack with retry_at on retryable failure, dead-letter when exhausted
 ```
 
 ### F-4 — Retry after failure
 
 _Trigger:_ scheduler tick
 
-1. C-13 → C-2 via I-2: promote items whose not_before has passed
+1. C-14 → C-2 via I-2: promote items whose not_before has passed
 
 ```mermaid
 sequenceDiagram
-  participant C_13 as C-13 Scheduler
+  participant C_14 as C-14 Scheduler
   participant C_2 as C-2 Work queue
-  Note over C_13: scheduler tick
-  C_13->>C_2: I-2 promote items whose not_before has passed
+  Note over C_14: scheduler tick
+  C_14->>C_2: I-2 promote items whose not_before has passed
 ```
 
 ### F-5 — Disable a continuously failing target
 
 _Trigger:_ policy tick
 
-1. C-14 → C-6 via I-6: read failure history and disable the target
-2. C-14 → C-9 via I-9: notify the owner
+1. C-15 → C-7 via I-7: read failure history and disable the target
+2. C-15 → C-10 via I-10: notify the owner
 
 ```mermaid
 sequenceDiagram
-  participant C_14 as C-14 Health policy
-  participant C_6 as C-6 Domain core
-  participant C_9 as C-9 Notifier
-  Note over C_14: policy tick
-  C_14->>C_6: I-6 read failure history and disable the target
-  C_14->>C_9: I-9 notify the owner
+  participant C_15 as C-15 Health policy
+  participant C_7 as C-7 Domain core
+  participant C_10 as C-10 Notifier
+  Note over C_15: policy tick
+  C_15->>C_7: I-7 read failure history and disable the target
+  C_15->>C_10: I-10 notify the owner
+```
+
+### F-6 — Run the batch job
+
+_Trigger:_ schedule fires
+
+1. C-16 → C-1 via I-1: read the window of records
+2. C-16 → C-1 via I-1: write results and the job report
+
+```mermaid
+sequenceDiagram
+  participant C_16 as C-16 Batch job
+  participant C_1 as C-1 Store
+  Note over C_16: schedule fires
+  C_16->>C_1: I-1 read the window of records
+  C_16->>C_1: I-1 write results and the job report
 ```
 
 ## Decisions
@@ -613,11 +708,11 @@ sequenceDiagram
   - + flexible queries
   - − complexity budget for a small team
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). REST/JSON over HTTP: 1.44; gRPC: 1.31; GraphQL: 1.16
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). REST/JSON over HTTP: 1.37; gRPC: 1.25; GraphQL: 1.12
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
-_Affects:_ C-15
+_Affects:_ C-17
 
 ### D-2 — Primary store (accepted)
 
@@ -642,7 +737,7 @@ _Affects:_ C-15
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL: 3.34; In-memory: 1.44; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.28; In-memory: 1.29; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints
 
 **Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
 
@@ -665,11 +760,11 @@ _Affects:_ C-1
   - + no secrets in headers
   - − certificate lifecycle for every customer
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.32; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
-_Affects:_ C-11, C-15
+_Affects:_ C-12, C-17
 
 ### D-4 — How producers publish (accepted)
 
@@ -687,11 +782,11 @@ _Affects:_ C-11, C-15
   - + decoupled
   - − new infrastructure
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). HTTP publish endpoint with idempotency keys: 1.94; In-process client library that writes the outbox: 1.66; Message bus topic: unavailable (needs broker, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.80; In-process client library that writes the outbox: 1.55; Message bus topic: unavailable (needs broker, not in the constraints)
 
 **Consequences.** Not choosing 'In-process client library that writes the outbox' gives up: no lost events at the source.
 
-_Affects:_ C-16
+_Affects:_ C-18
 
 ### D-5 — Work queue technology (accepted)
 
@@ -718,11 +813,11 @@ _Affects:_ C-16
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.37; Redis Streams with consumer groups: 2.01; In-memory queue: 1.44; Managed broker: unavailable (needs broker, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.14; Redis Streams with consumer groups: 1.81; In-memory queue: 1.37; Managed broker: unavailable (needs broker, not in the constraints)
 
 **Consequences.** Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.
 
-_Affects:_ C-2, C-16, C-12
+_Affects:_ C-2, C-18, C-13
 
 ### D-6 — Where delayed retries wait (accepted)
 
@@ -739,11 +834,11 @@ _Affects:_ C-2, C-16, C-12
   - + no store
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). not_before column on the work item: 2.08; Redis sorted set keyed by due time: 1.60; In-process timers: 1.42
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.92; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34
 
 **Consequences.** Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.
 
-_Affects:_ C-13, C-2
+_Affects:_ C-14, C-2
 
 ### D-7 — Process topology (accepted)
 
@@ -763,11 +858,11 @@ _Affects:_ C-13, C-2
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). One image, role by flag: `api` and `worker` proc: 1.84; Separate services per concern: 1.58; Single process with background threads: 1.43
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.88; Separate services per concern: 1.63; Single process with background threads: 1.37
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
-_Affects:_ C-15, C-16, C-12, C-13, C-14
+_Affects:_ C-17, C-18, C-13, C-14, C-15
 
 ### D-8 — Outbound request safety (accepted)
 
@@ -781,11 +876,11 @@ _Affects:_ C-15, C-16, C-12, C-13, C-14
   - − SSRF into internal networks
   - − unbounded response bodies
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Resolve and block private/link-local ranges: 1.49; Plain HTTP client with a timeout: 1.19
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Resolve and block private/link-local ranges: 1.41; Plain HTTP client with a timeout: 1.16
 
 **Consequences.** Not choosing 'Plain HTTP client with a timeout' gives up: simplest.
 
-_Affects:_ C-7
+_Affects:_ C-8
 
 ### D-9 — Storage of signing secrets (accepted)
 
@@ -803,11 +898,11 @@ _Affects:_ C-7
   - + simplest
   - − database dump exposes every customer secret
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Encrypted column: 1.52; Plaintext column: 1.48; External secrets manager: unavailable (needs vault, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.33; External secrets manager: unavailable (needs vault, not in the constraints)
 
 **Consequences.** Not choosing 'Plaintext column' gives up: simplest.
 
-_Affects:_ C-3, C-8
+_Affects:_ C-3, C-9
 
 ### D-10 — Per-target isolation of outbound work (accepted)
 
@@ -825,11 +920,157 @@ _Affects:_ C-3, C-8
   - + bounded blast radius without per-target state
   - − a slow target still delays its shard
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Partition the queue by target: 1.74; Hash targets to N shards, one worker pool per sh: 1.59; Single FIFO queue with a global worker pool: 1.40
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.75; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34
 
 **Consequences.** Not choosing 'Hash targets to N shards, one worker pool per sh' gives up: bounded blast radius without per-target state. Not choosing 'Single FIFO queue with a global worker pool' gives up: simplest.
 
-_Affects:_ C-2, C-12
+_Affects:_ C-2, C-13
+
+### D-11 — Redundancy for the availability target (accepted)
+
+**Context.** The availability target must be met through instance failures and deploys.
+
+- ✔ **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
+  - + survives one instance failure
+  - + zero-downtime deploys
+  - − needs stateless instances and a shared store
+- ✘ **Single instance with health-based restart**
+  - + simplest
+  - + cheapest
+  - − restart time is downtime
+  - − deploys are downtime
+- ✘ **Active-active across two regions**
+  - + survives a regional outage
+  - − data replication and conflict handling
+  - − cost
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.50; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)
+
+**Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
+
+_Affects:_ C-17, C-18, C-13
+
+### D-12 — Assumed answer: load (Q-payload) (proposed)
+
+**Context.** The requirements do not say. Question: Q-payload. No evidence in the text; engine default.
+
+- ✔ **2 KB / 256 KB**
+- ✘ **16 KB / 1 MB**
+- ✘ **256 bytes / 4 KB**
+
+**Rationale.** Typical JSON record sizes; the maximum bounds request bodies.
+
+**Consequences.** If the real answer differs: State the sizes; storage growth and body limits change.
+
+_Affects:_ C-18
+
+### D-13 — Assumed answer: quality (Q-availability) (proposed)
+
+**Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
+
+- ✔ **99.9 %**
+- ✘ **99.5 %**
+- ✘ **99.99 %**
+
+**Rationale.** Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.
+
+**Consequences.** If the real answer differs: State the target and what may be lost; topology and queue durability change.
+
+_Affects:_ C-2, C-11
+
+### D-14 — Assumed answer: data (Q-retention) (proposed)
+
+**Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
+
+- ✔ **90 days / 1 year**
+- ✘ **30 days / 90 days**
+- ✘ **indefinite**
+
+**Rationale.** Bounded retention limits storage growth and satisfies most data-minimisation rules.
+
+**Consequences.** If the real answer differs: State the retention; the deletion job and capacity change.
+
+_Affects:_ C-16, C-1
+
+### D-15 — Assumed answer: data (Q-backup) (proposed)
+
+**Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
+
+- ✔ **daily / 24 h / 4 h**
+- ✘ **hourly / 1 h / 1 h**
+- ✘ **none**
+
+**Rationale.** The store's own daily backup is the cheapest credible baseline.
+
+**Consequences.** If the real answer differs: State RPO/RTO; the store decision and a restore drill change.
+
+_Affects:_ C-1
+
+### D-16 — Assumed answer: data (Q-migration) (proposed)
+
+**Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
+
+- ✔ **greenfield**
+- ✘ **one-shot import**
+- ✘ **gradual cut-over**
+
+**Rationale.** Nothing in the text names an existing system.
+
+**Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
+
+### D-17 — Assumed answer: security (Q-auth) (proposed)
+
+**Context.** The requirements do not say. Question: Q-auth. Evidence: customers/visitors mentioned.
+
+- ✔ **API keys**
+- ✘ **OIDC**
+- ✘ **mTLS**
+
+**Rationale.** External callers without a stated identity provider are simplest to serve with per-customer keys.
+
+**Consequences.** If the real answer differs: State the scheme; the authentication decision is rescored.
+
+_Affects:_ C-12
+
+### D-18 — Assumed answer: compliance (Q-compliance) (proposed)
+
+**Context.** The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.
+
+- ✔ **GDPR-style deletion + audit**
+- ✘ **no regime**
+- ✘ **HIPAA/PCI controls**
+
+**Rationale.** Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.
+
+**Consequences.** If the real answer differs: State the regime; audit and deletion paths change.
+
+_Affects:_ C-6, C-1
+
+### D-19 — Assumed answer: operations (Q-alerting) (proposed)
+
+**Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
+
+- ✔ **error rate + queue growth**
+- ✘ **none**
+- ✘ **per-endpoint SLO alerts**
+
+**Rationale.** Two alerts catch most incidents without paging on noise.
+
+**Consequences.** If the real answer differs: State the rules and the on-call; observability conventions change.
+
+_Affects:_ C-11
+
+### D-20 — Assumed answer: cost (Q-budget) (proposed)
+
+**Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
+
+- ✔ **existing only**
+- ✘ **managed services allowed**
+- ✘ **strict monthly cap**
+
+**Rationale.** The cheapest assumption; every decision already prefers the option needing no new infrastructure.
+
+**Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
 ## Risks
 
@@ -870,15 +1111,15 @@ _Affects:_ C-2, C-12
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Store + Work queue + Observability (M)"]
-  WP_2["WP-2 Secret store (S)"]
+  WP_1["WP-1 Audit log + Store + Work queue (M)"]
+  WP_2["WP-2 Observability + Secret store (M)"]
   WP_3["WP-3 Authentication + Outbound HTTP client + Scheduler (M)"]
   WP_4["WP-4 Notifier + Signer (M)"]
   WP_5["WP-5 Domain core (S)"]
-  WP_6["WP-6 Admin HTTP API + Worker + Ingest API (M)"]
-  WP_7["WP-7 Health policy (S)"]
+  WP_6["WP-6 Admin HTTP API + Worker + Batch job (M)"]
+  WP_7["WP-7 Ingest API + Health policy (M)"]
   WP_1 --> WP_3
-  WP_1 --> WP_4
+  WP_2 --> WP_3
   WP_2 --> WP_4
   WP_1 --> WP_5
   WP_2 --> WP_5
@@ -889,6 +1130,8 @@ graph LR
   WP_4 --> WP_6
   WP_5 --> WP_6
   WP_1 --> WP_7
+  WP_2 --> WP_7
+  WP_3 --> WP_7
   WP_4 --> WP_7
   WP_5 --> WP_7
 ```
@@ -900,110 +1143,128 @@ graph LR
 3. WP-5
 4. WP-6, WP-7
 
-_Critical path (weight 7):_ WP-1 → WP-4 → WP-5 → WP-6
+_Critical path (weight 7):_ WP-2 → WP-4 → WP-5 → WP-7
 
-### WP-1 — Store + Work queue + Observability (M)
+### WP-1 — Audit log + Store + Work queue (M)
 
-Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
+Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor; Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.
 
-- **components**: C-1, C-2, C-10 · **implements**: I-1, I-2, I-10
-- **depends on**: — · **satisfies**: R-1, R-3, R-4, R-5, R-6, R-8, R-9, R-10, R-11, R-12
-- **write scope**: `app/store.py`, `tests/test_store.py`, `app/queue.py`, `tests/test_queue.py`, `app/observability.py`, `tests/test_observability.py`
+- **components**: C-6, C-1, C-2 · **implements**: I-6, I-1, I-2
+- **depends on**: — · **satisfies**: R-1, R-3, R-4, R-5, R-6, R-8, R-9, R-10, R-12, R-15, R-17
+- **write scope**: `app/audit.py`, `tests/test_audit.py`, `app/store.py`, `tests/test_store.py`, `app/queue.py`, `tests/test_queue.py`
 - **acceptance**:
-  - A-1 (test) unit tests of Store, Work queue, Observability pass — `python -m pytest -q tests/test_store.py tests/test_queue.py tests/test_observability.py`
+  - A-1 (test) unit tests of Audit log, Store, Work queue pass — `python -m pytest -q tests/test_audit.py tests/test_store.py tests/test_queue.py`
   - A-2 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
   - A-3 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
   - A-4 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target — metric R-10
-  - A-5 (metric) R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target — metric R-11
-- **notes**: family: crud_api
+  - A-5 (metric) R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-17
+- **notes**: family: audit_log
 
-### WP-2 — Secret store (S)
+### WP-2 — Observability + Secret store (M)
 
-Implement Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.
+Implement Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.
 
-- **components**: C-3 · **implements**: I-3
-- **depends on**: — · **satisfies**: R-1, R-2, R-5
-- **write scope**: `app/secrets.py`, `tests/test_secrets.py`
+- **components**: C-11, C-3 · **implements**: I-11, I-3
+- **depends on**: — · **satisfies**: R-1, R-2, R-5, R-8, R-11, R-17, R-19
+- **write scope**: `app/observability.py`, `tests/test_observability.py`, `app/secrets.py`, `tests/test_secrets.py`
 - **acceptance**:
-  - A-6 (test) unit tests of Secret store pass — `python -m pytest -q tests/test_secrets.py`
-- **notes**: family: signing
+  - A-6 (test) unit tests of Observability, Secret store pass — `python -m pytest -q tests/test_observability.py tests/test_secrets.py`
+  - A-7 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-8 (metric) R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target — metric R-11
+  - A-9 (metric) R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-17
+  - A-10 (metric) R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload — metric R-19
+- **notes**: family: observability
 
 ### WP-3 — Authentication + Outbound HTTP client + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Outbound HTTP client: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
-- **components**: C-11, C-7, C-13 · **implements**: I-11, I-7, I-13
-- **depends on**: WP-1 · **satisfies**: R-1, R-2, R-4, R-5, R-6
+- **components**: C-12, C-8, C-14 · **implements**: I-12, I-8, I-14
+- **depends on**: WP-1, WP-2 · **satisfies**: R-1, R-2, R-4, R-5, R-6, R-14, R-21
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/dispatcher.py`, `tests/test_dispatcher.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-7 (test) unit tests of Authentication, Outbound HTTP client, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_dispatcher.py tests/test_scheduler.py`
+  - A-11 (test) unit tests of Authentication, Outbound HTTP client, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_dispatcher.py tests/test_scheduler.py`
 - **notes**: family: admin_api
 
 ### WP-4 — Notifier + Signer (M)
 
 Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting; Signer: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.
 
-- **components**: C-9, C-8 · **implements**: I-9, I-8
-- **depends on**: WP-1, WP-2 · **satisfies**: R-1, R-2, R-5, R-7
+- **components**: C-10, C-9 · **implements**: I-10, I-9
+- **depends on**: WP-2 · **satisfies**: R-1, R-2, R-5, R-7
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`, `app/signer.py`, `tests/test_signer.py`
 - **acceptance**:
-  - A-8 (test) unit tests of Notifier, Signer pass — `python -m pytest -q tests/test_notifier.py tests/test_signer.py`
+  - A-12 (test) unit tests of Notifier, Signer pass — `python -m pytest -q tests/test_notifier.py tests/test_signer.py`
 - **notes**: family: notification
 
 ### WP-5 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
-- **components**: C-6 · **implements**: I-6
-- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-12
+- **components**: C-7 · **implements**: I-7
+- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-12, R-20, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-13 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: crud_api
 
-### WP-6 — Admin HTTP API + Worker + Ingest API (M)
+### WP-6 — Admin HTTP API + Worker + Batch job (M)
 
-Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.
+Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
-- **components**: C-15, C-12, C-16 · **implements**: I-15, I-12, I-16
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5 · **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-8, R-9, R-10, R-11, R-13
-- **write scope**: `app/admin_api.py`, `tests/test_admin_api.py`, `app/worker.py`, `tests/test_worker.py`, `app/ingest_api.py`, `tests/test_ingest_api.py`
+- **components**: C-17, C-13, C-16 · **implements**: I-17, I-13, I-16
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5 · **satisfies**: R-1, R-2, R-4, R-5, R-6, R-8, R-10, R-11, R-13, R-14, R-16, R-18
+- **write scope**: `app/admin_api.py`, `tests/test_admin_api.py`, `app/worker.py`, `tests/test_worker.py`, `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-10 (test) unit tests of Admin HTTP API, Worker, Ingest API pass — `python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_ingest_api.py`
-  - A-11 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-12 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-13 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target — metric R-10
-  - A-14 (metric) R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target — metric R-11
+  - A-14 (test) unit tests of Admin HTTP API, Worker, Batch job pass — `python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_batch.py`
+  - A-15 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-16 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target — metric R-10
+  - A-17 (metric) R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target — metric R-11
+  - A-18 (metric) R-16: size at 2 KB <= 256 kb kb — metric R-16
+  - A-19 (metric) R-18: time at 4 h 24 h h — metric R-18
 - **notes**: family: admin_api
 
-### WP-7 — Health policy (S)
+### WP-7 — Ingest API + Health policy (M)
 
-Implement Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.
+Implement Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence; Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.
 
-- **components**: C-14 · **implements**: I-14
-- **depends on**: WP-1, WP-4, WP-5 · **satisfies**: R-7
-- **write scope**: `app/policy.py`, `tests/test_policy.py`
+- **components**: C-18, C-15 · **implements**: I-18, I-15
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5 · **satisfies**: R-3, R-7, R-8, R-9, R-11, R-13, R-17
+- **write scope**: `app/ingest_api.py`, `tests/test_ingest_api.py`, `app/policy.py`, `tests/test_policy.py`
 - **acceptance**:
-  - A-15 (test) unit tests of Health policy pass — `python -m pytest -q tests/test_policy.py`
-- **notes**: family: health_policy
+  - A-20 (test) unit tests of Ingest API, Health policy pass — `python -m pytest -q tests/test_ingest_api.py tests/test_policy.py`
+  - A-21 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-22 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-23 (metric) R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target — metric R-11
+  - A-24 (metric) R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-17
+- **notes**: family: event_ingest
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-3, C-5, C-6, C-7, C-8, C-11, C-12, C-13, C-15 | WP-1, WP-2, WP-3, WP-4, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-2 | must | C-3, C-6, C-8, C-11, C-15 | WP-2, WP-3, WP-4, WP-5, WP-6 | A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-3 | must | C-2, C-6, C-16 | WP-1, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-4 | must | C-2, C-5, C-6, C-7, C-12, C-13 | WP-1, WP-3, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-7, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-5 | must | C-2, C-3, C-5, C-6, C-7, C-8, C-12, C-13 | WP-1, WP-2, WP-3, WP-4, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-6 | must | C-2, C-5, C-6, C-7, C-11, C-12, C-13, C-15 | WP-1, WP-3, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-7, A-9, A-10, A-11, A-12, A-13, A-14 |
-| R-7 | must | C-4, C-6, C-9, C-14 | WP-4, WP-5, WP-7 | A-8, A-9, A-15 |
-| R-8 | should | C-2, C-10, C-12, C-15, C-16 | WP-1, WP-6 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-12, A-13, A-14 |
-| R-9 | should | C-1, C-2, C-16 | WP-1, WP-6 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-12, A-13, A-14 |
-| R-10 | must | C-2, C-12 | WP-1, WP-6 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-12, A-13, A-14 |
-| R-11 | should | C-10, C-12, C-15, C-16 | WP-1, WP-6 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-12, A-13, A-14 |
-| R-12 | must | C-1, C-6 | WP-1, WP-5 | A-1, A-2, A-3, A-4, A-5, A-9 |
-| R-13 | must | C-12, C-15, C-16 | WP-6 | A-10, A-11, A-12, A-13, A-14 |
+| R-1 | must | C-2, C-3, C-5, C-7, C-8, C-9, C-12, C-13, C-14, C-17 | WP-1, WP-2, WP-3, WP-4, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-2 | must | C-3, C-7, C-9, C-12, C-17 | WP-2, WP-3, WP-4, WP-5, WP-6 | A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-3 | must | C-2, C-7, C-18 | WP-1, WP-5, WP-7 | A-1, A-2, A-3, A-4, A-5, A-13, A-20, A-21, A-22, A-23, A-24 |
+| R-4 | must | C-2, C-5, C-7, C-8, C-13, C-14 | WP-1, WP-3, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-11, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-5 | must | C-2, C-3, C-5, C-7, C-8, C-9, C-13, C-14 | WP-1, WP-2, WP-3, WP-4, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-6 | must | C-2, C-5, C-7, C-8, C-12, C-13, C-14, C-17 | WP-1, WP-3, WP-5, WP-6 | A-1, A-2, A-3, A-4, A-5, A-11, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-7 | must | C-4, C-7, C-10, C-15 | WP-4, WP-5, WP-7 | A-12, A-13, A-20, A-21, A-22, A-23, A-24 |
+| R-8 | should | C-2, C-11, C-13, C-17, C-18 | WP-1, WP-2, WP-6, WP-7 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-14, A-15, A-16, A-17, A-18, A-19, A-20, A-21, A-22, A-23, A-24 |
+| R-9 | should | C-1, C-2, C-18 | WP-1, WP-7 | A-1, A-2, A-3, A-4, A-5, A-20, A-21, A-22, A-23, A-24 |
+| R-10 | must | C-2, C-13 | WP-1, WP-6 | A-1, A-2, A-3, A-4, A-5, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-11 | should | C-11, C-13, C-17, C-18 | WP-2, WP-6, WP-7 | A-6, A-7, A-8, A-9, A-10, A-14, A-15, A-16, A-17, A-18, A-19, A-20, A-21, A-22, A-23, A-24 |
+| R-12 | must | C-1, C-7 | WP-1, WP-5 | A-1, A-2, A-3, A-4, A-5, A-13 |
+| R-13 | must | C-13, C-17, C-18 | WP-6, WP-7 | A-14, A-15, A-16, A-17, A-18, A-19, A-20, A-21, A-22, A-23, A-24 |
+| R-14 | must | C-14, C-16 | WP-3, WP-6 | A-11, A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-15 | must | C-6 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
+| R-16 | should | C-17 | WP-6 | A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-17 | must | C-1, C-2, C-11, C-18 | WP-1, WP-2, WP-7 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-20, A-21, A-22, A-23, A-24 |
+| R-18 | should | C-17 | WP-6 | A-14, A-15, A-16, A-17, A-18, A-19 |
+| R-19 | should | C-11 | WP-2 | A-6, A-7, A-8, A-9, A-10 |
+| R-20 | must | C-7 | WP-5 | A-13 |
+| R-21 | must | C-12 | WP-3 | A-11 |
+| R-22 | must | C-7 | WP-5 | A-13 |
 
 ## Conventions
 

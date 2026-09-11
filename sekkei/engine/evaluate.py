@@ -113,7 +113,7 @@ def review(design: Design, an: Analysis, generic_components: list[str]) -> Revie
         if not (has_arch or has_dec or has_acc or t.convention):
             rv.unaddressed.append((q, f"signals present (weight {w}) but the catalogue has no component, decision or check for it"))
         elif q == "availability" and not has_dec:
-            rv.unaddressed.append((q, "no redundancy/failover decision in the catalogue; decide instance count and health-based restart explicitly"))
+            rv.unaddressed.append((q, "no redundancy decision applies (no service component); decide instance count and health-based restart explicitly"))
     if an.team_size and len([c for c in design.components if c.kind != "external"]) > 4 * an.team_size:
         rv.notes.append(f"{len(design.components)} components for a team of {an.team_size}; consider merging adjacent layers.")
     nf = [u for u in an.requirements if u.kind == "nonfunctional" and u.metric and u.metric[1] == "review"]

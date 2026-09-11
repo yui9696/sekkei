@@ -7,16 +7,21 @@
     "signing": 6,
     "notification": 4,
     "health_policy": 7,
-    "observability": 6
+    "observability": 6,
+    "batch_pipeline": 2,
+    "auth": 2,
+    "audit_log": 2
   },
   "qualities": {
     "durability": 1.0,
-    "performance": 0.88,
-    "isolation": 0.94,
-    "security": 0.52,
+    "performance": 0.82,
+    "isolation": 0.82,
+    "availability": 0.63,
+    "security": 0.54,
     "operability": 0.82,
-    "scalability": 0.7,
-    "simplicity": 0.8
+    "scalability": 0.63,
+    "simplicity": 0.8,
+    "compliance": 0.54
   },
   "constraints": [
     "containers",
@@ -115,7 +120,6 @@
         9
       ],
       "rules": [
-        "pattern:event_ingest",
         "quality:durability"
       ]
     },
@@ -124,7 +128,6 @@
         10
       ],
       "rules": [
-        "pattern:crud_api",
         "quality:isolation"
       ]
     },
@@ -155,15 +158,88 @@
         "quality:scalability"
       ]
     },
+    "R-14": {
+      "sentences": [
+        14
+      ],
+      "rules": [
+        "pattern:batch_pipeline",
+        "quality:compliance"
+      ]
+    },
+    "R-15": {
+      "sentences": [
+        15
+      ],
+      "rules": [
+        "pattern:audit_log",
+        "quality:performance",
+        "quality:compliance"
+      ]
+    },
+    "R-16": {
+      "sentences": [
+        16
+      ],
+      "rules": []
+    },
+    "R-17": {
+      "sentences": [
+        17
+      ],
+      "rules": [
+        "quality:durability",
+        "quality:availability"
+      ]
+    },
+    "R-18": {
+      "sentences": [
+        18
+      ],
+      "rules": []
+    },
+    "R-19": {
+      "sentences": [
+        19
+      ],
+      "rules": [
+        "quality:operability"
+      ]
+    },
+    "R-20": {
+      "sentences": [
+        20
+      ],
+      "rules": []
+    },
+    "R-21": {
+      "sentences": [
+        21
+      ],
+      "rules": [
+        "pattern:auth",
+        "quality:isolation",
+        "quality:security"
+      ]
+    },
+    "R-22": {
+      "sentences": [
+        22
+      ],
+      "rules": []
+    },
     "C-1": {
       "sentences": [
         9,
-        12
+        12,
+        17
       ],
       "rules": [
         "pattern:admin_api",
         "pattern:event_ingest",
-        "pattern:async_delivery"
+        "pattern:async_delivery",
+        "pattern:auth",
+        "pattern:batch_pipeline"
       ]
     },
     "I-1": {
@@ -173,12 +249,15 @@
         3,
         4,
         5,
-        6
+        6,
+        14
       ],
       "rules": [
         "pattern:admin_api",
         "pattern:event_ingest",
-        "pattern:async_delivery"
+        "pattern:async_delivery",
+        "pattern:auth",
+        "pattern:batch_pipeline"
       ]
     },
     "C-2": {
@@ -190,7 +269,8 @@
         6,
         8,
         9,
-        10
+        10,
+        17
       ],
       "rules": [
         "pattern:event_ingest",
@@ -272,6 +352,24 @@
     },
     "C-6": {
       "sentences": [
+        15
+      ],
+      "rules": [
+        "pattern:audit_log",
+        "tactic:compliance"
+      ]
+    },
+    "I-6": {
+      "sentences": [
+        15
+      ],
+      "rules": [
+        "pattern:audit_log",
+        "tactic:compliance"
+      ]
+    },
+    "C-7": {
+      "sentences": [
         1,
         2,
         3,
@@ -279,7 +377,9 @@
         5,
         6,
         7,
-        12
+        12,
+        20,
+        22
       ],
       "rules": [
         "pattern:admin_api",
@@ -288,7 +388,7 @@
         "pattern:health_policy"
       ]
     },
-    "I-6": {
+    "I-7": {
       "sentences": [
         1,
         2,
@@ -305,41 +405,31 @@
         "pattern:health_policy"
       ]
     },
-    "C-7": {
-      "sentences": [
-        1,
-        4,
-        5,
-        6
-      ],
-      "rules": [
-        "pattern:async_delivery"
-      ]
-    },
-    "I-7": {
-      "sentences": [
-        1,
-        4,
-        5,
-        6
-      ],
-      "rules": [
-        "pattern:async_delivery"
-      ]
-    },
     "C-8": {
       "sentences": [
         1,
-        2,
-        5
+        4,
+        5,
+        6
       ],
       "rules": [
-        "pattern:signing"
+        "pattern:async_delivery"
       ]
     },
     "I-8": {
       "sentences": [
         1,
+        4,
+        5,
+        6
+      ],
+      "rules": [
+        "pattern:async_delivery"
+      ]
+    },
+    "C-9": {
+      "sentences": [
+        1,
         2,
         5
       ],
@@ -347,64 +437,81 @@
         "pattern:signing"
       ]
     },
-    "C-9": {
-      "sentences": [
-        7
-      ],
-      "rules": [
-        "pattern:notification",
-        "pattern:health_policy"
-      ]
-    },
     "I-9": {
       "sentences": [
-        7
+        1,
+        2,
+        5
       ],
       "rules": [
-        "pattern:notification",
-        "pattern:health_policy"
+        "pattern:signing"
       ]
     },
     "C-10": {
       "sentences": [
-        8,
-        11
+        7
       ],
       "rules": [
-        "pattern:observability",
-        "tactic:performance",
-        "tactic:operability"
+        "pattern:notification",
+        "pattern:health_policy"
       ]
     },
     "I-10": {
-      "sentences": [],
+      "sentences": [
+        7
+      ],
       "rules": [
-        "pattern:observability",
-        "tactic:performance",
-        "tactic:operability"
+        "pattern:notification",
+        "pattern:health_policy"
       ]
     },
     "C-11": {
       "sentences": [
-        1,
-        2,
-        6
+        8,
+        11,
+        17,
+        19
       ],
       "rules": [
-        "pattern:admin_api"
+        "pattern:observability",
+        "tactic:performance",
+        "tactic:availability",
+        "tactic:operability"
       ]
     },
     "I-11": {
+      "sentences": [],
+      "rules": [
+        "pattern:observability",
+        "tactic:performance",
+        "tactic:availability",
+        "tactic:operability"
+      ]
+    },
+    "C-12": {
+      "sentences": [
+        1,
+        2,
+        6,
+        21
+      ],
+      "rules": [
+        "pattern:admin_api",
+        "pattern:auth"
+      ]
+    },
+    "I-12": {
       "sentences": [
         1,
         2,
         6
       ],
       "rules": [
-        "pattern:admin_api"
+        "pattern:admin_api",
+        "pattern:auth"
       ]
     },
-    "C-12": {
+    "C-13": {
       "sentences": [
         1,
         4,
@@ -419,7 +526,7 @@
         "pattern:async_delivery"
       ]
     },
-    "I-12": {
+    "I-13": {
       "sentences": [
         1,
         4,
@@ -430,41 +537,36 @@
         "pattern:async_delivery"
       ]
     },
-    "C-13": {
-      "sentences": [
-        1,
-        4,
-        5,
-        6
-      ],
-      "rules": [
-        "pattern:async_delivery",
-        "quantities:async_delivery"
-      ]
-    },
-    "I-13": {
-      "sentences": [
-        1,
-        4,
-        5,
-        6
-      ],
-      "rules": [
-        "pattern:async_delivery",
-        "quantities:async_delivery"
-      ]
-    },
     "C-14": {
       "sentences": [
-        7
+        1,
+        4,
+        5,
+        6,
+        14
       ],
       "rules": [
-        "pattern:health_policy",
-        "quantities:health_policy"
+        "pattern:async_delivery",
+        "pattern:batch_pipeline",
+        "quantities:async_delivery"
       ]
     },
     "I-14": {
       "sentences": [
+        1,
+        4,
+        5,
+        6,
+        14
+      ],
+      "rules": [
+        "pattern:async_delivery",
+        "pattern:batch_pipeline",
+        "quantities:async_delivery"
+      ]
+    },
+    "C-15": {
+      "sentences": [
         7
       ],
       "rules": [
@@ -472,20 +574,49 @@
         "quantities:health_policy"
       ]
     },
-    "C-15": {
+    "I-15": {
+      "sentences": [
+        7
+      ],
+      "rules": [
+        "pattern:health_policy",
+        "quantities:health_policy"
+      ]
+    },
+    "C-16": {
+      "sentences": [
+        14
+      ],
+      "rules": [
+        "pattern:batch_pipeline",
+        "quantities:batch_pipeline"
+      ]
+    },
+    "I-16": {
+      "sentences": [
+        14
+      ],
+      "rules": [
+        "pattern:batch_pipeline",
+        "quantities:batch_pipeline"
+      ]
+    },
+    "C-17": {
       "sentences": [
         1,
         2,
         6,
         8,
         11,
-        13
+        13,
+        16,
+        18
       ],
       "rules": [
         "pattern:admin_api"
       ]
     },
-    "I-15": {
+    "I-17": {
       "sentences": [
         1,
         2,
@@ -495,19 +626,20 @@
         "pattern:admin_api"
       ]
     },
-    "C-16": {
+    "C-18": {
       "sentences": [
         3,
         8,
         9,
         11,
-        13
+        13,
+        17
       ],
       "rules": [
         "pattern:event_ingest"
       ]
     },
-    "I-16": {
+    "I-18": {
       "sentences": [
         3
       ],
@@ -557,6 +689,18 @@
         "entity:secret"
       ]
     },
+    "E-8": {
+      "sentences": [],
+      "rules": [
+        "entity:job_run"
+      ]
+    },
+    "E-9": {
+      "sentences": [],
+      "rules": [
+        "entity:audit_entry"
+      ]
+    },
     "F-1": {
       "sentences": [],
       "rules": [
@@ -587,6 +731,12 @@
         "flow:disable"
       ]
     },
+    "F-6": {
+      "sentences": [],
+      "rules": [
+        "flow:batch_run"
+      ]
+    },
     "D-1": {
       "sentences": [],
       "rules": [
@@ -594,10 +744,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-2": {
@@ -607,10 +759,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-3": {
@@ -620,10 +774,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-4": {
@@ -633,10 +789,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-5": {
@@ -646,10 +804,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-6": {
@@ -659,10 +819,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-7": {
@@ -672,10 +834,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-8": {
@@ -685,10 +849,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-9": {
@@ -698,10 +864,12 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "D-10": {
@@ -711,10 +879,27 @@
         "quality:durability",
         "quality:performance",
         "quality:isolation",
+        "quality:availability",
         "quality:security",
         "quality:operability",
         "quality:scalability",
-        "quality:simplicity"
+        "quality:simplicity",
+        "quality:compliance"
+      ]
+    },
+    "D-11": {
+      "sentences": [],
+      "rules": [
+        "decision:redundancy",
+        "quality:durability",
+        "quality:performance",
+        "quality:isolation",
+        "quality:availability",
+        "quality:security",
+        "quality:operability",
+        "quality:scalability",
+        "quality:simplicity",
+        "quality:compliance"
       ]
     },
     "K-1": {
@@ -786,13 +971,13 @@
     "WP-1": {
       "sentences": [],
       "rules": [
-        "package:layer0:crud_api"
+        "package:layer0:audit_log"
       ]
     },
     "WP-2": {
       "sentences": [],
       "rules": [
-        "package:layer0:signing"
+        "package:layer0:observability"
       ]
     },
     "WP-3": {
@@ -822,7 +1007,61 @@
     "WP-7": {
       "sentences": [],
       "rules": [
-        "package:layer3:health_policy"
+        "package:layer3:event_ingest"
+      ]
+    },
+    "D-12": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-13": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-14": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-15": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-16": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-17": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-18": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-19": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
+      ]
+    },
+    "D-20": {
+      "sentences": [],
+      "rules": [
+        "assumed-answer"
       ]
     },
     "K-12": {
@@ -1024,6 +1263,60 @@
       "text": "Must run as a set of stateless containers behind our existing ingress.",
       "section": "constraint",
       "modality": "must"
+    },
+    {
+      "index": 14,
+      "text": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 15,
+      "text": "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).",
+      "section": "functional",
+      "modality": ""
+    },
+    {
+      "index": 16,
+      "text": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 17,
+      "text": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
+      "section": "nonfunctional",
+      "modality": "must"
+    },
+    {
+      "index": 18,
+      "text": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 19,
+      "text": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "section": "nonfunctional",
+      "modality": ""
+    },
+    {
+      "index": 20,
+      "text": "No existing data or system to migrate from (assumed by the engine).",
+      "section": "constraint",
+      "modality": ""
+    },
+    {
+      "index": 21,
+      "text": "Authentication by API keys per customer (assumed by the engine).",
+      "section": "constraint",
+      "modality": ""
+    },
+    {
+      "index": 22,
+      "text": "Use existing infrastructure only; no new managed services (assumed by the engine).",
+      "section": "constraint",
+      "modality": ""
     }
   ],
   "repairs": []

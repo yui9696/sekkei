@@ -152,6 +152,20 @@
       "kind": "functional",
       "priority": "must",
       "rationale": ""
+    },
+    {
+      "id": "R-17",
+      "statement": "The engine answers its own open questions from evidence in the text or defensible defaults, appends the answers to the requirements so they shape the design, and records each as a proposed decision with the options considered and what to change if the real answer differs.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-18",
+      "statement": "Every functional requirement no pattern recognised gets an owner: an existing specific component by word overlap, the surface and core for a human use case, or a newly synthesised component named from the sentence's verb class and object, wired into the design and packaged.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
     }
   ],
   "components": [
@@ -396,11 +410,13 @@
         "I-13",
         "I-14",
         "I-15",
-        "I-17"
+        "I-17",
+        "I-25"
       ],
       "satisfies": [
         "R-13",
-        "R-15"
+        "R-15",
+        "R-18"
       ],
       "tags": []
     },
@@ -439,7 +455,7 @@
     {
       "id": "C-19",
       "name": "Engine facade",
-      "responsibility": "design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.",
+      "responsibility": "design(text, assume): analyse, answer open questions and re-analyse, synthesise, record assumed decisions, inject threats, repair, review, notes; ask(text): questions only.",
       "kind": "module",
       "path": "sekkei/engine/__init__.py",
       "requires": [
@@ -451,13 +467,48 @@
         "I-18",
         "I-20",
         "I-22",
-        "I-23"
+        "I-23",
+        "I-24",
+        "I-25"
       ],
       "satisfies": [
         "R-13",
         "R-14",
         "R-15",
-        "R-16"
+        "R-16",
+        "R-17"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-24",
+      "name": "Answers",
+      "responsibility": "Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.",
+      "kind": "module",
+      "path": "sekkei/engine/answers.py",
+      "requires": [
+        "I-15",
+        "I-20"
+      ],
+      "satisfies": [
+        "R-17"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-25",
+      "name": "Owners",
+      "responsibility": "Owner placement for requirements no pattern recognised: word overlap with specific components, surface+core for human use cases, or a synthesised component.",
+      "kind": "module",
+      "path": "sekkei/engine/owners.py",
+      "requires": [
+        "I-1",
+        "I-13",
+        "I-14",
+        "I-15"
+      ],
+      "satisfies": [
+        "R-18"
       ],
       "tags": []
     },
@@ -517,7 +568,9 @@
         "I-17",
         "I-20",
         "I-21",
-        "I-22"
+        "I-22",
+        "I-24",
+        "I-25"
       ],
       "satisfies": [
         "R-16"
@@ -1986,9 +2039,14 @@
               "name": "text",
               "type": "str",
               "description": ""
+            },
+            {
+              "name": "assume",
+              "type": "bool",
+              "description": ""
             }
           ],
-          "output": "EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error",
+          "output": "EngineResult: design, analysis, review, notes, answers, placements, diagnostics, trace; ok when no lint error",
           "errors": [],
           "pre": "",
           "post": "",
@@ -2011,6 +2069,161 @@
         }
       ],
       "stability": "stable",
+      "description": ""
+    },
+    {
+      "id": "I-24",
+      "name": "Answers API",
+      "owner": "C-24",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "answer",
+          "inputs": [
+            {
+              "name": "q",
+              "type": "Question",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "Answer | None (answer text, bullets to append, options, rationale, evidence, if_wrong, patterns)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "answers",
+          "inputs": [
+            {
+              "name": "qs",
+              "type": "list[Question]",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "list[Answer]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "augment",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "ans",
+              "type": "list[Answer]",
+              "description": ""
+            }
+          ],
+          "output": "requirements text with the answers appended under engine-marked sections",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "answers_markdown",
+          "inputs": [
+            {
+              "name": "ans",
+              "type": "list[Answer]",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-25",
+      "name": "Owners API",
+      "owner": "C-25",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "place",
+          "inputs": [
+            {
+              "name": "u",
+              "type": "ReqUnit",
+              "description": ""
+            },
+            {
+              "name": "d",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "layout",
+              "type": "Layout",
+              "description": ""
+            },
+            {
+              "name": "cid",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "iid",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "requires",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "Placement (owners, how, detail, created); may add a component and interface to the design",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "placements_markdown",
+          "inputs": [
+            {
+              "name": "ps",
+              "type": "list[Placement]",
+              "description": ""
+            },
+            {
+              "name": "d",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
       "description": ""
     },
     {
@@ -2312,9 +2525,9 @@
           "description": ""
         },
         {
-          "name": "sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]",
+          "name": "sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json] [--augmented REQ.md] [--no-assume]",
           "inputs": [],
-          "output": "a complete, lint-clean design without any model, plus the architect's notes",
+          "output": "a complete, lint-clean design without any model, plus the architect's notes; open questions answered unless --no-assume",
           "errors": [],
           "pre": "",
           "post": "",
@@ -3382,30 +3595,68 @@
       "notes": ""
     },
     {
-      "id": "WP-15",
-      "title": "Engine: architect's notes",
-      "goal": "Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
+      "id": "WP-16",
+      "title": "Engine: questions, answers and owners",
+      "goal": "Implement the gap questions, the answer rules for every question and the owner placement (overlap, surface+core, synthesis) for unrecognised requirements.",
       "components": [
         "C-20",
+        "C-24",
+        "C-25"
+      ],
+      "implements": [
+        "I-20",
+        "I-24",
+        "I-25"
+      ],
+      "depends_on": [
+        "WP-13"
+      ],
+      "satisfies": [
+        "R-16",
+        "R-17",
+        "R-18"
+      ],
+      "files": [
+        "sekkei/engine/gaps.py",
+        "sekkei/engine/answers.py",
+        "sekkei/engine/owners.py",
+        "tests/test_autonomy.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-19",
+          "description": "autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_autonomy.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-15",
+      "title": "Engine: architect's notes",
+      "goal": "Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
+      "components": [
         "C-21",
         "C-22",
         "C-23"
       ],
       "implements": [
-        "I-20",
         "I-21",
         "I-22",
         "I-23"
       ],
       "depends_on": [
         "WP-2",
-        "WP-13"
+        "WP-13",
+        "WP-16"
       ],
       "satisfies": [
         "R-16"
       ],
       "files": [
-        "sekkei/engine/gaps.py",
         "sekkei/engine/sizing.py",
         "sekkei/engine/threats.py",
         "sekkei/engine/report.py",
@@ -3440,13 +3691,16 @@
       "depends_on": [
         "WP-3",
         "WP-13",
-        "WP-15"
+        "WP-15",
+        "WP-16"
       ],
       "satisfies": [
         "R-13",
         "R-14",
         "R-15",
-        "R-16"
+        "R-16",
+        "R-17",
+        "R-18"
       ],
       "files": [
         "sekkei/engine/synthesis.py",

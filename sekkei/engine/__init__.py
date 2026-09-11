@@ -12,10 +12,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import rules as R
-from ..model import Design
+from ..model import Decision, Design, Option
 from .analysis import Analysis, analyse
+from .answers import Answer, augment
+from .answers import answers as _answers
 from .evaluate import Review, review
 from .gaps import Question, questions
+from .owners import Placement
 from .repair import repair
 from .report import REQUIREMENTS_TEMPLATE, Notes, notes
 from .synthesis import synthesise
@@ -31,6 +34,9 @@ class EngineResult:
     diagnostics: list[R.Diagnostic]
     trace: dict[str, dict[str, list]]
     log: list[str] = field(default_factory=list)
+    answers: list[Answer] = field(default_factory=list)
+    placements: list[Placement] = field(default_factory=list)
+    augmented_text: str = ""
 
     @property
     def ok(self) -> bool:
@@ -49,15 +55,43 @@ class EngineResult:
         }
 
 
-def design(text: str) -> EngineResult:
+def _assumed_decisions(d: Design, ans: list[Answer]) -> None:
+    """One proposed decision per engine answer, so a human can override it in the design."""
+    n = len(d.decisions)
+    key_to_cid = {t.split(":", 1)[1]: c.id for c in d.components for t in c.tags if t.startswith("archetype:")}
+    for a in ans:
+        n += 1
+        affects = [key_to_cid[k] for k in a.affects if k in key_to_cid]
+        d.decisions.append(Decision(
+            f"D-{n}", f"Assumed answer: {a.topic} ({a.question_id})",
+            f"The requirements do not say. Question: {a.question_id}. " + ("Evidence: " + a.evidence + "." if a.evidence else "No evidence in the text; engine default."),
+            [Option(o, [], []) for o in a.options], a.options[0], a.rationale, "If the real answer differs: " + a.if_wrong, affects, "proposed"))
+
+
+def design(text: str, assume: bool = True) -> EngineResult:
+    """Design from a requirements text. With ``assume`` the engine answers its own open questions first."""
     an = analyse(text)
+    ans: list[Answer] = []
+    full = text
+    if assume:
+        for _ in range(3):  # answers can raise new questions (e.g. records -> retention); converge
+            new = [a for a in _answers(questions(an), an) if a.question_id not in {x.question_id for x in ans}]
+            if not new:
+                break
+            ans += new
+            full = augment(text, ans)
+            an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets})
     syn = synthesise(an)
+    _assumed_decisions(syn.design, ans)
+    for x in syn.design.decisions:
+        syn.trace.setdefault(x.id, {"sentences": [], "rules": ["assumed-answer"]})
     added = inject_risks(syn.design)
     for k in syn.design.risks[len(syn.design.risks) - added:]:
         syn.trace[k.id] = {"sentences": [], "rules": ["threat:" + k.description.split("]")[0].strip("[")]}
     d, diags, log = repair(syn.design)
     rv = review(d, an, syn.generic)
-    return EngineResult(d, an, rv, notes(d, an, rv), diags, syn.trace, syn.log + log)
+    nt = notes(d, an, rv, ans, syn.placements)
+    return EngineResult(d, an, rv, nt, diags, syn.trace, syn.log + log, ans, syn.placements, full)
 
 
 def ask(text: str) -> list[Question]:

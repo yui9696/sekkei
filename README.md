@@ -61,6 +61,26 @@ notes list the questions it would have asked, each with the assumption it used m
 Answer a question by adding a bullet and run again; only the parts the answer touches
 change.
 
+## Nothing is left to a human by default
+
+Two things an architect normally does in the meeting room, the engine does on its own:
+
+- **It answers its own questions.** For every gap (no database stated, no latency target,
+  no retention, no authentication, …) an answer rule looks for evidence in the text first
+  (a command-line tool with `no network` → SQLite; staff and an identity provider → OIDC;
+  counts ≥ 10,000 → PostgreSQL) and falls back to a defensible default (team of 2; p95
+  300 ms reads / 1 s writes; 99.9 % monthly; 90-day retention; daily backups). The answers
+  are appended to the requirements so they shape the design through the normal path, and
+  each becomes a **proposed decision** recording the options, the evidence and what to
+  change if the real answer differs (`--augmented REQ.md` writes the augmented text;
+  `--no-assume` keeps the questions open instead).
+- **It owns every requirement.** A sentence no pattern recognises is placed by word
+  overlap with a specific component, or — for a human use case — on the surface and the
+  core, or a **new component is synthesised** from the sentence's verb class and object
+  ("The controller reads temperature from four sensors" → `Temperature reader`; "It opens
+  or closes the roof vents" → `Vents controller`), with an interface, a path and a work
+  package. Every placement is listed in the notes with how it was made.
+
 ## What you get
 
 | file | contents |
@@ -132,7 +152,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 161 |
+| tests | 169 |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) + the two-line minimal spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |

@@ -93,7 +93,7 @@ def questions(an: Analysis) -> list[Question]:
     if not has_auth and human_facing:
         q("Q-auth", "security", "How are callers authenticated (API keys, OIDC/OAuth, mTLS), and who issues credentials?",
           "Every management route is gated on it; the auth decision is scored on it.", "API keys per caller, hashed at rest.", "D: Caller authentication; C: Authentication")
-    if has_auth and not has_authz:
+    if has_auth and not has_authz and not re.search(r"\bno (?:caller )?authentication\b", low):
         q("Q-authz", "security", "Who may do what: roles, tenants, ownership rules?",
           "Authorization checks live in the core and in every brief's acceptance.", "Callers see only resources they own; no roles.", "core operations, acceptance")
     if external and not external_policy:
@@ -108,10 +108,6 @@ def questions(an: Analysis) -> list[Question]:
     if not has_budget:
         q("Q-budget", "cost", "Is there a cost ceiling (infrastructure per month) or a preference for existing infrastructure only?",
           "Options that add infrastructure are scored on cost.", "Existing infrastructure preferred (cost weight only if stated).", "decisions")
-    if an.unrecognised:
-        ids = ", ".join(u.id for u in an.unrecognised)
-        q("Q-unrecognised", "requirements", f"Requirements {ids} matched no pattern: which components should own them, and what are their operations?",
-          "The engine assigned them to the generic core/surface; a wrong owner misleads the briefs.", "Owned by the domain core (and the first surface).", "C: Domain core; interfaces")
     return qs
 
 

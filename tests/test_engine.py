@@ -68,8 +68,7 @@ def test_non_goals_are_kept_out_of_requirements_and_pattern_matching():
 def test_every_fixture_yields_a_lint_clean_design(name):
     r = design(load(name))
     assert r.ok, R.format_text(r.diagnostics)
-    assert R.lint(r.design, strict=True, disable=["Q"]) == []
-    assert [d for d in R.lint(r.design) if d.severity == "error"] == []
+    assert [d for d in R.lint(r.design, strict=True, disable=["Q"]) if d.severity != "info"] == []
 
 
 @pytest.mark.parametrize("name", FIXTURES)
@@ -155,12 +154,16 @@ def test_cli_tool_design_is_a_cli_with_a_persistent_preset_store():
     assert any(rid == "R-5" for rid, _ in r.review.unrecognised)  # "save a named filter preset": honestly unrecognised
 
 
-def test_novel_domain_gets_the_layered_fallback_and_says_so():
+def test_novel_domain_is_placed_by_synthesis_and_says_so():
     r = design(load("novel"))
     assert r.ok
-    assert r.review.generic and r.review.unrecognised and r.review.needs_human
+    assert r.review.unrecognised and r.placements
+    assert any(p.how == "synthesised" for p in r.placements)
     md = r.review.to_markdown()
-    assert "did not recognise" in md and "Generic components" in md
+    assert "did not recognise" in md
+    # a text that matches nothing at all gets the layered fallback and says so
+    r0 = design("# Hive counter\n\nFunctional\n- The device counts bees entering the hive and keeps the tally on an SD card.\n", assume=False)
+    assert r0.ok and r0.review.generic and "Generic components" in r0.review.to_markdown()
     assert {x.title: x.choice for x in r.design.decisions}["Primary store"].startswith("Files")  # "no database"
     assert r.design.conventions.language == "rust"
     assert any(k.description.startswith("Parts of the requirements were not recognised") for k in r.design.risks)

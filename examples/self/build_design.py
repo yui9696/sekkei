@@ -83,6 +83,12 @@ b.requirement("R-16", "Besides the design, the engine hands over an architect's 
                       "with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and "
                       "schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a "
                       "requirements template.")
+b.requirement("R-17", "The engine answers its own open questions from evidence in the text or defensible defaults, appends "
+                      "the answers to the requirements so they shape the design, and records each as a proposed decision "
+                      "with the options considered and what to change if the real answer differs.")
+b.requirement("R-18", "Every functional requirement no pattern recognised gets an owner: an existing specific component by "
+                      "word overlap, the surface and core for a human use case, or a newly synthesised component named "
+                      "from the sentence's verb class and object, wired into the design and packaged.")
 
 # --- components -------------------------------------------------------------
 b.component("C-1", "Model", "Dataclasses for the design, tolerant JSON loading, serialisation and the JSON Schema.",
@@ -122,15 +128,19 @@ b.component("C-15", "Requirements analysis", "Turns sentences into requirement u
 b.component("C-16", "Synthesis", "Instantiates and merges archetypes into components and interfaces, derives operations from "
             "verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and "
             "work packages; records the trace.", path="sekkei/engine/synthesis.py",
-            requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-17"], satisfies=["R-13", "R-15"])
+            requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-17", "I-25"], satisfies=["R-13", "R-15", "R-18"])
 b.component("C-17", "Evaluation", "Scores decision options against the active qualities and constraints (utility with "
             "availability rules and stated-technology bonus) and writes the engine's review of its own gaps.",
             path="sekkei/engine/evaluate.py", requires=["I-1", "I-14", "I-15"], satisfies=["R-13", "R-15"])
 b.component("C-18", "Repair", "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
             path="sekkei/engine/repair.py", requires=["I-1", "I-2"], satisfies=["R-13"])
-b.component("C-19", "Engine facade", "design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.",
-            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23"],
-            satisfies=["R-13", "R-14", "R-15", "R-16"])
+b.component("C-19", "Engine facade", "design(text, assume): analyse, answer open questions and re-analyse, synthesise, record assumed decisions, inject threats, repair, review, notes; ask(text): questions only.",
+            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
+            satisfies=["R-13", "R-14", "R-15", "R-16", "R-17"])
+b.component("C-24", "Answers", "Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.",
+            path="sekkei/engine/answers.py", requires=["I-15", "I-20"], satisfies=["R-17"])
+b.component("C-25", "Owners", "Owner placement for requirements no pattern recognised: word overlap with specific components, surface+core for human use cases, or a synthesised component.",
+            path="sekkei/engine/owners.py", requires=["I-1", "I-13", "I-14", "I-15"], satisfies=["R-18"])
 b.component("C-20", "Gap questions", "The questions an architect asks before committing, derived from what the text does not say, each with the assumption used meanwhile.",
             path="sekkei/engine/gaps.py", requires=["I-15"], satisfies=["R-16"])
 b.component("C-21", "Sizing", "Capacity estimates (Little's law, storage, backlog) and effort/schedule from package sizes and team size, with every assumption stated.",
@@ -138,7 +148,7 @@ b.component("C-21", "Sizing", "Capacity estimates (Little's law, storage, backlo
 b.component("C-22", "Threat model", "STRIDE-lite threats per archetype, injected into the design as risks with mitigations and proofs.",
             path="sekkei/engine/threats.py", requires=["I-1"], satisfies=["R-16"])
 b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.",
-            path="sekkei/engine/report.py", requires=["I-1", "I-15", "I-17", "I-20", "I-21", "I-22"], satisfies=["R-16"])
+            path="sekkei/engine/report.py", requires=["I-1", "I-15", "I-17", "I-20", "I-21", "I-22", "I-24", "I-25"], satisfies=["R-16"])
 
 # --- interfaces (operation names are the real function names; sekkei check verifies them) ---
 b.interface("I-1", "Model API", owner="C-1", kind="module", stability="stable", operations=[
@@ -245,8 +255,18 @@ b.interface("I-18", "Repair API", owner="C-18", kind="module", operations=[
     op("repair", [("design", "Design"), ("max_passes", "int")], "(design, remaining diagnostics, repairs applied)"),
 ])
 b.interface("I-19", "Engine API", owner="C-19", kind="module", stability="stable", operations=[
-    op("design", [("text", "str")], "EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error"),
+    op("design", [("text", "str"), ("assume", "bool")], "EngineResult: design, analysis, review, notes, answers, placements, diagnostics, trace; ok when no lint error"),
     op("ask", [("text", "str")], "list[Question]"),
+])
+b.interface("I-24", "Answers API", owner="C-24", kind="module", operations=[
+    op("answer", [("q", "Question"), ("an", "Analysis")], "Answer | None (answer text, bullets to append, options, rationale, evidence, if_wrong, patterns)"),
+    op("answers", [("qs", "list[Question]"), ("an", "Analysis")], "list[Answer]"),
+    op("augment", [("text", "str"), ("ans", "list[Answer]")], "requirements text with the answers appended under engine-marked sections"),
+    op("answers_markdown", [("ans", "list[Answer]")], "str"),
+])
+b.interface("I-25", "Owners API", owner="C-25", kind="module", operations=[
+    op("place", [("u", "ReqUnit"), ("d", "Design"), ("layout", "Layout"), ("cid", "dict"), ("iid", "dict"), ("requires", "dict")], "Placement (owners, how, detail, created); may add a component and interface to the design"),
+    op("placements_markdown", [("ps", "list[Placement]"), ("d", "Design")], "str"),
 ])
 b.interface("I-20", "Gap questions API", owner="C-20", kind="module", operations=[
     op("questions", [("an", "Analysis")], "list[Question] (id, topic, question, why, assumption, affects)"),
@@ -276,7 +296,7 @@ b.interface("I-10", "Command line", owner="C-10", kind="cli", operations=[
     op("sekkei accept REPORT [--force] / status / next / start WP", output="state transitions; stale briefs are refused"),
     op("sekkei diff OLD [-d NEW]", output="element changes and the affected packages; exit 1 if any"),
     op("sekkei schema / rules / prompt", output="JSON Schema; rule table; architect prompt"),
-    op("sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]", output="a complete, lint-clean design without any model, plus the architect's notes"),
+    op("sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json] [--augmented REQ.md] [--no-assume]", output="a complete, lint-clean design without any model, plus the architect's notes; open questions answered unless --no-assume"),
     op("sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]", output="the open questions; the requirements template"),
     op("sekkei draft REQ.md [--review] [--backend claude-code|anthropic]", output="optional model-based draft"),
 ])
@@ -436,12 +456,16 @@ b.work_package("WP-13", "Engine: analysis and evaluation", goal="Implement requi
                components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12"], satisfies=["R-13", "R-15"], size="M",
                files=["sekkei/engine/analysis.py", "sekkei/engine/evaluate.py"],
                acceptance=[check("A-15", "analysis tests pass on the fixtures", command=T + "tests/test_engine.py -k analysis")])
-b.work_package("WP-15", "Engine: architect's notes", goal="Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
-               components=["C-20", "C-21", "C-22", "C-23"], implements=["I-20", "I-21", "I-22", "I-23"], depends_on=["WP-2", "WP-13"], satisfies=["R-16"], size="M",
-               files=["sekkei/engine/gaps.py", "sekkei/engine/sizing.py", "sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
+b.work_package("WP-16", "Engine: questions, answers and owners", goal="Implement the gap questions, the answer rules for every question and the owner placement (overlap, surface+core, synthesis) for unrecognised requirements.",
+               components=["C-20", "C-24", "C-25"], implements=["I-20", "I-24", "I-25"], depends_on=["WP-13"], satisfies=["R-16", "R-17", "R-18"], size="M",
+               files=["sekkei/engine/gaps.py", "sekkei/engine/answers.py", "sekkei/engine/owners.py", "tests/test_autonomy.py"],
+               acceptance=[check("A-19", "autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component", command=T + "tests/test_autonomy.py")])
+b.work_package("WP-15", "Engine: architect's notes", goal="Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.",
+               components=["C-21", "C-22", "C-23"], implements=["I-21", "I-22", "I-23"], depends_on=["WP-2", "WP-13", "WP-16"], satisfies=["R-16"], size="M",
+               files=["sekkei/engine/sizing.py", "sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
                acceptance=[check("A-18", "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks", command=T + "tests/test_notes.py")])
 b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
-               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15"], satisfies=["R-13", "R-14", "R-15", "R-16"], size="L",
+               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",
                files=["sekkei/engine/synthesis.py", "sekkei/engine/repair.py", "sekkei/engine/__init__.py"],
                acceptance=[check("A-16", "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture", command=T + "tests/test_engine.py"),
                            check("A-17", "R-14: two runs on the same text produce identical JSON", kind="metric", metric="R-14")])

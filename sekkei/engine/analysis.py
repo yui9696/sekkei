@@ -70,13 +70,9 @@ def _match_patterns(low: str) -> dict[str, int]:
 
 
 def _sentence_patterns(sentence: T.Sentence, active: dict[str, int]) -> list[str]:
-    """Active patterns whose signals hit inside this sentence: those scoring >= 2, else the best scoring >= 1."""
+    """Active patterns whose signals score at least 2 inside this sentence (weight-1 signals alone are too generic)."""
     scores = {p.id: _score(p.signals, sentence.lower) for p in K.PATTERNS if p.id in active}
-    strong = [pid for pid, sc in scores.items() if sc >= 2]
-    if strong:
-        return strong
-    best = max(scores.items(), key=lambda kv: kv[1], default=(None, 0))
-    return [best[0]] if best[1] >= 1 else []
+    return [pid for pid, sc in scores.items() if sc >= 2]
 
 
 def _sentence_qualities(sentence: T.Sentence) -> list[str]:
@@ -122,10 +118,16 @@ def _summary(sentences: list[T.Sentence]) -> str:
     return prose[0].text if prose else (sentences[0].text if sentences else "")
 
 
-def analyse(text: str) -> Analysis:
+def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
+    """``hints`` maps the text of an engine-assumed bullet to the patterns it legitimately activates;
+    assumed bullets never activate patterns by their wording (they are policy, not capability)."""
+    hints = hints or {}
     sentences = T.segment(text)
     low = " ".join(s.text for s in sentences if s.section != "nongoal").lower()
-    active = _match_patterns(low)
+    active = _match_patterns(" ".join(s.text for s in sentences if s.section != "nongoal" and not s.assumed).lower())
+    for pats in hints.values():
+        for p in pats:
+            active[p] = max(active.get(p, 0), 2)
     # qualities: weight from signal strength across the document, normalised
     qw: dict[str, float] = {}
     for t in K.TACTICS:
@@ -160,7 +162,8 @@ def analyse(text: str) -> Analysis:
         if kind == "constraint":
             prio = "must"
         n += 1
-        unit = ReqUnit(f"R-{n}", s, kind, prio, _sentence_patterns(s, active), sq, _metric(s) if kind == "nonfunctional" else None)
+        pats = hints.get(s.text, []) if s.assumed else _sentence_patterns(s, active)
+        unit = ReqUnit(f"R-{n}", s, kind, prio, pats, sq, _metric(s) if kind == "nonfunctional" else None)
         if kind == "nonfunctional" and unit.metric is None:
             # a quality statement without a number: a default metric for the quality, else a review-visible target
             unit.metric = next((DEFAULT_METRICS[q] for q in sq if q in DEFAULT_METRICS), ("target to be agreed", "review", ""))

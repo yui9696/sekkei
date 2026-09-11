@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 
 from ..model import Design
 from .analysis import Analysis
+from .answers import Answer, answers_markdown
 from .evaluate import Review
 from .gaps import Question, questions, questions_markdown
+from .owners import Placement, placements_markdown
 from .sizing import Capacity, Effort, capacity, capacity_markdown, effort, effort_markdown
 from .threats import threats_markdown
 
@@ -45,14 +47,30 @@ class Notes:
     threats_md: str
     analysis_md: str = ""
     sections: list[str] = field(default_factory=list)
+    answers: list[Answer] = field(default_factory=list)
+    placements_md: str = ""
 
     def to_markdown(self) -> str:
         s = ["# Architect's notes (engine)\n",
              "Everything a solution architect hands over besides the design: the questions still open, the\n"
              "assumptions taken meanwhile, sizing, threats, effort — and what the engine could not do.\n"]
-        s.append("## 1. Questions to answer before committing\n")
-        s.append("Answer by adding bullets to the requirements and running `sekkei design` again; each answer changes only what its last column names.\n")
-        s.append(questions_markdown(self.questions))
+        if self.answers:
+            s.append("## 1. Questions the engine answered for you (confirm or override)\n")
+            s.append("Each answer is a proposed decision in the design and a bullet in the augmented requirements. "
+                     "To override, state the real answer in your requirements and run again.\n")
+            s.append(answers_markdown(self.answers))
+            answered = {a.question_id for a in self.answers}
+            left = [q for q in self.questions if q.id not in answered]
+            if left:
+                s.append("Still open:\n")
+                s.append(questions_markdown(left))
+        else:
+            s.append("## 1. Questions to answer before committing\n")
+            s.append("Answer by adding bullets to the requirements and running `sekkei design` again; each answer changes only what its last column names.\n")
+            s.append(questions_markdown(self.questions))
+        if self.placements_md:
+            s.append("## 1b. Requirements placed without a catalogue pattern\n")
+            s.append(self.placements_md)
         s.append("## 2. Capacity estimates\n")
         s.append(capacity_markdown(self.capacity))
         s.append("## 3. Effort and schedule\n")
@@ -80,5 +98,7 @@ def analysis_markdown(an: Analysis) -> str:
     return "\n".join(s) + "\n"
 
 
-def notes(design: Design, an: Analysis, review: Review) -> Notes:
-    return Notes(review, questions(an), capacity(an), effort(design, an), threats_markdown(design), analysis_markdown(an))
+def notes(design: Design, an: Analysis, review: Review, answers: list[Answer] | None = None,
+          placements: list[Placement] | None = None) -> Notes:
+    return Notes(review, questions(an), capacity(an), effort(design, an), threats_markdown(design), analysis_markdown(an),
+                 answers=list(answers or []), placements_md=placements_markdown(placements, design) if placements else "")

@@ -17,7 +17,7 @@ def load(name: str) -> str:
 
 
 def test_minimal_input_yields_a_design_and_the_questions_an_architect_would_ask():
-    r = design(MINIMAL)
+    r = design(MINIMAL, assume=False)
     assert r.ok and r.design.components and r.design.work_packages
     ids = {q.id for q in r.notes.questions}
     assert {"Q-lang", "Q-store", "Q-deploy", "Q-team", "Q-rate", "Q-latency", "Q-availability", "Q-auth"} <= ids
@@ -36,8 +36,8 @@ def test_a_complete_spec_leaves_few_questions():
 
 
 def test_answering_a_question_changes_only_its_target():
-    before = design(MINIMAL)
-    after = design(MINIMAL + "\n## Constraints\n- TypeScript on Node 20, PostgreSQL available.\n")
+    before = design(MINIMAL, assume=False)
+    after = design(MINIMAL + "\n## Constraints\n- TypeScript on Node 20, PostgreSQL available.\n", assume=False)
     qb = {q.id for q in before.notes.questions}
     qa = {q.id for q in after.notes.questions}
     assert {"Q-lang", "Q-store"} <= qb and not {"Q-lang", "Q-store"} & qa
@@ -57,7 +57,7 @@ def test_capacity_estimates_show_formula_and_inputs():
     assert any("fan-out" in e.formula for e in cap.estimates)  # async delivery pattern
     assert all(e.inputs and e.formula for e in cap.estimates)
     assert cap.missing == []
-    assert sizing.capacity(design(MINIMAL).analysis).missing
+    assert sizing.capacity(design(MINIMAL, assume=False).analysis).missing
 
 
 def test_effort_and_schedule():
@@ -103,5 +103,5 @@ def test_cli_ask_and_template(tmp_path, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)[0]["id"].startswith("Q-")
     assert main(["template", "-o", "requirements.md"]) == 0
     assert (tmp_path / "requirements.md").read_text().startswith("# <System name>")
-    assert main(["design", "r.md", "-o", "d.json", "--review", "n.md"]) == 0
+    assert main(["design", "r.md", "-o", "d.json", "--review", "n.md", "--no-assume"]) == 0
     assert "open questions" in capsys.readouterr().out and "Threat model" in (tmp_path / "n.md").read_text()

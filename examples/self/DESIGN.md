@@ -37,6 +37,8 @@ _version 0.1.0 · schema sekkei/1_
 | R-14 | nonfunctional | must | The design engine is deterministic: the same requirements text yields byte-identical output. | designs from two runs on the same text that differ = 0 designs |
 | R-15 | functional | must | Every element of a generated design traces to the input sentences and the catalogue rules that produced it, and the engine states which requirements it did not recognise instead of hiding them. | — |
 | R-16 | functional | must | Besides the design, the engine hands over an architect's notes: the questions the text leaves open with the assumption taken meanwhile, capacity estimates with formulas and inputs, an effort and schedule estimate, a STRIDE-lite threat model whose threats become risks in the design, and a requirements template. | — |
+| R-17 | functional | must | The engine answers its own open questions from evidence in the text or defensible defaults, appends the answers to the requirements so they shape the design, and records each as a proposed decision with the options considered and what to change if the real answer differs. | — |
+| R-18 | functional | must | Every functional requirement no pattern recognised gets an owner: an existing specific component by word overlap, the surface and core for a human use case, or a newly synthesised component named from the sentence's verb class and object, wired into the design and packaged. | — |
 
 ## Components
 
@@ -61,6 +63,8 @@ graph LR
   C_17["C-17 Evaluation"]
   C_18["C-18 Repair"]
   C_19["C-19 Engine facade"]
+  C_24["C-24 Answers"]
+  C_25["C-25 Owners"]
   C_20["C-20 Gap questions"]
   C_21["C-21 Sizing"]
   C_22["C-22 Threat model"]
@@ -103,6 +107,7 @@ graph LR
   C_16 -->|I-14| C_14
   C_16 -->|I-15| C_15
   C_16 -->|I-17| C_17
+  C_16 -->|I-25| C_25
   C_17 -->|I-1| C_1
   C_17 -->|I-14| C_14
   C_17 -->|I-15| C_15
@@ -117,6 +122,14 @@ graph LR
   C_19 -->|I-20| C_20
   C_19 -->|I-22| C_22
   C_19 -->|I-23| C_23
+  C_19 -->|I-24| C_24
+  C_19 -->|I-25| C_25
+  C_24 -->|I-15| C_15
+  C_24 -->|I-20| C_20
+  C_25 -->|I-1| C_1
+  C_25 -->|I-13| C_13
+  C_25 -->|I-14| C_14
+  C_25 -->|I-15| C_15
   C_20 -->|I-15| C_15
   C_21 -->|I-1| C_1
   C_21 -->|I-3| C_3
@@ -128,6 +141,8 @@ graph LR
   C_23 -->|I-20| C_20
   C_23 -->|I-21| C_21
   C_23 -->|I-22| C_22
+  C_23 -->|I-24| C_24
+  C_23 -->|I-25| C_25
 ```
 
 ### C-1 — Model
@@ -255,8 +270,8 @@ graph LR
 - **kind**: module · **path**: `sekkei/engine/synthesis.py`
 - **responsibility**: Instantiates and merges archetypes into components and interfaces, derives operations from verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and work packages; records the trace.
 - **provides**: I-16
-- **requires**: I-1, I-3, I-13, I-14, I-15, I-17
-- **satisfies**: R-13, R-15
+- **requires**: I-1, I-3, I-13, I-14, I-15, I-17, I-25
+- **satisfies**: R-13, R-15, R-18
 
 ### C-17 — Evaluation
 
@@ -277,10 +292,26 @@ graph LR
 ### C-19 — Engine facade
 
 - **kind**: module · **path**: `sekkei/engine/__init__.py`
-- **responsibility**: design(text): analyse, synthesise, inject threats, repair, review, notes; ask(text): questions only.
+- **responsibility**: design(text, assume): analyse, answer open questions and re-analyse, synthesise, record assumed decisions, inject threats, repair, review, notes; ask(text): questions only.
 - **provides**: I-19
-- **requires**: I-1, I-2, I-15, I-16, I-17, I-18, I-20, I-22, I-23
-- **satisfies**: R-13, R-14, R-15, R-16
+- **requires**: I-1, I-2, I-15, I-16, I-17, I-18, I-20, I-22, I-23, I-24, I-25
+- **satisfies**: R-13, R-14, R-15, R-16, R-17
+
+### C-24 — Answers
+
+- **kind**: module · **path**: `sekkei/engine/answers.py`
+- **responsibility**: Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.
+- **provides**: I-24
+- **requires**: I-15, I-20
+- **satisfies**: R-17
+
+### C-25 — Owners
+
+- **kind**: module · **path**: `sekkei/engine/owners.py`
+- **responsibility**: Owner placement for requirements no pattern recognised: word overlap with specific components, surface+core for human use cases, or a synthesised component.
+- **provides**: I-25
+- **requires**: I-1, I-13, I-14, I-15
+- **satisfies**: R-18
 
 ### C-20 — Gap questions
 
@@ -311,17 +342,18 @@ graph LR
 - **kind**: module · **path**: `sekkei/engine/report.py`
 - **responsibility**: Assembles questions, capacity, effort, threats, the self-review and the reading of the text into one Markdown report; holds the requirements template.
 - **provides**: I-23
-- **requires**: I-1, I-15, I-17, I-20, I-21, I-22
+- **requires**: I-1, I-15, I-17, I-20, I-21, I-22, I-24, I-25
 - **satisfies**: R-16
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-13, C-14
 1. C-12, C-15, C-22, C-3, C-8
-2. C-11, C-17, C-2, C-20, C-21, C-4, C-6, C-7
-3. C-16, C-18, C-23, C-5, C-9
-4. C-19
-5. C-10
+2. C-11, C-17, C-2, C-20, C-21, C-25, C-4, C-6, C-7
+3. C-16, C-18, C-24, C-5, C-9
+4. C-23
+5. C-19
+6. C-10
 
 ## Interfaces
 
@@ -507,8 +539,28 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `design` | `text`: str | EngineResult: design, analysis, review, notes, diagnostics, trace; ok when no lint error | — | — |
+| `design` | `text`: str, `assume`: bool | EngineResult: design, analysis, review, notes, answers, placements, diagnostics, trace; ok when no lint error | — | — |
 | `ask` | `text`: str | list[Question] | — | — |
+
+### I-24 — Answers API
+
+- **kind**: module · **owner**: C-24 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `answer` | `q`: Question, `an`: Analysis | Answer \| None (answer text, bullets to append, options, rationale, evidence, if_wrong, patterns) | — | — |
+| `answers` | `qs`: list[Question], `an`: Analysis | list[Answer] | — | — |
+| `augment` | `text`: str, `ans`: list[Answer] | requirements text with the answers appended under engine-marked sections | — | — |
+| `answers_markdown` | `ans`: list[Answer] | str | — | — |
+
+### I-25 — Owners API
+
+- **kind**: module · **owner**: C-25 · **stability**: draft
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `place` | `u`: ReqUnit, `d`: Design, `layout`: Layout, `cid`: dict, `iid`: dict, `requires`: dict | Placement (owners, how, detail, created); may add a component and interface to the design | — | — |
+| `placements_markdown` | `ps`: list[Placement], `d`: Design | str | — | — |
 
 ### I-20 — Gap questions API
 
@@ -564,7 +616,7 @@ graph LR
 | `sekkei accept REPORT [--force] / status / next / start WP` | — | state transitions; stale briefs are refused | — | — |
 | `sekkei diff OLD [-d NEW]` | — | element changes and the affected packages; exit 1 if any | — | — |
 | `sekkei schema / rules / prompt` | — | JSON Schema; rule table; architect prompt | — | — |
-| `sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json]` | — | a complete, lint-clean design without any model, plus the architect's notes | — | — |
+| `sekkei design REQ.md [-o design.json] [--render DESIGN.md] [--review NOTES.md] [--trace TRACE.json] [--augmented REQ.md] [--no-assume]` | — | a complete, lint-clean design without any model, plus the architect's notes; open questions answered unless --no-assume | — | — |
 | `sekkei ask REQ.md [--json] / sekkei template [-o requirements.md]` | — | the open questions; the requirements template | — | — |
 | `sekkei draft REQ.md [--review] [--backend claude-code\|anthropic]` | — | optional model-based draft | — | — |
 
@@ -893,6 +945,7 @@ graph LR
   WP_9["WP-9 Design engine (M)"]
   WP_12["WP-12 Engine: text and catalogue (L)"]
   WP_13["WP-13 Engine: analysis and evaluation (M)"]
+  WP_16["WP-16 Engine: questions, answers and owners (M)"]
   WP_15["WP-15 Engine: architect's notes (M)"]
   WP_14["WP-14 Engine: synthesis, repair and facade (L)"]
   WP_11["WP-11 Diff (S)"]
@@ -909,11 +962,14 @@ graph LR
   WP_3 --> WP_9
   WP_1 --> WP_12
   WP_12 --> WP_13
+  WP_13 --> WP_16
   WP_2 --> WP_15
   WP_13 --> WP_15
+  WP_16 --> WP_15
   WP_3 --> WP_14
   WP_13 --> WP_14
   WP_15 --> WP_14
+  WP_16 --> WP_14
   WP_1 --> WP_11
   WP_6 --> WP_10
   WP_7 --> WP_10
@@ -928,11 +984,12 @@ graph LR
 1. WP-1
 2. WP-11, WP-12, WP-2
 3. WP-13, WP-3, WP-4, WP-5, WP-7
-4. WP-15, WP-6, WP-8, WP-9
-5. WP-14
-6. WP-10
+4. WP-16, WP-6, WP-8, WP-9
+5. WP-15
+6. WP-14
+7. WP-10
 
-_Critical path (weight 16):_ WP-1 → WP-12 → WP-13 → WP-15 → WP-14 → WP-10
+_Critical path (weight 18):_ WP-1 → WP-12 → WP-13 → WP-16 → WP-15 → WP-14 → WP-10
 
 ### WP-1 — Model (M)
 
@@ -1044,13 +1101,23 @@ Implement requirement-unit analysis with pattern/quality/constraint matching, de
 - **acceptance**:
   - A-15 (test) analysis tests pass on the fixtures — `python -m pytest -q tests/test_engine.py -k analysis`
 
+### WP-16 — Engine: questions, answers and owners (M)
+
+Implement the gap questions, the answer rules for every question and the owner placement (overlap, surface+core, synthesis) for unrecognised requirements.
+
+- **components**: C-20, C-24, C-25 · **implements**: I-20, I-24, I-25
+- **depends on**: WP-13 · **satisfies**: R-16, R-17, R-18
+- **write scope**: `sekkei/engine/gaps.py`, `sekkei/engine/answers.py`, `sekkei/engine/owners.py`, `tests/test_autonomy.py`
+- **acceptance**:
+  - A-19 (test) autonomy tests pass: no open question is left on a two-line spec, evidence beats defaults, every unrecognised requirement is owned or gets a synthesised component — `python -m pytest -q tests/test_autonomy.py`
+
 ### WP-15 — Engine: architect's notes (M)
 
-Implement the gap questions, capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.
+Implement capacity and effort estimates, the STRIDE-lite threat model and the notes report with the requirements template.
 
-- **components**: C-20, C-21, C-22, C-23 · **implements**: I-20, I-21, I-22, I-23
-- **depends on**: WP-2, WP-13 · **satisfies**: R-16
-- **write scope**: `sekkei/engine/gaps.py`, `sekkei/engine/sizing.py`, `sekkei/engine/threats.py`, `sekkei/engine/report.py`, `tests/test_notes.py`
+- **components**: C-21, C-22, C-23 · **implements**: I-21, I-22, I-23
+- **depends on**: WP-2, WP-13, WP-16 · **satisfies**: R-16
+- **write scope**: `sekkei/engine/sizing.py`, `sekkei/engine/threats.py`, `sekkei/engine/report.py`, `tests/test_notes.py`
 - **acceptance**:
   - A-18 (test) notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks — `python -m pytest -q tests/test_notes.py`
 
@@ -1059,7 +1126,7 @@ Implement the gap questions, capacity and effort estimates, the STRIDE-lite thre
 Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.
 
 - **components**: C-16, C-18, C-19 · **implements**: I-16, I-18, I-19
-- **depends on**: WP-3, WP-13, WP-15 · **satisfies**: R-13, R-14, R-15, R-16
+- **depends on**: WP-3, WP-13, WP-15, WP-16 · **satisfies**: R-13, R-14, R-15, R-16, R-17, R-18
 - **write scope**: `sekkei/engine/synthesis.py`, `sekkei/engine/repair.py`, `sekkei/engine/__init__.py`
 - **acceptance**:
   - A-16 (test) engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture — `python -m pytest -q tests/test_engine.py`
@@ -1106,7 +1173,9 @@ Expose every operation on the command line with exit codes and JSON output, and 
 | R-13 | must | C-13, C-14, C-15, C-16, C-17, C-18, C-19 | WP-12, WP-13, WP-14 | A-14, A-15, A-16, A-17 |
 | R-14 | must | C-19 | WP-14 | A-16, A-17 |
 | R-15 | must | C-15, C-16, C-17, C-19 | WP-13, WP-14 | A-15, A-16, A-17 |
-| R-16 | must | C-19, C-20, C-21, C-22, C-23 | WP-15, WP-14 | A-18, A-16, A-17 |
+| R-16 | must | C-19, C-20, C-21, C-22, C-23 | WP-16, WP-15, WP-14 | A-19, A-18, A-16, A-17 |
+| R-17 | must | C-19, C-24 | WP-16, WP-14 | A-19, A-16, A-17 |
+| R-18 | must | C-16, C-25 | WP-16, WP-14 | A-19, A-16, A-17 |
 
 ## Conventions
 

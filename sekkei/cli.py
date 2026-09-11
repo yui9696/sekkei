@@ -279,8 +279,11 @@ def cmd_design(args: argparse.Namespace) -> int:
     from .engine import design as run_engine
 
     text = Path(args.input).read_text(encoding="utf-8")
-    result = run_engine(text)
+    result = run_engine(text, assume=not args.no_assume)
     M.dump(result.design, args.output)
+    if args.augmented:
+        Path(args.augmented).write_text(result.augmented_text, encoding="utf-8")
+        print(f"wrote {args.augmented}")
     print(f"wrote {args.output}: {len(result.design.requirements)} requirements, {len(result.design.components)} components, "
           f"{len(result.design.interfaces)} interfaces, {len(result.design.decisions)} decisions, "
           f"{len(result.design.work_packages)} work packages")
@@ -301,8 +304,13 @@ def cmd_design(args: argparse.Namespace) -> int:
     print("active qualities: " + (", ".join(f"{q}={w}" for q, w in an.qualities.items()) or "(none)"))
     for x in result.design.decisions:
         print(f"  {x.id} {x.title}: {x.choice}")
-    if result.notes.questions:
-        print(f"open questions: {len(result.notes.questions)} (see --review); assumptions taken meanwhile")
+    if result.answers:
+        print(f"questions answered by the engine: {len(result.answers)} (proposed decisions; see --review)")
+    if result.placements:
+        print(f"requirements placed without a pattern: {len(result.placements)} (see --review)")
+    open_qs = [q for q in result.notes.questions if q.id not in {a.question_id for a in result.answers}]
+    if open_qs:
+        print(f"open questions: {len(open_qs)} (see --review)")
     if result.review.needs_human:
         print("needs a human: " + "; ".join(
             [f"{len(result.review.unrecognised)} unrecognised requirement(s)"] * bool(result.review.unrecognised)
@@ -455,6 +463,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--render", metavar="DESIGN.md", help="also write the Markdown design document")
     sp.add_argument("--review", metavar="NOTES.md", help="also write the architect's notes: questions, capacity, effort, threats, self-review")
     sp.add_argument("--trace", metavar="TRACE.json", help="also write the element-to-sentence/rule trace")
+    sp.add_argument("--augmented", metavar="REQ.md", help="also write the requirements with the engine's assumed answers appended")
+    sp.add_argument("--no-assume", action="store_true", help="do not answer open questions; leave them in the notes")
 
     sp = add("ask", cmd_ask, "print the questions an architect would ask about a requirements text", design=False)
     sp.add_argument("input", help="requirements text file")

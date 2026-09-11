@@ -17,6 +17,7 @@ from . import catalog as K
 from . import text as T
 from .analysis import Analysis, ReqUnit
 from .evaluate import decide
+from .owners import Placement, place
 
 # archetype -> archetypes that call it (in addition to Archetype.needs), applied when both are active
 CONSUMERS: dict[str, list[str]] = {
@@ -73,6 +74,7 @@ QUALITY_CARRIERS = {
 }
 
 _HTTP_SURFACES = ("surface_api", "admin_api", "ingest_api")
+_ALL_SURFACES = (*_HTTP_SURFACES, "cli", "push", "ui")
 
 
 @dataclass
@@ -81,6 +83,7 @@ class Synthesis:
     trace: dict[str, dict[str, list]] = field(default_factory=dict)
     generic: list[str] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
+    placements: list[Placement] = field(default_factory=list)
 
 
 def _layout(an: Analysis) -> K.Layout:
@@ -117,13 +120,15 @@ def _active_archetypes(an: Analysis) -> tuple[list[str], list[str], dict[str, li
     human = {"staff", "manager", "managers", "grower", "owner", "owners", "member", "members", "employee", "employees",
              "customer", "customers", "user", "users", "admin", "admins", "administrator", "operator", "operators",
              "visitor", "visitors", "client", "clients", "subscriber", "subscribers", "anyone", "people", "developer", "developers"}
-    if pats and not any(a in active for a in (*_HTTP_SURFACES, "cli", "push")) \
+    if pats and not any(a in active for a in _ALL_SURFACES) \
             and any(set(u.sentence.actors) & human for u in an.requirements if u.kind == "functional"):
         active.setdefault("surface_api", None)
         reasons.setdefault("surface_api", []).append("inference:human-actors-need-a-surface")
     if not pats:
         low = " ".join(s.lower for s in an.sentences)
-        surface = "cli" if re.search(r"\bcli\b|command[- ]line|\bstdin\b|\bterminal\b", low) else "surface_api"
+        surface = ("cli" if re.search(r"\bcli\b|command[- ]line|\bstdin\b|\bterminal\b", low)
+                   else "ui" if "no_network" in an.constraints or re.search(r"\bpanel\b|\bscreen\b|\bdisplay\b", low)
+                   else "surface_api")
         for a in (surface, "core", "store", "config"):
             active.setdefault(a, None)
             reasons.setdefault(a, []).append("fallback:layered")
@@ -132,10 +137,12 @@ def _active_archetypes(an: Analysis) -> tuple[list[str], list[str], dict[str, li
         # unrecognised functional sentences need a home: the core (and a surface if none exists)
         active.setdefault("core", None)
         reasons.setdefault("core", []).append("fallback:unrecognised")
-        if not any(a in active for a in (*_HTTP_SURFACES, "cli", "push")):
-            active.setdefault("surface_api", None)
-            reasons.setdefault("surface_api", []).append("fallback:unrecognised")
-            generic.append("surface_api")
+        if not any(a in active for a in (*_HTTP_SURFACES, "cli", "push", "ui")) \
+                and any(u.sentence.actors for u in an.unrecognised):
+            key = "ui" if "no_network" in an.constraints else "surface_api"
+            active.setdefault(key, None)
+            reasons.setdefault(key, []).append("fallback:unrecognised")
+            generic.append(key)
     # close under needs
     changed = True
     while changed:
@@ -309,8 +316,10 @@ def synthesise(an: Analysis) -> Synthesis:
 
     # --- requirements ------------------------------------------------------
     for u in an.requirements:
-        d.requirements.append(Requirement(u.id, u.sentence.text, u.kind, u.priority, _metric_of(u),
-                                          rationale="" if u.recognised else "not matched by any catalogue pattern; assigned to the generic core"))
+        rationale = "assumed by the engine; confirm or override" if u.sentence.assumed else ""
+        if not u.recognised:
+            rationale = (rationale + "; " if rationale else "") + "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+        d.requirements.append(Requirement(u.id, u.sentence.text, u.kind, u.priority, _metric_of(u), rationale=rationale))
         trace[u.id] = {"sentences": [u.sentence.index], "rules": [f"pattern:{p}" for p in u.patterns] + [f"quality:{q}" for q in u.qualities]}
 
     # --- components + interfaces ---------------------------------------------
@@ -319,7 +328,7 @@ def synthesise(an: Analysis) -> Synthesis:
     for n, key in enumerate(active, 1):
         cid[key] = f"C-{n}"
         iid[key] = f"I-{n}"
-    surfaces = [a for a in active if a in _HTTP_SURFACES or a in ("cli", "push")]
+    surfaces = [a for a in active if a in _ALL_SURFACES]
     functional_units = [u for u in an.requirements if u.kind == "functional"]
 
     for key in active:
@@ -363,8 +372,23 @@ def synthesise(an: Analysis) -> Synthesis:
                     op.pre = (op.pre + "; " if op.pre else "") + "stated values: " + note
                     trace[iface.id]["rules"].append(f"quantities:{pid}")
 
+    # --- owners for requirements no pattern recognised ------------------------
+    placements: list[Placement] = []
+    for u in an.unrecognised:
+        p = place(u, d, layout, cid, iid, requires)
+        placements.append(p)
+        for owner in p.owners:
+            comp = d.component(owner)
+            if comp is not None and u.id not in comp.satisfies:
+                comp.satisfies.append(u.id)
+        for created in p.created:
+            trace[created] = {"sentences": [u.sentence.index], "rules": ["owner:synthesised"]}
+        trace[u.id]["rules"].append(f"owner:{p.how}")
+
     # --- requirement -> component mapping ------------------------------------
     for u in an.requirements:
+        if not u.recognised:
+            continue
         for key in _satisfiers(u, active, surfaces):
             comp = d.component(cid[key])
             if comp is not None and u.id not in comp.satisfies:
@@ -532,4 +556,4 @@ def synthesise(an: Analysis) -> Synthesis:
                                            deps, satisfies, files, "S" if len(ids) == 1 else "M", acc,
                                            notes=f"family: {family_of[ids[0]]}"))
         trace[wp_id] = {"sentences": [], "rules": [f"package:layer{[i for i, L in enumerate(layers) if ids[0] in L][0]}:{family_of[ids[0]]}"]}
-    return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log)
+    return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log, placements)

@@ -132,6 +132,38 @@ A design document is not the whole job. The engine also produces, deterministica
 `sekkei ask REQ.md` prints the questions alone; `sekkei template` prints the
 requirements template that makes the engine's job easiest.
 
+## 7c. Autonomy: answering its own questions and owning every requirement
+
+Two things were left to a human in 7b. Both are now decided by the engine and marked
+as decisions the human may override, which is what an architect does when the client is
+not in the room.
+
+**Answers (`engine/answers.py`).** Every gap question has an answer rule: first evidence
+in the text (a CLI with `no network` → SQLite; customers and an admin surface → API keys;
+staff and an identity provider → OIDC; counts ≥ 10,000 → PostgreSQL), else a defensible
+default (team of 2; p95 300 ms reads / 1 s writes; 99.9 % monthly; 90-day retention;
+daily backups RPO 24 h / RTO 4 h; timeouts 10 s with five retries; personal data →
+deletion on request). Each answer is appended to the requirements as bullets under
+engine-marked sections, the text is analysed again so the answer flows through the normal
+path (constraint tokens, metrics, team size), and a `Decision` with status `proposed`
+records the question, the options considered, the choice, the evidence and what to change
+if the real answer differs. Requirements created this way carry `rationale: assumed by the
+engine (Q-…)`. `sekkei design --no-assume` turns this off; `sekkei ask` still lists the
+raw questions.
+
+**Owners (`engine/owners.py`).** A functional requirement no pattern recognised is placed
+by, in order: (1) lexical overlap between the sentence's nouns/verbs and each existing
+component's name, responsibility and operation names — a score of at least two shared
+tokens wins; (2) a human actor with a view/manage verb → the surface and the core;
+(3) otherwise a **new component is synthesised** from the verb class and the object:
+read/poll/measure/receive → "<Object> reader" (integration layer, required by the core),
+open/close/switch/adjust/control → "<Object> controller" (integration layer), compute/
+transform/aggregate/parse → "<Object> processor" (core layer), with an interface whose
+operations come from the sentence's verbs and objects, a path from the layout, and a place
+in a work package. Every placement is recorded in the trace and in the notes with how it
+was made (`matched (score n)`, `surface+core`, `synthesised`), so a wrong owner is one
+line to spot.
+
 ## 8. Tests
 
 - Determinism: `design(text)` twice → identical JSON.

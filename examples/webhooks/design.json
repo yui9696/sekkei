@@ -11,7 +11,10 @@
     "Outbound requests carry an HMAC signature; secrets rotate with a grace window.",
     "The system notifies people through an external channel.",
     "Targets that keep failing are disabled by policy and the owner is told.",
-    "Metrics, structured logs and health endpoints for operations."
+    "Metrics, structured logs and health endpoints for operations.",
+    "Callers are authenticated and authorized.",
+    "Scheduled jobs process stored records in windows.",
+    "Changes are recorded append-only with the actor."
   ],
   "non_goals": [],
   "conventions": {
@@ -145,6 +148,89 @@
       "kind": "constraint",
       "priority": "must",
       "rationale": ""
+    },
+    {
+      "id": "R-14",
+      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-15",
+      "statement": "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-16",
+      "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "size at 2 KB",
+        "target": "<= 256 kb",
+        "unit": "kb"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-17",
+      "statement": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "ratio",
+        "target": "99.9 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-18",
+      "statement": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "time at 4 h",
+        "target": "24 h",
+        "unit": "h"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-19",
+      "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "ratio at 5 minutes, 10 minutes",
+        "target": "1 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-20",
+      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-21",
+      "statement": "Authentication by API keys per customer (assumed by the engine).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-22",
+      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
     }
   ],
   "components": [
@@ -157,7 +243,8 @@
       "requires": [],
       "satisfies": [
         "R-9",
-        "R-12"
+        "R-12",
+        "R-17"
       ],
       "tags": [
         "layer:0",
@@ -179,7 +266,8 @@
         "R-6",
         "R-8",
         "R-9",
-        "R-10"
+        "R-10",
+        "R-17"
       ],
       "tags": [
         "layer:0",
@@ -238,15 +326,31 @@
     },
     {
       "id": "C-6",
+      "name": "Audit log",
+      "responsibility": "Append-only record of who did what to which resource, queryable by resource and actor.",
+      "kind": "datastore",
+      "path": "app/audit.py",
+      "requires": [],
+      "satisfies": [
+        "R-15"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:audit"
+      ]
+    },
+    {
+      "id": "C-7",
       "name": "Domain core",
       "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
       "kind": "module",
       "path": "app/core.py",
       "requires": [
         "I-1",
-        "I-10",
+        "I-11",
         "I-3",
-        "I-9"
+        "I-6",
+        "I-10"
       ],
       "satisfies": [
         "R-1",
@@ -256,7 +360,9 @@
         "R-5",
         "R-6",
         "R-7",
-        "R-12"
+        "R-12",
+        "R-20",
+        "R-22"
       ],
       "tags": [
         "layer:1",
@@ -264,13 +370,13 @@
       ]
     },
     {
-      "id": "C-7",
+      "id": "C-8",
       "name": "Outbound HTTP client",
       "responsibility": "Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome.",
       "kind": "module",
       "path": "app/dispatcher.py",
       "requires": [
-        "I-10"
+        "I-11"
       ],
       "satisfies": [
         "R-1",
@@ -284,7 +390,7 @@
       ]
     },
     {
-      "id": "C-8",
+      "id": "C-9",
       "name": "Signer",
       "responsibility": "Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
       "kind": "module",
@@ -303,14 +409,14 @@
       ]
     },
     {
-      "id": "C-9",
+      "id": "C-10",
       "name": "Notifier",
       "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "kind": "module",
       "path": "app/notifier.py",
       "requires": [
         "I-4",
-        "I-10"
+        "I-11"
       ],
       "satisfies": [
         "R-7"
@@ -321,7 +427,7 @@
       ]
     },
     {
-      "id": "C-10",
+      "id": "C-11",
       "name": "Observability",
       "responsibility": "Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "kind": "module",
@@ -329,7 +435,9 @@
       "requires": [],
       "satisfies": [
         "R-8",
-        "R-11"
+        "R-11",
+        "R-17",
+        "R-19"
       ],
       "tags": [
         "layer:1",
@@ -337,7 +445,7 @@
       ]
     },
     {
-      "id": "C-11",
+      "id": "C-12",
       "name": "Authentication",
       "responsibility": "Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
       "kind": "module",
@@ -348,7 +456,8 @@
       "satisfies": [
         "R-1",
         "R-2",
-        "R-6"
+        "R-6",
+        "R-21"
       ],
       "tags": [
         "layer:1",
@@ -356,18 +465,18 @@
       ]
     },
     {
-      "id": "C-12",
+      "id": "C-13",
       "name": "Worker",
       "responsibility": "Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.",
       "kind": "job",
       "path": "app/worker.py",
       "requires": [
         "I-2",
-        "I-6",
-        "I-13",
-        "I-10",
         "I-7",
-        "I-8"
+        "I-14",
+        "I-11",
+        "I-8",
+        "I-9"
       ],
       "satisfies": [
         "R-1",
@@ -385,20 +494,21 @@
       ]
     },
     {
-      "id": "C-13",
+      "id": "C-14",
       "name": "Scheduler",
       "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "kind": "job",
       "path": "app/scheduler.py",
       "requires": [
-        "I-10",
+        "I-11",
         "I-2"
       ],
       "satisfies": [
         "R-1",
         "R-4",
         "R-5",
-        "R-6"
+        "R-6",
+        "R-14"
       ],
       "tags": [
         "layer:2",
@@ -406,15 +516,15 @@
       ]
     },
     {
-      "id": "C-14",
+      "id": "C-15",
       "name": "Health policy",
       "responsibility": "Evaluates per-target failure history against the disable policy and applies the consequence.",
       "kind": "job",
       "path": "app/policy.py",
       "requires": [
-        "I-6",
-        "I-9",
-        "I-10"
+        "I-7",
+        "I-10",
+        "I-11"
       ],
       "satisfies": [
         "R-7"
@@ -425,15 +535,35 @@
       ]
     },
     {
-      "id": "C-15",
+      "id": "C-16",
+      "name": "Batch job",
+      "responsibility": "Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "kind": "job",
+      "path": "app/batch.py",
+      "requires": [
+        "I-1",
+        "I-14",
+        "I-11",
+        "I-7"
+      ],
+      "satisfies": [
+        "R-14"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:batch"
+      ]
+    },
+    {
+      "id": "C-17",
       "name": "Admin HTTP API",
       "responsibility": "Management surface for operators/customers: resource lifecycle and configuration; authenticated.",
       "kind": "service",
       "path": "app/admin_api.py",
       "requires": [
-        "I-6",
+        "I-7",
+        "I-12",
         "I-11",
-        "I-10",
         "I-3"
       ],
       "satisfies": [
@@ -442,7 +572,9 @@
         "R-6",
         "R-8",
         "R-11",
-        "R-13"
+        "R-13",
+        "R-16",
+        "R-18"
       ],
       "tags": [
         "layer:3",
@@ -450,23 +582,24 @@
       ]
     },
     {
-      "id": "C-16",
+      "id": "C-18",
       "name": "Ingest API",
       "responsibility": "Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.",
       "kind": "service",
       "path": "app/ingest_api.py",
       "requires": [
-        "I-6",
+        "I-7",
         "I-2",
-        "I-10",
-        "I-11"
+        "I-11",
+        "I-12"
       ],
       "satisfies": [
         "R-3",
         "R-8",
         "R-9",
         "R-11",
-        "R-13"
+        "R-13",
+        "R-17"
       ],
       "tags": [
         "layer:3",
@@ -793,8 +926,73 @@
     },
     {
       "id": "I-6",
-      "name": "Domain core interface",
+      "name": "Audit log interface",
       "owner": "C-6",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "append",
+          "inputs": [
+            {
+              "name": "actor",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "resource",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "details",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "query",
+          "inputs": [
+            {
+              "name": "resource",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "actor",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "entries",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Audit log. "
+    },
+    {
+      "id": "I-7",
+      "name": "Domain core interface",
+      "owner": "C-7",
       "kind": "module",
       "operations": [
         {
@@ -1066,15 +1264,51 @@
           "pre": "",
           "post": "",
           "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
+        },
+        {
+          "name": "record_audit",
+          "inputs": [
+            {
+              "name": "audit",
+              "type": "Audit | id",
+              "description": ""
+            }
+          ],
+          "output": "Audit | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+        },
+        {
+          "name": "delete_engine",
+          "inputs": [
+            {
+              "name": "engine",
+              "type": "Engine | id",
+              "description": ""
+            }
+          ],
+          "output": "Engine | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
         }
       ],
       "stability": "draft",
       "description": "Provided by Domain core. "
     },
     {
-      "id": "I-7",
+      "id": "I-8",
       "name": "Outbound HTTP client interface",
-      "owner": "C-7",
+      "owner": "C-8",
       "kind": "module",
       "operations": [
         {
@@ -1116,9 +1350,9 @@
       "description": "Provided by Outbound HTTP client. "
     },
     {
-      "id": "I-8",
+      "id": "I-9",
       "name": "Signer interface",
-      "owner": "C-8",
+      "owner": "C-9",
       "kind": "module",
       "operations": [
         {
@@ -1171,9 +1405,9 @@
       "description": "Provided by Signer. "
     },
     {
-      "id": "I-9",
+      "id": "I-10",
       "name": "Notifier interface",
-      "owner": "C-9",
+      "owner": "C-10",
       "kind": "module",
       "operations": [
         {
@@ -1208,9 +1442,9 @@
       "description": "Provided by Notifier. "
     },
     {
-      "id": "I-10",
+      "id": "I-11",
       "name": "Observability interface",
-      "owner": "C-10",
+      "owner": "C-11",
       "kind": "module",
       "operations": [
         {
@@ -1316,9 +1550,9 @@
       "description": "Provided by Observability. "
     },
     {
-      "id": "I-11",
+      "id": "I-12",
       "name": "Authentication interface",
-      "owner": "C-11",
+      "owner": "C-12",
       "kind": "module",
       "operations": [
         {
@@ -1370,9 +1604,9 @@
       "description": "Provided by Authentication. "
     },
     {
-      "id": "I-12",
+      "id": "I-13",
       "name": "Worker interface",
-      "owner": "C-12",
+      "owner": "C-13",
       "kind": "module",
       "operations": [
         {
@@ -1412,9 +1646,9 @@
       "description": "Provided by Worker. "
     },
     {
-      "id": "I-13",
+      "id": "I-14",
       "name": "Scheduler interface",
-      "owner": "C-13",
+      "owner": "C-14",
       "kind": "module",
       "operations": [
         {
@@ -1457,9 +1691,9 @@
       "description": "Provided by Scheduler. "
     },
     {
-      "id": "I-14",
+      "id": "I-15",
       "name": "Health policy interface",
-      "owner": "C-14",
+      "owner": "C-15",
       "kind": "module",
       "operations": [
         {
@@ -1482,9 +1716,36 @@
       "description": "Provided by Health policy. "
     },
     {
-      "id": "I-15",
+      "id": "I-16",
+      "name": "Batch job interface",
+      "owner": "C-16",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "run",
+          "inputs": [
+            {
+              "name": "window",
+              "type": "DateRange",
+              "description": ""
+            }
+          ],
+          "output": "JobReport",
+          "errors": [
+            "JobError"
+          ],
+          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Batch job. "
+    },
+    {
+      "id": "I-17",
       "name": "Admin HTTP API interface",
-      "owner": "C-15",
+      "owner": "C-17",
       "kind": "http",
       "operations": [
         {
@@ -1607,9 +1868,9 @@
       "description": "Provided by Admin HTTP API. "
     },
     {
-      "id": "I-16",
+      "id": "I-18",
       "name": "Ingest API interface",
-      "owner": "C-16",
+      "owner": "C-18",
       "kind": "http",
       "operations": [
         {
@@ -1923,6 +2184,88 @@
         }
       ],
       "description": ""
+    },
+    {
+      "id": "E-8",
+      "name": "JobRun",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "job",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_start",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_end",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "report",
+          "type": "json",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-9",
+      "name": "AuditEntry",
+      "owner": "C-6",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "actor",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "action",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "resource",
+          "type": "str",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
     }
   ],
   "flows": [
@@ -1932,19 +2275,19 @@
       "trigger": "authenticated management request",
       "steps": [
         {
-          "from": "C-15",
-          "to": "C-11",
-          "via": "I-11",
+          "from": "C-17",
+          "to": "C-12",
+          "via": "I-12",
           "description": "authenticate and authorize"
         },
         {
-          "from": "C-15",
-          "to": "C-6",
-          "via": "I-6",
+          "from": "C-17",
+          "to": "C-7",
+          "via": "I-7",
           "description": "apply the change"
         },
         {
-          "from": "C-6",
+          "from": "C-7",
           "to": "C-1",
           "via": "I-1",
           "description": "persist"
@@ -1957,19 +2300,19 @@
       "trigger": "producer calls the ingest API",
       "steps": [
         {
-          "from": "C-16",
-          "to": "C-6",
-          "via": "I-6",
+          "from": "C-18",
+          "to": "C-7",
+          "via": "I-7",
           "description": "validate the event against known types"
         },
         {
-          "from": "C-6",
+          "from": "C-7",
           "to": "C-1",
           "via": "I-1",
           "description": "persist the event"
         },
         {
-          "from": "C-16",
+          "from": "C-18",
           "to": "C-2",
           "via": "I-2",
           "description": "enqueue one work item per matching target; ack only after both are durable"
@@ -1982,19 +2325,19 @@
       "trigger": "worker leases due items",
       "steps": [
         {
-          "from": "C-12",
+          "from": "C-13",
           "to": "C-2",
           "via": "I-2",
           "description": "lease items of one partition"
         },
         {
-          "from": "C-12",
-          "to": "C-6",
-          "via": "I-6",
+          "from": "C-13",
+          "to": "C-7",
+          "via": "I-7",
           "description": "load target, secrets and payload"
         },
         {
-          "from": "C-12",
+          "from": "C-13",
           "to": "C-2",
           "via": "I-2",
           "description": "ack on success, nack with retry_at on retryable failure, dead-letter when exhausted"
@@ -2007,7 +2350,7 @@
       "trigger": "scheduler tick",
       "steps": [
         {
-          "from": "C-13",
+          "from": "C-14",
           "to": "C-2",
           "via": "I-2",
           "description": "promote items whose not_before has passed"
@@ -2020,16 +2363,35 @@
       "trigger": "policy tick",
       "steps": [
         {
-          "from": "C-14",
-          "to": "C-6",
-          "via": "I-6",
+          "from": "C-15",
+          "to": "C-7",
+          "via": "I-7",
           "description": "read failure history and disable the target"
         },
         {
-          "from": "C-14",
-          "to": "C-9",
-          "via": "I-9",
+          "from": "C-15",
+          "to": "C-10",
+          "via": "I-10",
           "description": "notify the owner"
+        }
+      ]
+    },
+    {
+      "id": "F-6",
+      "name": "Run the batch job",
+      "trigger": "schedule fires",
+      "steps": [
+        {
+          "from": "C-16",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "read the window of records"
+        },
+        {
+          "from": "C-16",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "write results and the job report"
         }
       ]
     }
@@ -2071,10 +2433,10 @@
         }
       ],
       "choice": "REST/JSON over HTTP",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). REST/JSON over HTTP: 1.44; gRPC: 1.31; GraphQL: 1.16",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). REST/JSON over HTTP: 1.37; gRPC: 1.25; GraphQL: 1.12",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
-        "C-15"
+        "C-17"
       ],
       "status": "accepted"
     },
@@ -2127,7 +2489,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL: 3.34; In-memory: 1.44; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.28; In-memory: 1.29; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
       "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
       "affects": [
         "C-1"
@@ -2171,11 +2533,11 @@
         }
       ],
       "choice": "API keys per customer, hashed at rest, sent as a bearer token",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.32; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)",
       "consequences": "Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
-        "C-11",
-        "C-15"
+        "C-12",
+        "C-17"
       ],
       "status": "accepted"
     },
@@ -2215,10 +2577,10 @@
         }
       ],
       "choice": "HTTP publish endpoint with idempotency keys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). HTTP publish endpoint with idempotency keys: 1.94; In-process client library that writes the outbox: 1.66; Message bus topic: unavailable (needs broker, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.80; In-process client library that writes the outbox: 1.55; Message bus topic: unavailable (needs broker, not in the constraints)",
       "consequences": "Not choosing 'In-process client library that writes the outbox' gives up: no lost events at the source.",
       "affects": [
-        "C-16"
+        "C-18"
       ],
       "status": "accepted"
     },
@@ -2273,12 +2635,12 @@
         }
       ],
       "choice": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.37; Redis Streams with consumer groups: 2.01; In-memory queue: 1.44; Managed broker: unavailable (needs broker, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.14; Redis Streams with consumer groups: 1.81; In-memory queue: 1.37; Managed broker: unavailable (needs broker, not in the constraints)",
       "consequences": "Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.",
       "affects": [
         "C-2",
-        "C-16",
-        "C-12"
+        "C-18",
+        "C-13"
       ],
       "status": "accepted"
     },
@@ -2317,10 +2679,10 @@
         }
       ],
       "choice": "not_before column on the work item; the scheduler promotes due rows",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). not_before column on the work item: 2.08; Redis sorted set keyed by due time: 1.60; In-process timers: 1.42",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.92; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34",
       "consequences": "Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.",
       "affects": [
-        "C-13",
+        "C-14",
         "C-2"
       ],
       "status": "accepted"
@@ -2363,14 +2725,14 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). One image, role by flag: `api` and `worker` proc: 1.84; Separate services per concern: 1.58; Single process with background threads: 1.43",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.88; Separate services per concern: 1.63; Single process with background threads: 1.37",
       "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
       "affects": [
-        "C-15",
-        "C-16",
-        "C-12",
+        "C-17",
+        "C-18",
         "C-13",
-        "C-14"
+        "C-14",
+        "C-15"
       ],
       "status": "accepted"
     },
@@ -2400,10 +2762,10 @@
         }
       ],
       "choice": "Resolve and block private/link-local ranges; pin the resolved IP; cap body size and redirects; per-request timeout",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Resolve and block private/link-local ranges: 1.49; Plain HTTP client with a timeout: 1.19",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Resolve and block private/link-local ranges: 1.41; Plain HTTP client with a timeout: 1.16",
       "consequences": "Not choosing 'Plain HTTP client with a timeout' gives up: simplest.",
       "affects": [
-        "C-7"
+        "C-8"
       ],
       "status": "accepted"
     },
@@ -2443,11 +2805,11 @@
         }
       ],
       "choice": "Encrypted column (AES-GCM) with a key from the environment/KMS",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Encrypted column: 1.52; Plaintext column: 1.48; External secrets manager: unavailable (needs vault, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.33; External secrets manager: unavailable (needs vault, not in the constraints)",
       "consequences": "Not choosing 'Plaintext column' gives up: simplest.",
       "affects": [
         "C-3",
-        "C-8"
+        "C-9"
       ],
       "status": "accepted"
     },
@@ -2487,13 +2849,320 @@
         }
       ],
       "choice": "Partition the queue by target; each lease takes one partition with a per-partition concurrency cap",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), isolation (weight 0.94). Partition the queue by target: 1.74; Hash targets to N shards, one worker pool per sh: 1.59; Single FIFO queue with a global worker pool: 1.40",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.75; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34",
       "consequences": "Not choosing 'Hash targets to N shards, one worker pool per sh' gives up: bounded blast radius without per-target state. Not choosing 'Single FIFO queue with a global worker pool' gives up: simplest.",
       "affects": [
         "C-2",
-        "C-12"
+        "C-13"
       ],
       "status": "accepted"
+    },
+    {
+      "id": "D-11",
+      "title": "Redundancy for the availability target",
+      "context": "The availability target must be met through instance failures and deploys.",
+      "options": [
+        {
+          "name": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
+          "pros": [
+            "survives one instance failure",
+            "zero-downtime deploys"
+          ],
+          "cons": [
+            "needs stateless instances and a shared store"
+          ]
+        },
+        {
+          "name": "Single instance with health-based restart",
+          "pros": [
+            "simplest",
+            "cheapest"
+          ],
+          "cons": [
+            "restart time is downtime",
+            "deploys are downtime"
+          ]
+        },
+        {
+          "name": "Active-active across two regions",
+          "pros": [
+            "survives a regional outage"
+          ],
+          "cons": [
+            "data replication and conflict handling",
+            "cost"
+          ]
+        }
+      ],
+      "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.50; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)",
+      "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
+      "affects": [
+        "C-17",
+        "C-18",
+        "C-13"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-12",
+      "title": "Assumed answer: load (Q-payload)",
+      "context": "The requirements do not say. Question: Q-payload. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "2 KB / 256 KB",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "16 KB / 1 MB",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "256 bytes / 4 KB",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "2 KB / 256 KB",
+      "rationale": "Typical JSON record sizes; the maximum bounds request bodies.",
+      "consequences": "If the real answer differs: State the sizes; storage growth and body limits change.",
+      "affects": [
+        "C-18"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-13",
+      "title": "Assumed answer: quality (Q-availability)",
+      "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "99.9 %",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "99.5 %",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "99.99 %",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "99.9 %",
+      "rationale": "Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.",
+      "consequences": "If the real answer differs: State the target and what may be lost; topology and queue durability change.",
+      "affects": [
+        "C-2",
+        "C-11"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-14",
+      "title": "Assumed answer: data (Q-retention)",
+      "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "90 days / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "30 days / 90 days",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "indefinite",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "90 days / 1 year",
+      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "affects": [
+        "C-16",
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-15",
+      "title": "Assumed answer: data (Q-backup)",
+      "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "daily / 24 h / 4 h",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "hourly / 1 h / 1 h",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "daily / 24 h / 4 h",
+      "rationale": "The store's own daily backup is the cheapest credible baseline.",
+      "consequences": "If the real answer differs: State RPO/RTO; the store decision and a restore drill change.",
+      "affects": [
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-16",
+      "title": "Assumed answer: data (Q-migration)",
+      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "greenfield",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "one-shot import",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "gradual cut-over",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "greenfield",
+      "rationale": "Nothing in the text names an existing system.",
+      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
+      "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-17",
+      "title": "Assumed answer: security (Q-auth)",
+      "context": "The requirements do not say. Question: Q-auth. Evidence: customers/visitors mentioned.",
+      "options": [
+        {
+          "name": "API keys",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "OIDC",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "mTLS",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "API keys",
+      "rationale": "External callers without a stated identity provider are simplest to serve with per-customer keys.",
+      "consequences": "If the real answer differs: State the scheme; the authentication decision is rescored.",
+      "affects": [
+        "C-12"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-18",
+      "title": "Assumed answer: compliance (Q-compliance)",
+      "context": "The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.",
+      "options": [
+        {
+          "name": "GDPR-style deletion + audit",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "no regime",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "HIPAA/PCI controls",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "GDPR-style deletion + audit",
+      "rationale": "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.",
+      "consequences": "If the real answer differs: State the regime; audit and deletion paths change.",
+      "affects": [
+        "C-6",
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-19",
+      "title": "Assumed answer: operations (Q-alerting)",
+      "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "error rate + queue growth",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "per-endpoint SLO alerts",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "error rate + queue growth",
+      "rationale": "Two alerts catch most incidents without paging on noise.",
+      "consequences": "If the real answer differs: State the rules and the on-call; observability conventions change.",
+      "affects": [
+        "C-11"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-20",
+      "title": "Assumed answer: cost (Q-budget)",
+      "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "existing only",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "managed services allowed",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "strict monthly cap",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "existing only",
+      "rationale": "The cheapest assumption; every decision already prefers the option needing no new infrastructure.",
+      "consequences": "If the real answer differs: State the budget; options adding infrastructure become available.",
+      "affects": [],
+      "status": "proposed"
     }
   ],
   "risks": [
@@ -2504,7 +3173,7 @@
       "impact": "medium",
       "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
       "affects": [
-        "C-16"
+        "C-18"
       ]
     },
     {
@@ -2524,8 +3193,8 @@
       "impact": "high",
       "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
       "affects": [
-        "C-15",
-        "C-11"
+        "C-17",
+        "C-12"
       ]
     },
     {
@@ -2535,7 +3204,7 @@
       "impact": "medium",
       "mitigation": "Send a stable event id and attempt number in headers; document idempotent consumption; never retry on 2xx.",
       "affects": [
-        "C-12",
+        "C-13",
         "C-2"
       ]
     },
@@ -2546,8 +3215,8 @@
       "impact": "medium",
       "mitigation": "Add jitter to the backoff schedule and cap concurrent deliveries per partition and globally.",
       "affects": [
-        "C-13",
-        "C-12"
+        "C-14",
+        "C-13"
       ]
     },
     {
@@ -2557,7 +3226,7 @@
       "impact": "high",
       "mitigation": "Resolve before connecting, block private ranges, pin the IP, forbid redirects to non-public hosts.",
       "affects": [
-        "C-7"
+        "C-8"
       ]
     },
     {
@@ -2577,8 +3246,8 @@
       "impact": "medium",
       "mitigation": "Use the database clock for scheduling; tolerate a bounded skew window when verifying timestamps.",
       "affects": [
-        "C-8",
-        "C-13"
+        "C-9",
+        "C-14"
       ]
     },
     {
@@ -2598,8 +3267,8 @@
       "impact": "medium",
       "mitigation": "Rate-limit notifications per owner and batch them.",
       "affects": [
-        "C-9",
-        "C-14"
+        "C-10",
+        "C-15"
       ]
     },
     {
@@ -2609,7 +3278,7 @@
       "impact": "low",
       "mitigation": "Label by outcome and partition class, not by target id; expose per-target detail through the API instead.",
       "affects": [
-        "C-10"
+        "C-11"
       ]
     },
     {
@@ -2679,7 +3348,7 @@
       "impact": "high",
       "mitigation": "Resolve and block private/link-local ranges; pin the resolved IP; forbid redirects to non-public hosts. Check: URL to 169.254.169.254 / 10.0.0.1 / localhost is refused before connecting",
       "affects": [
-        "C-7"
+        "C-8"
       ]
     },
     {
@@ -2689,7 +3358,7 @@
       "impact": "medium",
       "mitigation": "Per-request timeout; cap response size; stream and discard bodies. Check: target that stalls is cut at the timeout; 100 MB body is cut at the cap",
       "affects": [
-        "C-7"
+        "C-8"
       ]
     },
     {
@@ -2699,7 +3368,7 @@
       "impact": "high",
       "mitigation": "Send only the documented headers; never forward inbound headers. Check: captured request has exactly the documented headers",
       "affects": [
-        "C-7"
+        "C-8"
       ]
     },
     {
@@ -2709,7 +3378,7 @@
       "impact": "medium",
       "mitigation": "Sign timestamp + body; document a tolerance window for verifiers. Check: replay outside the window fails verification",
       "affects": [
-        "C-8"
+        "C-9"
       ]
     },
     {
@@ -2719,7 +3388,7 @@
       "impact": "medium",
       "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
       "affects": [
-        "C-9"
+        "C-10"
       ]
     },
     {
@@ -2729,7 +3398,7 @@
       "impact": "medium",
       "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
       "affects": [
-        "C-11"
+        "C-12"
       ]
     },
     {
@@ -2739,7 +3408,7 @@
       "impact": "high",
       "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
       "affects": [
-        "C-11"
+        "C-12"
       ]
     },
     {
@@ -2749,7 +3418,7 @@
       "impact": "medium",
       "mitigation": "Authenticate in one middleware for every management route; deny by default. Check: every management route returns 401 unauthenticated",
       "affects": [
-        "C-15"
+        "C-17"
       ]
     },
     {
@@ -2759,7 +3428,7 @@
       "impact": "medium",
       "mitigation": "Audit log entries for every management write with the principal. Check: each write produces an audit entry",
       "affects": [
-        "C-15"
+        "C-17"
       ]
     },
     {
@@ -2769,7 +3438,7 @@
       "impact": "high",
       "mitigation": "Ownership check on every resource operation. Check: cross-customer access returns 404",
       "affects": [
-        "C-15"
+        "C-17"
       ]
     },
     {
@@ -2779,7 +3448,7 @@
       "impact": "medium",
       "mitigation": "Authenticate producers (service credentials); allowlist event types. Check: unauthenticated publish returns 401",
       "affects": [
-        "C-16"
+        "C-18"
       ]
     },
     {
@@ -2789,7 +3458,7 @@
       "impact": "medium",
       "mitigation": "Idempotency key per event; reject or de-duplicate replays. Check: replaying the same key does not enqueue twice",
       "affects": [
-        "C-16"
+        "C-18"
       ]
     },
     {
@@ -2799,24 +3468,24 @@
       "impact": "medium",
       "mitigation": "Per-producer rate limit; back-pressure with 429 and Retry-After. Check: flood from one producer is throttled",
       "affects": [
-        "C-16"
+        "C-18"
       ]
     }
   ],
   "work_packages": [
     {
       "id": "WP-1",
-      "title": "Store + Work queue + Observability",
-      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
+      "title": "Audit log + Store + Work queue",
+      "goal": "Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor; Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.",
       "components": [
+        "C-6",
         "C-1",
-        "C-2",
-        "C-10"
+        "C-2"
       ],
       "implements": [
+        "I-6",
         "I-1",
-        "I-2",
-        "I-10"
+        "I-2"
       ],
       "depends_on": [],
       "satisfies": [
@@ -2828,24 +3497,25 @@
         "R-8",
         "R-9",
         "R-10",
-        "R-11",
-        "R-12"
+        "R-12",
+        "R-15",
+        "R-17"
       ],
       "files": [
+        "app/audit.py",
+        "tests/test_audit.py",
         "app/store.py",
         "tests/test_store.py",
         "app/queue.py",
-        "tests/test_queue.py",
-        "app/observability.py",
-        "tests/test_observability.py"
+        "tests/test_queue.py"
       ],
       "size": "M",
       "acceptance": [
         {
           "id": "A-1",
-          "description": "unit tests of Store, Work queue, Observability pass",
+          "description": "unit tests of Audit log, Store, Work queue pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_store.py tests/test_queue.py tests/test_observability.py",
+          "command": "python -m pytest -q tests/test_audit.py tests/test_store.py tests/test_queue.py",
           "metric": ""
         },
         {
@@ -2871,69 +3541,108 @@
         },
         {
           "id": "A-5",
-          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
-          "metric": "R-11"
+          "metric": "R-17"
         }
       ],
-      "notes": "family: crud_api"
+      "notes": "family: audit_log"
     },
     {
       "id": "WP-2",
-      "title": "Secret store",
-      "goal": "Implement Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
+      "title": "Observability + Secret store",
+      "goal": "Implement Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Secret store: Holds per-endpoint signing secrets and their rotation history; encrypts at rest.",
       "components": [
+        "C-11",
         "C-3"
       ],
       "implements": [
+        "I-11",
         "I-3"
       ],
       "depends_on": [],
       "satisfies": [
         "R-1",
         "R-2",
-        "R-5"
+        "R-5",
+        "R-8",
+        "R-11",
+        "R-17",
+        "R-19"
       ],
       "files": [
+        "app/observability.py",
+        "tests/test_observability.py",
         "app/secrets.py",
         "tests/test_secrets.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-6",
-          "description": "unit tests of Secret store pass",
+          "description": "unit tests of Observability, Secret store pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_secrets.py",
+          "command": "python -m pytest -q tests/test_observability.py tests/test_secrets.py",
           "metric": ""
+        },
+        {
+          "id": "A-7",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-8",
+          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
+        },
+        {
+          "id": "A-9",
+          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-17"
+        },
+        {
+          "id": "A-10",
+          "description": "R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-19"
         }
       ],
-      "notes": "family: signing"
+      "notes": "family: observability"
     },
     {
       "id": "WP-3",
       "title": "Authentication + Outbound HTTP client + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Outbound HTTP client: Performs the outbound HTTP call with timeouts, size limits, redirect and private-address protection, and returns a classified outcome; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
-        "C-11",
-        "C-7",
-        "C-13"
+        "C-12",
+        "C-8",
+        "C-14"
       ],
       "implements": [
-        "I-11",
-        "I-7",
-        "I-13"
+        "I-12",
+        "I-8",
+        "I-14"
       ],
       "depends_on": [
-        "WP-1"
+        "WP-1",
+        "WP-2"
       ],
       "satisfies": [
         "R-1",
         "R-2",
         "R-4",
         "R-5",
-        "R-6"
+        "R-6",
+        "R-14",
+        "R-21"
       ],
       "files": [
         "app/auth.py",
@@ -2946,7 +3655,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-11",
           "description": "unit tests of Authentication, Outbound HTTP client, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_dispatcher.py tests/test_scheduler.py",
@@ -2960,15 +3669,14 @@
       "title": "Notifier + Signer",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting; Signer: Produces and verifies HMAC signatures over request bodies with the current and previous secrets.",
       "components": [
-        "C-9",
-        "C-8"
+        "C-10",
+        "C-9"
       ],
       "implements": [
-        "I-9",
-        "I-8"
+        "I-10",
+        "I-9"
       ],
       "depends_on": [
-        "WP-1",
         "WP-2"
       ],
       "satisfies": [
@@ -2986,7 +3694,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-12",
           "description": "unit tests of Notifier, Signer pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py tests/test_signer.py",
@@ -3000,10 +3708,10 @@
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
-        "C-6"
+        "C-7"
       ],
       "implements": [
-        "I-6"
+        "I-7"
       ],
       "depends_on": [
         "WP-1",
@@ -3018,7 +3726,9 @@
         "R-5",
         "R-6",
         "R-7",
-        "R-12"
+        "R-12",
+        "R-20",
+        "R-22"
       ],
       "files": [
         "app/core.py",
@@ -3027,7 +3737,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-13",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -3038,16 +3748,16 @@
     },
     {
       "id": "WP-6",
-      "title": "Admin HTTP API + Worker + Ingest API",
-      "goal": "Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.",
+      "title": "Admin HTTP API + Worker + Batch job",
+      "goal": "Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated; Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure; Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
-        "C-15",
-        "C-12",
+        "C-17",
+        "C-13",
         "C-16"
       ],
       "implements": [
-        "I-15",
-        "I-12",
+        "I-17",
+        "I-13",
         "I-16"
       ],
       "depends_on": [
@@ -3060,97 +3770,145 @@
       "satisfies": [
         "R-1",
         "R-2",
-        "R-3",
         "R-4",
         "R-5",
         "R-6",
         "R-8",
-        "R-9",
         "R-10",
         "R-11",
-        "R-13"
+        "R-13",
+        "R-14",
+        "R-16",
+        "R-18"
       ],
       "files": [
         "app/admin_api.py",
         "tests/test_admin_api.py",
         "app/worker.py",
         "tests/test_worker.py",
-        "app/ingest_api.py",
-        "tests/test_ingest_api.py"
+        "app/batch.py",
+        "tests/test_batch.py"
       ],
       "size": "M",
       "acceptance": [
         {
-          "id": "A-10",
-          "description": "unit tests of Admin HTTP API, Worker, Ingest API pass",
+          "id": "A-14",
+          "description": "unit tests of Admin HTTP API, Worker, Batch job pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_ingest_api.py",
+          "command": "python -m pytest -q tests/test_admin_api.py tests/test_worker.py tests/test_batch.py",
           "metric": ""
         },
         {
-          "id": "A-11",
+          "id": "A-15",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-12",
-          "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-9"
-        },
-        {
-          "id": "A-13",
+          "id": "A-16",
           "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
         },
         {
-          "id": "A-14",
+          "id": "A-17",
           "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
+        },
+        {
+          "id": "A-18",
+          "description": "R-16: size at 2 KB <= 256 kb kb",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-16"
+        },
+        {
+          "id": "A-19",
+          "description": "R-18: time at 4 h 24 h h",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-18"
         }
       ],
       "notes": "family: admin_api"
     },
     {
       "id": "WP-7",
-      "title": "Health policy",
-      "goal": "Implement Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.",
+      "title": "Ingest API + Health policy",
+      "goal": "Implement Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence; Health policy: Evaluates per-target failure history against the disable policy and applies the consequence.",
       "components": [
-        "C-14"
+        "C-18",
+        "C-15"
       ],
       "implements": [
-        "I-14"
+        "I-18",
+        "I-15"
       ],
       "depends_on": [
         "WP-1",
+        "WP-2",
+        "WP-3",
         "WP-4",
         "WP-5"
       ],
       "satisfies": [
-        "R-7"
+        "R-3",
+        "R-7",
+        "R-8",
+        "R-9",
+        "R-11",
+        "R-13",
+        "R-17"
       ],
       "files": [
+        "app/ingest_api.py",
+        "tests/test_ingest_api.py",
         "app/policy.py",
         "tests/test_policy.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-15",
-          "description": "unit tests of Health policy pass",
+          "id": "A-20",
+          "description": "unit tests of Ingest API, Health policy pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_policy.py",
+          "command": "python -m pytest -q tests/test_ingest_api.py tests/test_policy.py",
           "metric": ""
+        },
+        {
+          "id": "A-21",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-22",
+          "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
+        },
+        {
+          "id": "A-23",
+          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
+        },
+        {
+          "id": "A-24",
+          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-17"
         }
       ],
-      "notes": "family: health_policy"
+      "notes": "family: event_ingest"
     }
   ]
 }
