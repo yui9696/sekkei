@@ -199,7 +199,7 @@ Hand-authoring is also possible: JSON (`sekkei schema`) or a Python DSL (`sekkei
 ## Dogfood and numbers
 
 sekkei's own architecture is [`examples/self/design.json`](examples/self/design.json)
-(23 components including the engine's eleven; prose in [DESIGN.md](DESIGN.md)). The
+(29 components including the engine's twelve, Japanese input, deliverables and the red team; prose in [DESIGN.md](DESIGN.md)). The
 test-suite lints it in strict mode and runs `sekkei check` against this repository, so an
 import that violates the declared dependency direction fails the build.
 
