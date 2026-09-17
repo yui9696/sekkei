@@ -44,14 +44,14 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **24 person-days**; critical path **13 days**; with a team of 5: **about 13 working days** (3 weeks).
+- Total effort: **24 person-days**; critical path **13 days**; with a team of 5: **about 16 working days** (4 weeks).
 - Wave 1: WP-1
 - Wave 2: WP-2, WP-3, WP-4
 - Wave 3: WP-5
 - Wave 4: WP-6, WP-7
 - Wave 5: WP-8, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
-- Assumption: Team of 5; packages in one wave run in parallel up to the team size.
+- Assumption: Team of 5; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
 ## 4. Threat model (STRIDE-lite)
 
@@ -82,10 +82,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ### Decisions taken (scored trade-offs)
 
-- D-1 Work queue technology: **Managed broker (SQS/RabbitMQ/Kafka)**
+- D-1 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-2 Primary store: **PostgreSQL**
-- D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
-- D-4 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
+- D-3 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
+- D-4 Work queue technology: **Managed broker (SQS/RabbitMQ/Kafka)**
 - D-5 Time-series storage: **TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)**
 - D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-7 Assumed answer: load (Q-payload): **2 KB / 256 KB**
@@ -100,13 +100,13 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 6. How the text was read
 
-- Patterns recognised: event_ingest, notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
+- Patterns recognised: notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
 - Quality attributes (weight): durability 1.0, performance 0.9, availability 0.9, simplicity 0.7
 - Constraint tokens: broker, containers, idp, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
-| R-1 | functional | must | event_ingest, batch_pipeline, mqtt_ingest | — | — |
+| R-1 | functional | must | batch_pipeline, mqtt_ingest | — | — |
 | R-2 | functional | must | **none** | — | — |
 | R-3 | functional | must | **none** | — | — |
 | R-4 | functional | must | notification, sms_notification | — | — |

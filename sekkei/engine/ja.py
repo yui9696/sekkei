@@ -82,10 +82,12 @@ VERBS = {
     "オファー": "offer", "マッチング": "match", "課金": "charge", "請求": "charge", "タグ付け": "tag", "抽出": "extract",
     "分割": "split", "索引": "index", "レンダリング": "render", "描画": "render", "ローテーション": "rotate",
     "失効": "revoke", "取り下げ": "revoke", "承認依頼": "request", "コメント": "comment", "利用": "use", "使用": "use",
+    "非公開": "unpublish", "視聴": "view", "受講": "take", "受験": "take", "再開": "resume", "把握": "track", "連携": "integrate",
+    "受け取る": "receive", "受け取り": "receive", "受け取れる": "receive", "自動生成": "generate", "途切れ": "stall",
     "動かす": "run", "稼働": "run", "運用": "operate", "適用": "apply", "反映": "apply", "応答": "respond", "返す": "return",
     "呼び出す": "call", "呼び出し": "call", "連携": "integrate", "接続": "connect", "受け取る": "receive", "受け取り": "receive",
     "見る": "view", "書く": "write", "読む": "read", "貼る": "attach", "貼り付け": "attach",
-    "並べ替え": "sort", "ソート": "sort", "絞る": "filter", "選ぶ": "choose", "選択": "choose", "指定": "set", "決定": "set",
+    "並べ替え": "sort", "ソート": "sort", "絞る": "filter", "選ぶ": "choose", "選び": "choose", "選択": "choose", "指定": "set", "決定": "set",
     "開始": "start", "終了": "close", "完了": "complete", "停止": "stop", "再開": "resume", "中断": "cancel", "破棄": "discard",
     "復元": "restore", "復旧": "restore", "巻き戻し": "rollback", "検知": "detect", "検出": "detect", "判定": "check",
     "アラート": "alert", "警告": "alert", "エスカレーション": "escalate", "返信": "reply", "投票": "vote", "採点": "grade",
@@ -109,7 +111,7 @@ NOUNS = {
     "出退勤": "attendance", "契約": "contracts", "案件": "deals", "チケット": "tickets", "問い合わせ内容": "inquiries",
     "メッセージ": "messages", "チャット": "chat", "記事": "articles", "コメント": "comments", "タグ": "tags", "カテゴリ": "categories",
     "キュー": "queue", "データベース": "database", "テーブル": "tables", "レコード": "records", "データ": "data", "件数": "counts",
-    "統計": "statistics", "集計結果": "aggregates", "グラフ": "chart", "チャート": "chart", "画面": "screen", "ページ": "pages",
+    "統計": "statistics", "集計結果": "aggregates", "グラフ": "chart", "チャート": "chart", "画面": "pages", "ページ": "pages",
     "フォーム": "forms", "テンプレート": "templates", "コンテンツ": "content", "お知らせ": "announcements", "クーポン": "coupons",
     "ポイント": "points", "ランキング": "ranking", "レビュー": "reviews", "評価": "ratings", "お気に入り": "favourites",
     "検索結果": "search results", "キーワード": "keywords", "添付ファイル": "attachments", "添付": "attachments",
@@ -134,6 +136,14 @@ NOUNS = {
     "患者情報": "patient records", "予約枠": "slots", "枠": "slots", "空き": "availability", "座席": "seats", "席": "seats",
     "商品情報": "product records", "価格": "prices", "単価": "unit price", "税": "tax", "送料": "shipping fee", "割引": "discounts",
     "仕様": "specification", "要件": "requirements", "設計": "design", "画面遷移": "screens",
+    "リマインド": "reminders", "リマインダー": "reminders", "前日": "the day before", "当日": "the same day", "翌日": "the next day",
+    "診療科": "departments", "空き枠": "available slots", "基本情報": "basic information", "氏名": "name", "生年月日": "date of birth",
+    "保険証番号": "insurance number", "シフト": "shifts", "診療時間": "opening hours", "電子カルテ": "electronic health record",
+    "電子カルテシステム": "electronic health record system", "個人情報保護法": "appi", "本人の求めに応じて": "on request",
+    "確定した": "confirmed", "確定": "confirmed", "動画教材": "video courses", "教材": "materials", "講座": "courses",
+    "確認テスト": "tests", "採点結果": "grades", "解説": "explanations", "受講状況": "progress", "受講期限": "deadline",
+    "未受講": "not yet taken", "部下": "their reports", "視聴位置": "playback position", "再生": "playback",
+    "ロケール": "locale", "社内": "internal", "社外": "external", "受講完了": "completions", "成績": "grades",
 }
 
 QUALITIES = {
@@ -171,6 +181,7 @@ QUALITIES = {
     "取りこぼさない": "must never be lost", "取りこぼし": "lost", "落とさない": "must never be lost", "確実に": "reliably",
     "エラー": "errors", "例外": "errors", "タイムアウト": "timeout", "接続数": "connections", "同時接続": "concurrent connections",
     "レスポンス": "response", "処理時間": "latency", "処理速度": "throughput", "秒間": "per second", "毎秒": "per second",
+    "途切れない": "must not stall", "途切れず": "must not stall", "止まらない": "must not stop", "後で": "later",
     "平文": "plaintext", "平文で": "in plaintext", "ハッシュ化": "hashed", "マスキング": "masked", "匿名化": "anonymised",
     "開発": "develop", "実装": "implement", "運用中": "in production", "本番": "production", "検証環境": "staging",
 }
@@ -284,6 +295,8 @@ def numbers(s: str) -> str:
     # 「N 秒ごと」「N 分おき」→ every N seconds (before the plain duration rule eats the number)
     s = re.sub(_JA_NUM + r"\s*(?P<unit>秒|分|時間)\s*(?:ごと|毎|おき|間隔)(?:に|で)?",
                lambda m: f"every {_num(m)} {'seconds' if m.group('unit') == '秒' else 'minutes' if m.group('unit') == '分' else 'hours'} ", s)
+    s = re.sub(r"1\s*(?P<per>日|時間|分|秒|月)\s*(?:あたり|につき|に|で)\s*" + _JA_NUM + r"\s*(?P<what>" + "|".join(sorted(map(re.escape, _COUNTER), key=len, reverse=True)) + r")?",
+               lambda m: f"{_num(m)} {_COUNTER.get(m.group('what') or '', 'requests')}{_PER[m.group('per')]}", s)
     # rate: 「毎秒 1万件」「1,000件/秒」「1000リクエスト/秒」「秒間 500 件」
     def rate(m: re.Match) -> str:
         return f"{_num(m)} {_COUNTER.get(m.group('what') or '', 'requests')}{_PER[m.group('per')]}"
@@ -425,6 +438,7 @@ class Rewrite:
 
 #: fixed phrases folded into one modal before tokenising (inflection tails would otherwise split them)
 _PRE = {"してはならない": "禁止", "してはいけない": "禁止", "しては行けない": "禁止", "してはならず": "禁止",
+        "てはならない": "禁止", "てはならず": "禁止", "てはいけない": "禁止", "てはいけず": "禁止",
         "しなければならない": "必須", "しなくてはならない": "必須", "しなければいけない": "必須", "する必要がある": "必須",
         "なければならない": "必須", "ねばならない": "必須", "できるようにする": "できる", "できること": "できる",
         "できるようにしたい": "できる", "できるようになる": "できる", "する事": "する", "こと。": "。"}
@@ -439,8 +453,43 @@ def _participle(v: str) -> str:
     return v + "ed"
 
 
+_CLAUSE_SPLIT = re.compile(r"(?<=[しびきみぎりいえてでちにず])、|(?<=して)、|(?<=でき)、|(?<=、)(?=(?:また|さらに|かつ|および))")
+
+
+def _clauses(s: str) -> list[str]:
+    """「診療科と医師を選び、空き枠から予約を登録できる」→ two clauses, each with its own verb;
+    the actor of the first clause carries over."""
+    parts = [p.strip("、 ") for p in _CLAUSE_SPLIT.split(s) if p and p.strip("、 ")]
+    return parts if len(parts) > 1 else [s]
+
+
 def rewrite_sentence(src: str) -> Rewrite:
-    """One Japanese requirement sentence -> one English sentence in actor-verb-object order."""
+    """One Japanese requirement sentence -> one English sentence in actor-verb-object order.
+    Multi-clause sentences are rewritten clause by clause (the first clause's actor carries over)."""
+    if not is_japanese(src):
+        clean = unicodedata.normalize("NFKC", src).strip().rstrip("。")
+        return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
+    s0 = unicodedata.normalize("NFKC", src).strip().rstrip("。.")
+    clauses = _clauses(s0)
+    if len(clauses) > 1:
+        head = _rewrite_clause(clauses[0])
+        actor_m = re.match(r"^(\w[\w ]*?) (?:can|must|should|may|are)\b", head.english)
+        outs = [head]
+        for c in clauses[1:]:
+            r = _rewrite_clause(c)
+            m2 = re.match(r"^The system (must not|must|can|should|may) ", r.english)
+            if actor_m and m2:
+                aux = m2.group(1)
+                if aux == "must" and actor_m.group(1).lower() not in ("system", "the system"):
+                    aux = "can"
+                r.english = f"{actor_m.group(1)} {aux} " + r.english[m2.end():]
+            outs.append(r)
+        en = " ".join(o.english for o in outs if o.english)
+        return Rewrite(src.strip(), en, [w for o in outs for w in o.untranslated])
+    return _rewrite_clause(s0, src)
+
+
+def _rewrite_clause(src: str, original: str | None = None) -> Rewrite:
     if not is_japanese(src):
         clean = unicodedata.normalize("NFKC", src).strip().rstrip("。")
         return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
@@ -449,6 +498,7 @@ def rewrite_sentence(src: str) -> Rewrite:
     s = numbers(s)
     toks = _tokenise_list(s)
     unknown = [t.text for t in toks if t.role == "unknown"]
+    src = original if original is not None else src
     toks = [t for t in toks if t.role != "unknown"]
     # out of scope, stated inline: 「購買は対象外」
     if any(t.text == "out of scope" for t in toks):
@@ -506,9 +556,14 @@ def rewrite_sentence(src: str) -> Rewrite:
             parts.append(" ".join(rest_words))
     else:
         words = ([actor] if actor else []) + rest_words + ([" and ".join(objects)] if objects else [])
-        if modal in ("must", "should", "must not", "always", "never"):
-            words.append({"always": "must always", "never": "must never"}.get(modal, modal))
-        parts.append(" ".join(w for w in words if w))
+        if modal in ("must not", "never") and words:
+            # 「成績は失われてはならない」: subject first, then the prohibition, then the state
+            subj, state = words[0], " ".join(words[1:])
+            parts.append(f"{subj} must never be {state}".strip())
+        else:
+            if modal in ("must", "should", "always"):
+                words.append({"always": "must always"}.get(modal, modal))
+            parts.append(" ".join(w for w in words if w))
     en = re.sub(r"\s+", " ", " ".join(parts)).strip()
     en = en[:1].upper() + en[1:] if en else en
     if en and not en.endswith("."):

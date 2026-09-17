@@ -6,7 +6,6 @@ _version 0.1.0 · schema sekkei/1_
 
 ## Goals
 
-- Producers hand events to the system, which persists them before acknowledging.
 - The system notifies people through an external channel.
 - Callers are authenticated and authorized.
 - Scheduled jobs process stored records in windows.
@@ -315,7 +314,7 @@ graph LR
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 | `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
 | | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
 | | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-8 — Notifier interface
@@ -417,28 +416,7 @@ graph LR
 
 ## Entities
 
-### E-1 — Event (owner C-1)
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `type` | str | indexed |
-| `payload` | json |  |
-| `created_at` | timestamp |  |
-| `idempotency_key` | str | unique per producer |
-
-### E-2 — WorkItem (owner C-2)
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `partition` | str | indexed; the isolation key |
-| `payload_ref` | uuid | references the event |
-| `attempt` | int | >= 0 |
-| `not_before` | timestamp | indexed |
-| `leased_until` | timestamp \| null |  |
-
-### E-3 — Principal (owner C-1)
+### E-1 — Principal (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -446,7 +424,7 @@ graph LR
 | `kind` | enum(customer, operator, service) |  |
 | `scopes` | list[str] |  |
 
-### E-4 — JobRun (owner C-1)
+### E-2 — JobRun (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -456,6 +434,27 @@ graph LR
 | `window_end` | timestamp |  |
 | `status` | enum |  |
 | `report` | json |  |
+
+### E-3 — Event (owner C-1)
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `type` | str | indexed |
+| `payload` | json |  |
+| `created_at` | timestamp |  |
+| `idempotency_key` | str | unique per producer |
+
+### E-4 — WorkItem (owner C-2)
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `partition` | str | indexed; the isolation key |
+| `payload_ref` | uuid | references the event |
+| `attempt` | int | >= 0 |
+| `not_before` | timestamp | indexed |
+| `leased_until` | timestamp \| null |  |
 
 ### E-5 — Duplicate (owner C-1)
 
@@ -499,34 +498,28 @@ sequenceDiagram
 
 ## Decisions
 
-### D-1 — Work queue technology (accepted)
+### D-1 — Caller authentication (accepted)
 
-**Context.** Work items must survive a crash and be leased by several workers.
+**Context.** Management operations must be attributable to a customer or operator.
 
-- ✘ **PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED**
-  - + transactional with the domain data (persist + enqueue atomically)
-  - + no new infrastructure
-  - + easy to inspect
-  - − throughput bounded by the database (fine to ~10k items/s)
-  - − needs a vacuum-friendly schema
-- ✘ **Redis Streams with consumer groups**
-  - + high throughput
-  - + built-in consumer groups and pending lists
-  - − durability depends on AOF/fsync configuration
-  - − separate from the transactional store: needs an outbox
-- ✔ **Managed broker (SQS/RabbitMQ/Kafka)**
-  - + scales independently
-  - + delayed delivery built in (SQS)
-  - − new infrastructure and cost
-  - − at-least-once semantics still need an outbox
-- ✘ **In-memory queue**
-  - + simplest possible
-  - − work is lost on crash
-  - − single process only
+- ✘ **API keys per customer, hashed at rest, sent as a bearer token**
+  - + simple
+  - + scriptable
+  - − no delegation or expiry unless added
+- ✔ **OAuth2 / OIDC with the platform's identity provider**
+  - + single sign-on
+  - + expiry and scopes
+  - − integration effort
+- ✘ **Mutual TLS**
+  - + strong
+  - + no secrets in headers
+  - − certificate lifecycle for every customer
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints
 
-_Affects:_ C-2
+**Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
+
+_Affects:_ C-10
 
 ### D-2 — Primary store (accepted)
 
@@ -557,30 +550,7 @@ _Affects:_ C-2
 
 _Affects:_ C-1
 
-### D-3 — Caller authentication (accepted)
-
-**Context.** Management operations must be attributable to a customer or operator.
-
-- ✘ **API keys per customer, hashed at rest, sent as a bearer token**
-  - + simple
-  - + scriptable
-  - − no delegation or expiry unless added
-- ✔ **OAuth2 / OIDC with the platform's identity provider**
-  - + single sign-on
-  - + expiry and scopes
-  - − integration effort
-- ✘ **Mutual TLS**
-  - + strong
-  - + no secrets in headers
-  - − certificate lifecycle for every customer
-
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints
-
-**Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
-
-_Affects:_ C-10
-
-### D-4 — Process topology (accepted)
+### D-3 — Process topology (accepted)
 
 **Context.** The same code base serves requests and performs background work.
 
@@ -603,6 +573,35 @@ _Affects:_ C-10
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
 _Affects:_ C-14, C-12
+
+### D-4 — Work queue technology (accepted)
+
+**Context.** Work items must survive a crash and be leased by several workers.
+
+- ✘ **PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED**
+  - + transactional with the domain data (persist + enqueue atomically)
+  - + no new infrastructure
+  - + easy to inspect
+  - − throughput bounded by the database (fine to ~10k items/s)
+  - − needs a vacuum-friendly schema
+- ✘ **Redis Streams with consumer groups**
+  - + high throughput
+  - + built-in consumer groups and pending lists
+  - − durability depends on AOF/fsync configuration
+  - − separate from the transactional store: needs an outbox
+- ✔ **Managed broker (SQS/RabbitMQ/Kafka)**
+  - + scales independently
+  - + delayed delivery built in (SQS)
+  - − new infrastructure and cost
+  - − at-least-once semantics still need an outbox
+- ✘ **In-memory queue**
+  - + simplest possible
+  - − work is lost on crash
+  - − single process only
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
+
+_Affects:_ C-2
 
 ### D-5 — Time-series storage (accepted)
 
@@ -778,12 +777,12 @@ _Affects:_ C-12, C-2
 
 | id | risk | likelihood | impact | mitigation |
 |---|---|---|---|---|
-| K-1 | Payloads or uploads without size limits exhaust memory or disk. | medium | medium | Enforce size limits at the surface; reject early with a clear error. |
-| K-2 | A widespread failure disables many targets and emails every owner at once. | low | medium | Rate-limit notifications per owner and batch them. |
-| K-3 | A management operation reachable without authentication. | low | high | Authenticate in one middleware for every management route; test every route unauthenticated. |
-| K-4 | Entities evolve; migrations run against live data. | medium | medium | Versioned migrations applied before deploy; additive changes first, removals one release later. |
-| K-5 | At-least-once delivery means a target can receive the same event twice (crash between call and ack). | high | medium | Send a stable event id and attempt number in headers; document idempotent consumption; never retry on 2xx. |
-| K-6 | Retried and dead-lettered items accumulate and slow the lease query. | medium | medium | Partial index on (partition, not_before) for live items; archive terminal items on a schedule. |
+| K-1 | A widespread failure disables many targets and emails every owner at once. | low | medium | Rate-limit notifications per owner and batch them. |
+| K-2 | A management operation reachable without authentication. | low | high | Authenticate in one middleware for every management route; test every route unauthenticated. |
+| K-3 | Entities evolve; migrations run against live data. | medium | medium | Versioned migrations applied before deploy; additive changes first, removals one release later. |
+| K-4 | At-least-once delivery means a target can receive the same event twice (crash between call and ack). | high | medium | Send a stable event id and attempt number in headers; document idempotent consumption; never retry on 2xx. |
+| K-5 | Retried and dead-lettered items accumulate and slow the lease query. | medium | medium | Partial index on (partition, not_before) for live items; archive terminal items on a schedule. |
+| K-6 | Payloads or uploads without size limits exhaust memory or disk. | medium | medium | Enforce size limits at the surface; reject early with a clear error. |
 | K-7 | Parts of the requirements were not recognised by the catalogue and received a generic decomposition. | medium | medium | Review the components marked generic; refine responsibilities and interfaces before briefing. |
 | K-8 | [tampering] Store: Injection through query construction. | medium | medium | Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing |
 | K-9 | [information_disclosure] Store: Backups and dumps contain everything. | medium | high | Encrypt backups; restrict who can take them. Check: backup file is not readable without the key |
@@ -895,7 +894,7 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
   - A-8 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
-- **notes**: family: event_ingest
+- **notes**: family: mqtt_ingest
 
 ### WP-6 — MQTT consumer (S)
 

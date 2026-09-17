@@ -250,7 +250,7 @@ graph LR
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 | `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
 | | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
 | | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-4 — Observability interface

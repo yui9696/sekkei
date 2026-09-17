@@ -211,7 +211,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 37 patterns, 49 archetypes, 25 decision points / 73 options, 12 quality tactics, 23 risks, 9 language layouts, 44 threats |
+| catalogue | 40 patterns, 52 archetypes, 26 decision points / 76 options, 12 quality tactics, 25 risks, 9 language layouts, 44 threats |
 | `sekkei deliver` on the SaaS fixture | 31 files (18 ADRs) in about 0.5 s |
 | `sekkei redteam` on the SaaS fixture | 18 engine runs in about 0.8 s |
 
@@ -224,6 +224,12 @@ telemetry over MQTT), scored on ten architect's criteria with the evidence. Resu
 a human still adds is listed there: state machines and timing rules inside a use case,
 pipelines implied by a consequence ("must not block uploads"), technologies the catalogue
 does not know, and naming.
+
+[docs/EVALUATION_2026-09-17.md](docs/EVALUATION_2026-09-17.md): three more unseen specs,
+two in Japanese (hospital booking, corporate LMS) and one in English (loan origination
+with KYC and an underwriter workflow): 13/12/13 → 15/15/16 after the fixes they motivated.
+Japanese lands two points lower on fidelity and operation naming — the cost of a glossary
+instead of a parser — and the same everywhere else.
 
 ## Prior art
 

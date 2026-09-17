@@ -15,6 +15,8 @@ _version 0.1.0 · schema sekkei/1_
 - Files are uploaded, stored and served.
 - Scheduled jobs process stored records in windows.
 - Predictions are served from a versioned model.
+- Records are searched by meaning through embeddings.
+- Figures are aggregated over history for people to read.
 
 ## Requirements
 
@@ -59,7 +61,8 @@ graph LR
   C_11["C-11 Model server"]
   C_12["C-12 Scheduler"]
   C_13["C-13 Batch job"]
-  C_14["C-14 Public HTTP API"]
+  C_14["C-14 Reporting"]
+  C_15["C-15 Public HTTP API"]
   C_4 -->|I-1| C_1
   C_4 -->|I-6| C_6
   C_4 -->|I-9| C_9
@@ -75,11 +78,12 @@ graph LR
   C_13 -->|I-12| C_12
   C_13 -->|I-6| C_6
   C_13 -->|I-4| C_4
-  C_14 -->|I-4| C_4
-  C_14 -->|I-6| C_6
-  C_14 -->|I-7| C_7
-  C_14 -->|I-8| C_8
-  C_14 -->|I-10| C_10
+  C_14 -->|I-1| C_1
+  C_15 -->|I-4| C_4
+  C_15 -->|I-6| C_6
+  C_15 -->|I-7| C_7
+  C_15 -->|I-8| C_8
+  C_15 -->|I-10| C_10
 ```
 
 ### C-1 — Store
@@ -186,20 +190,28 @@ graph LR
 - **requires**: I-1, I-12, I-6, I-4
 - **satisfies**: R-7, R-14
 
-### C-14 — Public HTTP API
+### C-14 — Reporting
+
+- **kind**: job · **path**: `app/reporting.py`
+- **responsibility**: Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.
+- **provides**: I-14
+- **requires**: I-1
+- **satisfies**: R-7
+
+### C-15 — Public HTTP API
 
 - **kind**: service · **path**: `app/surface_api.py`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
-- **provides**: I-14
+- **provides**: I-15
 - **requires**: I-4, I-6, I-7, I-8, I-10
 - **satisfies**: R-1, R-10, R-8, R-9, R-17, R-19
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-11, C-2, C-3, C-6, C-8, C-9
-1. C-10, C-12, C-5, C-7
+1. C-10, C-12, C-14, C-5, C-7
 2. C-4
-3. C-13, C-14
+3. C-13, C-15
 
 ## Interfaces
 
@@ -277,7 +289,7 @@ graph LR
 | | from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is | | | |
 | `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
 | | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_engine` | `engine`: Engine \| id | Engine \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
 | | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
 
 ### I-5 — Notifier interface
@@ -372,9 +384,20 @@ graph LR
 |---|---|---|---|---|
 | `run` | `window`: DateRange | JobReport | JobError | stated values: 90 days (R-14); 1 year (R-14) |
 
-### I-14 — Public HTTP API interface
+### I-14 — Reporting interface
 
-- **kind**: http · **owner**: C-14 · **stability**: draft
+- **kind**: module · **owner**: C-14 · **stability**: draft
+- Provided by Reporting. 
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `build` | `report`: str, `window`: TimeWindow | ReportRun | — | aggregates written atomically; the previous version stays readable until then |
+| `read` | `report`: str, `filter`: dict | rows | — | — |
+| | serves the last completed run | | | |
+
+### I-15 — Public HTTP API interface
+
+- **kind**: http · **owner**: C-15 · **stability**: draft
 - Provided by Public HTTP API. 
 
 | operation | inputs | output | errors | pre / post |
@@ -436,7 +459,18 @@ Generic domain record; refine per entity found in the requirements.
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-5 — Document (owner C-1)
+### E-5 — ReportRun (owner C-1)
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `report` | str | indexed |
+| `window_start` | timestamp |  |
+| `window_end` | timestamp |  |
+| `completed_at` | timestamp |  |
+| `rows` | int |  |
+
+### E-6 — Document (owner C-1)
 
 Domain entity named in the requirements ('document'); confirm the fields.
 
@@ -451,16 +485,16 @@ Domain entity named in the requirements ('document'); confirm the fields.
 
 _Trigger:_ client calls the API
 
-1. C-14 → C-4 via I-4: validate and apply
+1. C-15 → C-4 via I-4: validate and apply
 2. C-4 → C-1 via I-1: read/write
 
 ```mermaid
 sequenceDiagram
-  participant C_14 as C-14 Public HTTP API
+  participant C_15 as C-15 Public HTTP API
   participant C_4 as C-4 Domain core
   participant C_1 as C-1 Store
-  Note over C_14: client calls the API
-  C_14->>C_4: I-4 validate and apply
+  Note over C_15: client calls the API
+  C_15->>C_4: I-4 validate and apply
   C_4->>C_1: I-1 read/write
 ```
 
@@ -502,7 +536,7 @@ sequenceDiagram
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
-_Affects:_ C-14
+_Affects:_ C-15
 
 ### D-2 — Primary store (accepted)
 
@@ -595,7 +629,7 @@ _Affects:_ C-9
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
-_Affects:_ C-14, C-12
+_Affects:_ C-15, C-12
 
 ### D-6 — Vector index for semantic search (accepted)
 
@@ -621,7 +655,33 @@ _Affects:_ C-14, C-12
 
 _Affects:_ C-10, C-1
 
-### D-7 — Redundancy for the availability target (accepted)
+### D-7 — Where reports are computed (accepted)
+
+**Context.** Aggregations over history must not slow down the transactional path.
+
+- ✔ **Materialised aggregates built by a scheduled job into report tables in the primary database**
+  - + one database
+  - + reports are a read of precomputed rows
+  - − freshness = job interval
+  - − aggregate design per report
+- ✘ **Read replica queried directly**
+  - + fresh
+  - + no aggregate design
+  - − heavy queries still hit a copy of the OLTP schema
+  - − replica lag
+- ✘ **Columnar analytics store (ClickHouse / warehouse) fed by a pipeline**
+  - + fast over years of data
+  - + ad-hoc analytics
+  - − a second store and a pipeline
+  - − eventual consistency
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.63; Read replica queried directly: 1.47; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)
+
+**Consequences.** Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.
+
+_Affects:_ C-14, C-1
+
+### D-8 — Redundancy for the availability target (accepted)
 
 **Context.** The availability target must be met through instance failures and deploys.
 
@@ -643,9 +703,9 @@ _Affects:_ C-10, C-1
 
 **Consequences.** Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
-_Affects:_ C-14
+_Affects:_ C-15
 
-### D-8 — Assumed answer: stack (Q-deploy) (proposed)
+### D-9 — Assumed answer: stack (Q-deploy) (proposed)
 
 **Context.** The requirements do not say. Question: Q-deploy. No evidence in the text; engine default.
 
@@ -657,9 +717,9 @@ _Affects:_ C-14
 
 **Consequences.** If the real answer differs: State the deployment; topology, statelessness conventions and store options change.
 
-_Affects:_ C-14
+_Affects:_ C-15
 
-### D-9 — Assumed answer: quality (Q-availability) (proposed)
+### D-10 — Assumed answer: quality (Q-availability) (proposed)
 
 **Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
 
@@ -673,7 +733,7 @@ _Affects:_ C-14
 
 _Affects:_ C-6
 
-### D-10 — Assumed answer: data (Q-retention) (proposed)
+### D-11 — Assumed answer: data (Q-retention) (proposed)
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
@@ -687,7 +747,7 @@ _Affects:_ C-6
 
 _Affects:_ C-13, C-1
 
-### D-11 — Assumed answer: data (Q-backup) (proposed)
+### D-12 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -701,7 +761,7 @@ _Affects:_ C-13, C-1
 
 _Affects:_ C-1
 
-### D-12 — Assumed answer: security (Q-authz) (proposed)
+### D-13 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -715,7 +775,7 @@ _Affects:_ C-1
 
 _Affects:_ C-4, C-7
 
-### D-13 — Assumed answer: resilience (Q-external) (proposed)
+### D-14 — Assumed answer: resilience (Q-external) (proposed)
 
 **Context.** The requirements do not say. Question: Q-external. No evidence in the text; engine default.
 
@@ -729,7 +789,7 @@ _Affects:_ C-4, C-7
 
 _Affects:_ C-12
 
-### D-14 — Assumed answer: cost (Q-budget) (proposed)
+### D-15 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -741,7 +801,7 @@ _Affects:_ C-12
 
 **Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
-### D-15 — Assumed answer: data (Q-migration) (proposed)
+### D-16 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
 
@@ -761,19 +821,21 @@ _Affects:_ C-12
 | K-2 | Entities evolve; migrations run against live data. | medium | medium | Versioned migrations applied before deploy; additive changes first, removals one release later. |
 | K-3 | A widespread failure disables many targets and emails every owner at once. | low | medium | Rate-limit notifications per owner and batch them. |
 | K-4 | A management operation reachable without authentication. | low | high | Authenticate in one middleware for every management route; test every route unauthenticated. |
-| K-5 | Parts of the requirements were not recognised by the catalogue and received a generic decomposition. | medium | medium | Review the components marked generic; refine responsibilities and interfaces before briefing. |
-| K-6 | [tampering] Store: Injection through query construction. | medium | medium | Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing |
-| K-7 | [information_disclosure] Store: Backups and dumps contain everything. | medium | high | Encrypt backups; restrict who can take them. Check: backup file is not readable without the key |
-| K-8 | [tampering] File storage: Uploaded content is not what its type claims. | medium | medium | Sniff content type; reject executables; size limits. Check: renamed executable is rejected |
-| K-9 | [elevation] File storage: Path traversal through user-supplied names. | medium | high | Generate storage keys; never use client names as paths. Check: name '../x' cannot escape the store |
-| K-10 | [denial_of_service] Notifier: Notification storms and template injection. | medium | medium | Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner |
-| K-11 | [spoofing] Authentication: Credential stuffing or leaked keys. | medium | medium | Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled |
-| K-12 | [elevation] Authentication: A caller acts on another tenant's resources. | medium | high | Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation |
-| K-13 | [denial_of_service] Model server: Adversarial or oversized inputs exhaust inference capacity. | medium | medium | Input size limits; batching with timeouts. Check: oversize input rejected before inference |
-| K-14 | [spoofing] Public HTTP API: Requests without a verified caller identity reach domain operations. | medium | medium | Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials |
-| K-15 | [tampering] Public HTTP API: Malformed or oversized bodies reach the core. | medium | medium | Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413 |
-| K-16 | [denial_of_service] Public HTTP API: A single caller saturates the service. | medium | medium | Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected |
-| K-17 | [information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses. | medium | high | Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body |
+| K-5 | Dashboards show figures from a failed or late run without saying so. | medium | low | Every report row carries the run's completion time; the UI shows it; alert when a run is late. |
+| K-6 | Parts of the requirements were not recognised by the catalogue and received a generic decomposition. | medium | medium | Review the components marked generic; refine responsibilities and interfaces before briefing. |
+| K-7 | [tampering] Store: Injection through query construction. | medium | medium | Parameterised queries only; no string-built SQL. Check: static check for string-formatted SQL finds nothing |
+| K-8 | [information_disclosure] Store: Backups and dumps contain everything. | medium | high | Encrypt backups; restrict who can take them. Check: backup file is not readable without the key |
+| K-9 | [tampering] File storage: Uploaded content is not what its type claims. | medium | medium | Sniff content type; reject executables; size limits. Check: renamed executable is rejected |
+| K-10 | [elevation] File storage: Path traversal through user-supplied names. | medium | high | Generate storage keys; never use client names as paths. Check: name '../x' cannot escape the store |
+| K-11 | [denial_of_service] Notifier: Notification storms and template injection. | medium | medium | Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner |
+| K-12 | [spoofing] Authentication: Credential stuffing or leaked keys. | medium | medium | Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled |
+| K-13 | [elevation] Authentication: A caller acts on another tenant's resources. | medium | high | Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation |
+| K-14 | [denial_of_service] Model server: Adversarial or oversized inputs exhaust inference capacity. | medium | medium | Input size limits; batching with timeouts. Check: oversize input rejected before inference |
+| K-15 | [information_disclosure] Reporting: Aggregates over small groups re-identify people. | medium | high | Suppress rows below a minimum group size in person-level reports. Check: a report over a group of one shows no row |
+| K-16 | [spoofing] Public HTTP API: Requests without a verified caller identity reach domain operations. | medium | medium | Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials |
+| K-17 | [tampering] Public HTTP API: Malformed or oversized bodies reach the core. | medium | medium | Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413 |
+| K-18 | [denial_of_service] Public HTTP API: A single caller saturates the service. | medium | medium | Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected |
+| K-19 | [information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses. | medium | high | Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body |
 
 ## Work packages
 
@@ -785,35 +847,37 @@ graph LR
   WP_4["WP-4 Model server (S)"]
   WP_5["WP-5 Authentication + Scheduler (M)"]
   WP_6["WP-6 Notifier (S)"]
-  WP_7["WP-7 Search index (S)"]
-  WP_8["WP-8 Domain core (S)"]
-  WP_9["WP-9 Batch job (S)"]
-  WP_10["WP-10 Public HTTP API (S)"]
+  WP_7["WP-7 Reporting (S)"]
+  WP_8["WP-8 Search index (S)"]
+  WP_9["WP-9 Domain core (S)"]
+  WP_10["WP-10 Batch job (S)"]
+  WP_11["WP-11 Public HTTP API (S)"]
   WP_2 --> WP_5
   WP_2 --> WP_6
   WP_2 --> WP_7
-  WP_1 --> WP_8
   WP_2 --> WP_8
-  WP_3 --> WP_8
-  WP_4 --> WP_8
-  WP_6 --> WP_8
+  WP_1 --> WP_9
   WP_2 --> WP_9
-  WP_5 --> WP_9
-  WP_8 --> WP_9
+  WP_3 --> WP_9
+  WP_4 --> WP_9
+  WP_6 --> WP_9
   WP_2 --> WP_10
   WP_5 --> WP_10
-  WP_7 --> WP_10
-  WP_8 --> WP_10
+  WP_9 --> WP_10
+  WP_2 --> WP_11
+  WP_5 --> WP_11
+  WP_8 --> WP_11
+  WP_9 --> WP_11
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1, WP-2, WP-3, WP-4
-2. WP-5, WP-6, WP-7
-3. WP-8
-4. WP-10, WP-9
+2. WP-5, WP-6, WP-7, WP-8
+3. WP-9
+4. WP-10, WP-11
 
-_Critical path (weight 5):_ WP-2 → WP-6 → WP-8 → WP-9
+_Critical path (weight 5):_ WP-2 → WP-6 → WP-9 → WP-11
 
 ### WP-1 — File storage (S)
 
@@ -886,7 +950,18 @@ Implement Notifier: Sends operator/customer notifications through the configured
   - A-11 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
-### WP-7 — Search index (S)
+### WP-7 — Reporting (S)
+
+Implement Reporting: Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.
+
+- **components**: C-14 · **implements**: I-14
+- **depends on**: WP-2 · **satisfies**: R-7
+- **write scope**: `app/reporting.py`, `tests/test_reporting.py`
+- **acceptance**:
+  - A-12 (test) unit tests of Reporting pass — `python -m pytest -q tests/test_reporting.py`
+- **notes**: family: reporting
+
+### WP-8 — Search index (S)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
@@ -894,12 +969,12 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
-  - A-12 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-13 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-14 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
+  - A-14 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-15 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
 - **notes**: family: search
 
-### WP-8 — Domain core (S)
+### WP-9 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
@@ -907,59 +982,59 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-20, R-21
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-15 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: crud_api
 
-### WP-9 — Batch job (S)
+### WP-10 — Batch job (S)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-2, WP-5, WP-8 · **satisfies**: R-7, R-14
+- **depends on**: WP-2, WP-5, WP-9 · **satisfies**: R-7, R-14
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-17 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-10 — Public HTTP API (S)
+### WP-11 — Public HTTP API (S)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
-- **components**: C-14 · **implements**: I-14
-- **depends on**: WP-2, WP-5, WP-7, WP-8 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-19
+- **components**: C-15 · **implements**: I-15
+- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-19
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
-  - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-18 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-19 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-20 (metric) R-17: time at 4 h 24 h h — metric R-17
+  - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-19 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-20 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-21 (metric) R-17: time at 4 h 24 h h — metric R-17
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-14 | WP-8, WP-10 | A-15, A-17, A-18, A-19, A-20 |
-| R-2 | must | C-3, C-4 | WP-1, WP-8 | A-1, A-15 |
-| R-3 | must | C-4, C-10, C-11 | WP-4, WP-7, WP-8 | A-9, A-12, A-13, A-14, A-15 |
-| R-4 | must | C-10 | WP-7 | A-12, A-13, A-14 |
-| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15 |
-| R-6 | must | C-10 | WP-7 | A-12, A-13, A-14 |
-| R-7 | must | C-2, C-5, C-10, C-12, C-13 | WP-5, WP-6, WP-7, WP-9 | A-10, A-11, A-12, A-13, A-14, A-16 |
-| R-8 | should | C-9, C-10, C-14 | WP-3, WP-7, WP-10 | A-6, A-7, A-8, A-12, A-13, A-14, A-17, A-18, A-19, A-20 |
-| R-9 | must | C-1, C-9, C-10, C-14 | WP-2, WP-3, WP-7, WP-10 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-12, A-13, A-14, A-17, A-18, A-19, A-20 |
-| R-10 | must | C-4, C-14 | WP-8, WP-10 | A-15, A-17, A-18, A-19, A-20 |
-| R-11 | must | C-1, C-4, C-8 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-15 |
-| R-12 | must | C-4 | WP-8 | A-15 |
+| R-1 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20, A-21 |
+| R-2 | must | C-3, C-4 | WP-1, WP-9 | A-1, A-16 |
+| R-3 | must | C-4, C-10, C-11 | WP-4, WP-8, WP-9 | A-9, A-13, A-14, A-15, A-16 |
+| R-4 | must | C-10 | WP-8 | A-13, A-14, A-15 |
+| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-9 | A-6, A-7, A-8, A-9, A-16 |
+| R-6 | must | C-10 | WP-8 | A-13, A-14, A-15 |
+| R-7 | must | C-2, C-5, C-10, C-12, C-13, C-14 | WP-5, WP-6, WP-7, WP-8, WP-10 | A-10, A-11, A-12, A-13, A-14, A-15, A-17 |
+| R-8 | should | C-9, C-10, C-15 | WP-3, WP-8, WP-11 | A-6, A-7, A-8, A-13, A-14, A-15, A-18, A-19, A-20, A-21 |
+| R-9 | must | C-1, C-9, C-10, C-15 | WP-2, WP-3, WP-8, WP-11 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-13, A-14, A-15, A-18, A-19, A-20, A-21 |
+| R-10 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20, A-21 |
+| R-11 | must | C-1, C-4, C-8 | WP-2, WP-9 | A-2, A-3, A-4, A-5, A-16 |
+| R-12 | must | C-4 | WP-9 | A-16 |
 | R-13 | must | C-7 | WP-5 | A-10 |
-| R-14 | must | C-12, C-13 | WP-5, WP-9 | A-10, A-16 |
+| R-14 | must | C-12, C-13 | WP-5, WP-10 | A-10, A-17 |
 | R-15 | could | C-7 | WP-5 | A-10 |
 | R-16 | must | C-1, C-6 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-17 | should | C-14 | WP-10 | A-17, A-18, A-19, A-20 |
+| R-17 | should | C-15 | WP-11 | A-18, A-19, A-20, A-21 |
 | R-18 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-19 | must | C-14 | WP-10 | A-17, A-18, A-19, A-20 |
-| R-20 | must | C-4 | WP-8 | A-15 |
-| R-21 | must | C-4 | WP-8 | A-15 |
+| R-19 | must | C-15 | WP-11 | A-18, A-19, A-20, A-21 |
+| R-20 | must | C-4 | WP-9 | A-16 |
+| R-21 | must | C-4 | WP-9 | A-16 |
 
 ## Conventions
 

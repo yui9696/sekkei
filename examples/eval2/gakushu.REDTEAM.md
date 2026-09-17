@@ -1,0 +1,13 @@
+# Red-team report (engine self-audit)
+
+2 finding(s) from 19 engine runs: 0 high, 1 medium, 1 info.
+
+## medium
+
+- **RT07** [R-3] no catalogue pattern recognised this sentence; it was placed by the engine's fallback
+  - evidence: Employees can take tests. Employees can view explanations grades immediately.
+
+## info
+
+- **RT01** [R-14] deleting this constraint changes nothing: it coincides with what the engine assumes by default (still worth stating)
+  - evidence: Employees authenticate internal SSO OIDC. Containers existing ingress behind.

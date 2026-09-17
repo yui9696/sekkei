@@ -888,15 +888,15 @@
           "description": "from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
         },
         {
-          "name": "delete_engine",
+          "name": "delete_job",
           "inputs": [
             {
-              "name": "engine",
-              "type": "Engine | id",
+              "name": "job",
+              "type": "Job | id",
               "description": ""
             }
           ],
-          "output": "Engine | None",
+          "output": "Job | None",
           "errors": [
             "ValidationError",
             "NotFound"

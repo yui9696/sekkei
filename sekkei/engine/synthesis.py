@@ -35,6 +35,7 @@ CONSUMERS: dict[str, list[str]] = {
     "files": ["core"],
     "exporter": ["surface_api", "cli", "batch"],
     "bus": ["push", "core"],
+    "verifier": ["core"],
     "payments": ["core"],
     "model": ["core"],
     "audit": ["core"],
@@ -184,9 +185,7 @@ def _active_archetypes(an: Analysis) -> tuple[list[str], list[str], dict[str, li
                 active.setdefault(a, None)
                 reasons.setdefault(a, []).append(f"tactic:{t.quality}")
     generic: list[str] = []
-    human = {"staff", "manager", "managers", "grower", "owner", "owners", "member", "members", "employee", "employees",
-             "customer", "customers", "user", "users", "admin", "admins", "administrator", "operator", "operators",
-             "visitor", "visitors", "client", "clients", "subscriber", "subscribers", "anyone", "people", "developer", "developers"}
+    human = T.HUMAN_ACTORS
     if "mqtt_ingest" in an.patterns and "ingest_api" in active and not re.search(r"\bhttp\b|\brest\b|\bapi\b", " ".join(s.lower for s in an.sentences if not s.assumed)):
         del active["ingest_api"]  # devices publish over MQTT; an HTTP ingest surface would be redundant
     if pats and not any(a in active for a in _HUMAN_SURFACES) \
@@ -247,13 +246,21 @@ def _is_object(w: str) -> bool:
 
 def _object_after(verb: str, sentence: T.Sentence) -> str:
     """The noun that follows a verb ('rotate the signing secret' -> 'secret'); else the nearest noun before it."""
-    words = sentence.words
+    # punctuation kept as tokens so that a parenthesis or a comma ends a noun run:
+    # "create an application (amount, term)" -> application, not amount
+    words = [w.rstrip(".-") for w in re.findall(r"[a-zA-Z][a-zA-Z0-9_.-]*|[(),;:]", sentence.text.lower())]
     for i, w in enumerate(words):
         if T.verb_of(w) == verb:
             # forward: the head of the first noun run after the verb ("add stock items" -> "items");
             # verbs and fillers before the run are skipped, the run is at most two tokens long
             run: list[str] = []
             for w2 in words[i + 1: i + 7]:
+                if w2 in "(),;:":
+                    if run:
+                        break
+                    if w2 == "(":
+                        break
+                    continue
                 if _is_object(w2):
                     run.append(w2)
                     if len(run) == 2:

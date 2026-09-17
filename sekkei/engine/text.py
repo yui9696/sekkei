@@ -39,7 +39,21 @@ ACTORS = (
     "ops", "developer", "developers", "internal service", "internal services", "service", "services",
     "client", "clients", "team", "system", "subscriber", "subscribers", "tenant", "tenants",
     "engineer", "engineers", "analyst", "analysts", "agent", "agents", "visitor", "visitors", "we",
+    "applicant", "applicants", "borrower", "borrowers", "underwriter", "underwriters", "senior underwriter", "auditor", "auditors",
+    "regulator", "regulators", "accountant", "accountants", "recruiter", "recruiters", "candidate", "candidates", "contractor", "contractors",
+    "supplier", "suppliers", "vendor", "vendors", "partner", "partners", "physician", "physicians", "pharmacist", "pharmacists",
+    "parent", "parents", "coach", "coaches", "instructor", "instructors", "attendee", "attendees", "organiser", "organisers", "organizer", "organizers",
+    "participant", "participants", "volunteer", "volunteers", "donor", "donors", "resident", "residents", "landlord", "landlords",
+    "technician", "technicians", "inspector", "inspectors", "dispatcher", "dispatchers", "courier", "couriers", "farmer", "farmers",
+    "retailer", "retailers", "wholesaler", "wholesalers", "broker", "brokers", "advisor", "advisors", "adviser", "advisers", "trader", "traders",
+    "finance staff", "sales staff", "support staff", "support agent", "support agents", "moderator", "moderators", "publisher", "publishers",
 )
+
+#: actors that are people (a person's use case needs a surface: an API, a UI or a CLI)
+HUMAN_ACTORS = frozenset(a for a in ACTORS if a not in (
+    "tool", "command", "program", "script", "application", "app", "controller", "device", "bot", "job", "truck", "trucks",
+    "vehicle", "vehicles", "internal service", "internal services", "service", "services", "system", "we", "team",
+))
 
 # verb -> (http method, interface verb)
 VERBS = {

@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "summary": "Trucks send sensor readings to a central service that keeps the fleet manager informed.",
   "goals": [
-    "Producers hand events to the system, which persists them before acknowledging.",
     "The system notifies people through an external channel.",
     "Callers are authenticated and authorized.",
     "Scheduled jobs process stored records in windows.",
@@ -1018,15 +1017,15 @@
           "description": "from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
         },
         {
-          "name": "delete_engine",
+          "name": "delete_job",
           "inputs": [
             {
-              "name": "engine",
-              "type": "Engine | id",
+              "name": "job",
+              "type": "Job | id",
               "description": ""
             }
           ],
-          "output": "Engine | None",
+          "output": "Job | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1500,6 +1499,76 @@
   "entities": [
     {
       "id": "E-1",
+      "name": "Principal",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "kind",
+          "type": "enum(customer, operator, service)",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "scopes",
+          "type": "list[str]",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-2",
+      "name": "JobRun",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "job",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_start",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "window_end",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "report",
+          "type": "json",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "id": "E-3",
       "name": "Event",
       "owner": "C-1",
       "fields": [
@@ -1537,7 +1606,7 @@
       "description": ""
     },
     {
-      "id": "E-2",
+      "id": "E-4",
       "name": "WorkItem",
       "owner": "C-2",
       "fields": [
@@ -1574,76 +1643,6 @@
         {
           "name": "leased_until",
           "type": "timestamp | null",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": ""
-    },
-    {
-      "id": "E-3",
-      "name": "Principal",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "kind",
-          "type": "enum(customer, operator, service)",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "scopes",
-          "type": "list[str]",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": ""
-    },
-    {
-      "id": "E-4",
-      "name": "JobRun",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "job",
-          "type": "str",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "window_start",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "window_end",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "status",
-          "type": "enum",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "report",
-          "type": "json",
           "constraints": "",
           "description": ""
         }
@@ -1739,59 +1738,45 @@
   "decisions": [
     {
       "id": "D-1",
-      "title": "Work queue technology",
-      "context": "Work items must survive a crash and be leased by several workers.",
+      "title": "Caller authentication",
+      "context": "Management operations must be attributable to a customer or operator.",
       "options": [
         {
-          "name": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
+          "name": "API keys per customer, hashed at rest, sent as a bearer token",
           "pros": [
-            "transactional with the domain data (persist + enqueue atomically)",
-            "no new infrastructure",
-            "easy to inspect"
+            "simple",
+            "scriptable"
           ],
           "cons": [
-            "throughput bounded by the database (fine to ~10k items/s)",
-            "needs a vacuum-friendly schema"
+            "no delegation or expiry unless added"
           ]
         },
         {
-          "name": "Redis Streams with consumer groups",
+          "name": "OAuth2 / OIDC with the platform's identity provider",
           "pros": [
-            "high throughput",
-            "built-in consumer groups and pending lists"
+            "single sign-on",
+            "expiry and scopes"
           ],
           "cons": [
-            "durability depends on AOF/fsync configuration",
-            "separate from the transactional store: needs an outbox"
+            "integration effort"
           ]
         },
         {
-          "name": "Managed broker (SQS/RabbitMQ/Kafka)",
+          "name": "Mutual TLS",
           "pros": [
-            "scales independently",
-            "delayed delivery built in (SQS)"
+            "strong",
+            "no secrets in headers"
           ],
           "cons": [
-            "new infrastructure and cost",
-            "at-least-once semantics still need an outbox"
-          ]
-        },
-        {
-          "name": "In-memory queue",
-          "pros": [
-            "simplest possible"
-          ],
-          "cons": [
-            "work is lost on crash",
-            "single process only"
+            "certificate lifecycle for every customer"
           ]
         }
       ],
-      "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
-      "consequences": "",
+      "choice": "OAuth2 / OIDC with the platform's identity provider",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints",
+      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
-        "C-2"
+        "C-10"
       ],
       "status": "accepted"
     },
@@ -1853,50 +1838,6 @@
     },
     {
       "id": "D-3",
-      "title": "Caller authentication",
-      "context": "Management operations must be attributable to a customer or operator.",
-      "options": [
-        {
-          "name": "API keys per customer, hashed at rest, sent as a bearer token",
-          "pros": [
-            "simple",
-            "scriptable"
-          ],
-          "cons": [
-            "no delegation or expiry unless added"
-          ]
-        },
-        {
-          "name": "OAuth2 / OIDC with the platform's identity provider",
-          "pros": [
-            "single sign-on",
-            "expiry and scopes"
-          ],
-          "cons": [
-            "integration effort"
-          ]
-        },
-        {
-          "name": "Mutual TLS",
-          "pros": [
-            "strong",
-            "no secrets in headers"
-          ],
-          "cons": [
-            "certificate lifecycle for every customer"
-          ]
-        }
-      ],
-      "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints",
-      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
-      "affects": [
-        "C-10"
-      ],
-      "status": "accepted"
-    },
-    {
-      "id": "D-4",
       "title": "Process topology",
       "context": "The same code base serves requests and performs background work.",
       "options": [
@@ -1938,6 +1879,64 @@
       "affects": [
         "C-14",
         "C-12"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-4",
+      "title": "Work queue technology",
+      "context": "Work items must survive a crash and be leased by several workers.",
+      "options": [
+        {
+          "name": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
+          "pros": [
+            "transactional with the domain data (persist + enqueue atomically)",
+            "no new infrastructure",
+            "easy to inspect"
+          ],
+          "cons": [
+            "throughput bounded by the database (fine to ~10k items/s)",
+            "needs a vacuum-friendly schema"
+          ]
+        },
+        {
+          "name": "Redis Streams with consumer groups",
+          "pros": [
+            "high throughput",
+            "built-in consumer groups and pending lists"
+          ],
+          "cons": [
+            "durability depends on AOF/fsync configuration",
+            "separate from the transactional store: needs an outbox"
+          ]
+        },
+        {
+          "name": "Managed broker (SQS/RabbitMQ/Kafka)",
+          "pros": [
+            "scales independently",
+            "delayed delivery built in (SQS)"
+          ],
+          "cons": [
+            "new infrastructure and cost",
+            "at-least-once semantics still need an outbox"
+          ]
+        },
+        {
+          "name": "In-memory queue",
+          "pros": [
+            "simplest possible"
+          ],
+          "cons": [
+            "work is lost on crash",
+            "single process only"
+          ]
+        }
+      ],
+      "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
+      "consequences": "",
+      "affects": [
+        "C-2"
       ],
       "status": "accepted"
     },
@@ -2296,16 +2295,6 @@
   "risks": [
     {
       "id": "K-1",
-      "description": "Payloads or uploads without size limits exhaust memory or disk.",
-      "likelihood": "medium",
-      "impact": "medium",
-      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
-      "affects": [
-        "C-14"
-      ]
-    },
-    {
-      "id": "K-2",
       "description": "A widespread failure disables many targets and emails every owner at once.",
       "likelihood": "low",
       "impact": "medium",
@@ -2315,7 +2304,7 @@
       ]
     },
     {
-      "id": "K-3",
+      "id": "K-2",
       "description": "A management operation reachable without authentication.",
       "likelihood": "low",
       "impact": "high",
@@ -2325,7 +2314,7 @@
       ]
     },
     {
-      "id": "K-4",
+      "id": "K-3",
       "description": "Entities evolve; migrations run against live data.",
       "likelihood": "medium",
       "impact": "medium",
@@ -2335,7 +2324,7 @@
       ]
     },
     {
-      "id": "K-5",
+      "id": "K-4",
       "description": "At-least-once delivery means a target can receive the same event twice (crash between call and ack).",
       "likelihood": "high",
       "impact": "medium",
@@ -2345,13 +2334,23 @@
       ]
     },
     {
-      "id": "K-6",
+      "id": "K-5",
       "description": "Retried and dead-lettered items accumulate and slow the lease query.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Partial index on (partition, not_before) for live items; archive terminal items on a schedule.",
       "affects": [
         "C-2"
+      ]
+    },
+    {
+      "id": "K-6",
+      "description": "Payloads or uploads without size limits exhaust memory or disk.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
+      "affects": [
+        "C-14"
       ]
     },
     {
@@ -2681,7 +2680,7 @@
           "metric": ""
         }
       ],
-      "notes": "family: event_ingest"
+      "notes": "family: mqtt_ingest"
     },
     {
       "id": "WP-6",

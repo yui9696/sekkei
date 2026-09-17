@@ -1,32 +1,35 @@
 {
   "sekkei": "1",
-  "name": "internal-document-search-with-summaries",
+  "name": "internal-manage-system",
   "version": "0.1.0",
-  "summary": "Employees must find internal documents quickly and get a short summary without opening them.",
+  "summary": "Employees can take video courses.",
   "goals": [
     "Clients read and write domain resources over HTTP.",
     "The system notifies people through an external channel.",
+    "Metrics, structured logs and health endpoints for operations.",
     "Callers are authenticated and authorized.",
-    "Request budgets per caller.",
-    "Hot reads are cached.",
     "Users search and filter records.",
     "Files are uploaded, stored and served.",
-    "Scheduled jobs process stored records in windows.",
-    "Predictions are served from a versioned model.",
-    "Records are searched by meaning through embeddings.",
-    "Figures are aggregated over history for people to read."
+    "Changes are recorded append-only with the actor.",
+    "Records move in and out as files.",
+    "Large media files are stored once and played by many.",
+    "Users work in several languages and locales."
   ],
-  "non_goals": [],
+  "non_goals": [
+    "Videos existing service.",
+    "Outside learners external."
+  ],
   "conventions": {
-    "language": "python",
-    "test_command": "python -m pytest -q",
-    "lint_command": "ruff check .",
+    "language": "typescript",
+    "test_command": "npx vitest run",
+    "lint_command": "npx eslint .",
     "rules": [
-      "Type hints on every public function; dataclasses or pydantic for records.",
-      "No business logic in the HTTP layer.",
+      "strict TypeScript; no `any` in exported signatures.",
+      "No business logic in route handlers.",
+      "Every component logs one structured line per unit of work with the correlation id.",
       "No in-process state that a second instance would not see; instances are interchangeable.",
       "Prefer the boring option; a new piece of infrastructure needs a decision record.",
-      "Python 3.12 as stated in the constraints.",
+      "Node 20 as stated in the constraints.",
       "Stateless processes: configuration from the environment, no local files that a second instance would not see."
     ],
     "definition_of_done": [
@@ -38,111 +41,126 @@
   "requirements": [
     {
       "id": "R-1",
-      "statement": "Employees must find internal documents quickly and get a short summary without opening them.",
+      "statement": "Admins can create, publish and unpublish courses videos files tests.",
       "kind": "functional",
       "priority": "must",
-      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+      "rationale": "source (ja): 管理者は講座(タイトル、説明、動画ファイル、確認テスト)を作成・公開・非公開にできる。"
     },
     {
       "id": "R-2",
-      "statement": "Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team.",
+      "statement": "Employees can search and take courses. Employees can save and resume playback position videos later.",
       "kind": "functional",
-      "priority": "must",
-      "rationale": ""
+      "priority": "could",
+      "rationale": "source (ja): 社員は講座を検索して受講し、動画の視聴位置を保存して後で再開できる。"
     },
     {
       "id": "R-3",
-      "statement": "The system extracts the text, splits it into chunks, computes embeddings and indexes them for semantic search.",
+      "statement": "Employees can take tests. Employees can view explanations grades immediately.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes); source (ja): 社員は確認テストを受験し、採点結果と解説を即時に閲覧できる。"
     },
     {
       "id": "R-4",
-      "statement": "Employees search with a natural-language query and get the ten best passages with links to the documents.",
+      "statement": "Managers can list and view grades their reports progress. Managers can export CSV.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): 上長は部下の受講状況と成績を一覧で閲覧し、CSV でエクスポートできる。"
     },
     {
       "id": "R-5",
-      "statement": "For each result the system generates a three-sentence summary with an LLM and caches it.",
+      "statement": "The system must notify deadline 3 days before not yet taken employees email.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): 受講期限の 3 日前に未受講の社員へメールで通知する。"
     },
     {
       "id": "R-6",
-      "statement": "Team leads can delete documents; deleted documents disappear from search results within one minute.",
+      "statement": "Courses completions grades audit for 5 years retention.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): 講座の受講完了と成績は監査のため 5 年間保持する。"
     },
     {
       "id": "R-7",
-      "statement": "Every search query is logged with the employee id for usage reporting; a weekly report is emailed to the knowledge team.",
+      "statement": "The system must view pages email employees locale items.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): 画面とメールは社員のロケール(日本語・英語)で表示する。"
     },
     {
       "id": "R-8",
-      "statement": "Search returns within 800 ms p95 for a corpus of 50,000 documents.",
+      "statement": "Videos files up to 2 GB. The system must complete upload within 10 min.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
-        "name": "p95 latency at 50,000",
-        "target": "<= 800 ms",
-        "unit": "ms"
+        "name": "latency at 2 GB",
+        "target": "<= 10 min",
+        "unit": "min"
       },
-      "rationale": ""
+      "rationale": "source (ja): 動画ファイルは最大 2GB。アップロードは 10 分以内に完了すること。"
     },
     {
       "id": "R-9",
-      "statement": "Embedding and summary generation must not block uploads; an upload is acknowledged within 1 s.",
+      "statement": "The system must view videos concurrently 2000 users playback must not stall.",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "latency",
-        "target": "<= 1 s",
-        "unit": "s"
+        "name": "number of users",
+        "target": "2000 users",
+        "unit": "users"
       },
-      "rationale": ""
+      "rationale": "source (ja): 同時に 2,000 人が動画を視聴しても再生が途切れないこと。"
     },
     {
       "id": "R-10",
-      "statement": "Documents are visible only to members of the tagged team.",
-      "kind": "functional",
+      "statement": "The system must respond courses list within 300 ms p95.",
+      "kind": "nonfunctional",
       "priority": "must",
-      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+      "metric": {
+        "name": "p95 latency",
+        "target": "<= 300 ms",
+        "unit": "ms"
+      },
+      "rationale": "source (ja): 講座一覧は 300ms 以内(p95)に応答すること。"
     },
     {
       "id": "R-11",
-      "statement": "Python 3.12, PostgreSQL with pgvector available, S3-compatible object storage available. Team of 3.",
-      "kind": "constraint",
+      "statement": "Grades must never be lost. Grades must not record double-applied.",
+      "kind": "nonfunctional",
       "priority": "must",
-      "rationale": ""
+      "metric": {
+        "name": "records lost across a process crash",
+        "target": "= 0",
+        "unit": "records"
+      },
+      "rationale": "source (ja): 成績は失われてはならず、二重に記録されてはならない。"
     },
     {
       "id": "R-12",
-      "statement": "Embeddings and summaries come from an external API with a rate limit of 60 requests per minute.",
-      "kind": "constraint",
+      "statement": "Monthly availability at least 99.9 %. The system must export Prometheus for metrics.",
+      "kind": "nonfunctional",
       "priority": "must",
-      "rationale": ""
+      "metric": {
+        "name": "ratio",
+        "target": ">= 99.9 %",
+        "unit": "%"
+      },
+      "rationale": "source (ja): 月間稼働率 99.9% 以上。Prometheus 向けメトリクスを出力する。"
     },
     {
       "id": "R-13",
-      "statement": "Employees authenticate through the company SSO (OIDC).",
+      "statement": "The system can use object storage TypeScript Node 20 PostgreSQL S3. Team of 4.",
       "kind": "constraint",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): TypeScript(Node 20)、PostgreSQL、S3 互換のオブジェクトストレージを利用可能。チームは 4 名。"
     },
     {
       "id": "R-14",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
-      "kind": "functional",
+      "statement": "Employees authenticate internal SSO OIDC. Containers existing ingress behind.",
+      "kind": "constraint",
       "priority": "must",
-      "rationale": "assumed by the engine; confirm or override"
+      "rationale": "source (ja): 社員の認証は社内 SSO(OIDC)。コンテナで既存のイングレスの背後に配置する。"
     },
     {
       "id": "R-15",
@@ -153,13 +171,13 @@
     },
     {
       "id": "R-16",
-      "statement": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
+      "statement": "The system sustains 20 requests/s with peaks of 200 requests/s (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "must",
+      "priority": "should",
       "metric": {
-        "name": "ratio",
-        "target": "99.9 %",
-        "unit": "%"
+        "name": "sustained rate",
+        "target": "20 requests /s",
+        "unit": "requests /s"
       },
       "rationale": "assumed by the engine; confirm or override"
     },
@@ -189,21 +207,26 @@
     },
     {
       "id": "R-19",
-      "statement": "Deployed as stateless containers behind an ingress (assumed by the engine).",
-      "kind": "constraint",
-      "priority": "must",
+      "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "should",
+      "metric": {
+        "name": "ratio at 5 minutes, 10 minutes",
+        "target": "1 %",
+        "unit": "%"
+      },
       "rationale": "assumed by the engine; confirm or override"
     },
     {
       "id": "R-20",
-      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
+      "statement": "No existing data or system to migrate from (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
       "id": "R-21",
-      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -215,12 +238,12 @@
       "name": "Store",
       "responsibility": "Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
       "kind": "datastore",
-      "path": "app/store.py",
+      "path": "src/store.ts",
       "requires": [],
       "satisfies": [
         "R-9",
         "R-11",
-        "R-16",
+        "R-13",
         "R-18"
       ],
       "tags": [
@@ -236,6 +259,7 @@
       "path": "",
       "requires": [],
       "satisfies": [
+        "R-5",
         "R-7"
       ],
       "tags": [
@@ -248,9 +272,10 @@
       "name": "File storage",
       "responsibility": "Stores and serves uploaded files/blobs with content-type and size limits.",
       "kind": "datastore",
-      "path": "app/files.py",
+      "path": "src/files.ts",
       "requires": [],
       "satisfies": [
+        "R-1",
         "R-2"
       ],
       "tags": [
@@ -260,26 +285,54 @@
     },
     {
       "id": "C-4",
+      "name": "Audit log",
+      "responsibility": "Append-only record of who did what to which resource, queryable by resource and actor.",
+      "kind": "datastore",
+      "path": "src/audit.ts",
+      "requires": [],
+      "satisfies": [
+        "R-6"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:audit"
+      ]
+    },
+    {
+      "id": "C-5",
+      "name": "CDN",
+      "responsibility": "Edge cache in front of the object store; serves media by signed, expiring URLs.",
+      "kind": "external",
+      "path": "",
+      "requires": [],
+      "satisfies": [
+        "R-1",
+        "R-2"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:cdn"
+      ]
+    },
+    {
+      "id": "C-6",
       "name": "Domain core",
       "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
       "kind": "module",
-      "path": "app/core.py",
+      "path": "src/core.ts",
       "requires": [
         "I-1",
-        "I-6",
-        "I-9",
+        "I-8",
         "I-3",
-        "I-11",
-        "I-5"
+        "I-4",
+        "I-7"
       ],
       "satisfies": [
-        "R-1",
-        "R-10",
-        "R-2",
         "R-3",
-        "R-5",
+        "R-4",
+        "R-9",
         "R-11",
-        "R-12",
+        "R-13",
         "R-20",
         "R-21"
       ],
@@ -289,16 +342,17 @@
       ]
     },
     {
-      "id": "C-5",
+      "id": "C-7",
       "name": "Notifier",
       "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "kind": "module",
-      "path": "app/notifier.py",
+      "path": "src/notifier.ts",
       "requires": [
         "I-2",
-        "I-6"
+        "I-8"
       ],
       "satisfies": [
+        "R-5",
         "R-7"
       ],
       "tags": [
@@ -307,14 +361,15 @@
       ]
     },
     {
-      "id": "C-6",
+      "id": "C-8",
       "name": "Observability",
       "responsibility": "Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "kind": "module",
-      "path": "app/observability.py",
+      "path": "src/observability.ts",
       "requires": [],
       "satisfies": [
-        "R-16"
+        "R-12",
+        "R-19"
       ],
       "tags": [
         "layer:1",
@@ -322,16 +377,16 @@
       ]
     },
     {
-      "id": "C-7",
+      "id": "C-9",
       "name": "Authentication",
       "responsibility": "Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
       "kind": "module",
-      "path": "app/auth.py",
+      "path": "src/auth.ts",
       "requires": [
         "I-1"
       ],
       "satisfies": [
-        "R-13",
+        "R-14",
         "R-15"
       ],
       "tags": [
@@ -340,53 +395,19 @@
       ]
     },
     {
-      "id": "C-8",
-      "name": "Rate limiter",
-      "responsibility": "Per-principal or per-key request budgets with a sliding window.",
-      "kind": "module",
-      "path": "app/ratelimit.py",
-      "requires": [],
-      "satisfies": [
-        "R-11"
-      ],
-      "tags": [
-        "layer:1",
-        "archetype:ratelimit"
-      ]
-    },
-    {
-      "id": "C-9",
-      "name": "Cache",
-      "responsibility": "Read-through cache with TTL and explicit invalidation.",
-      "kind": "module",
-      "path": "app/cache.py",
-      "requires": [],
-      "satisfies": [
-        "R-5",
-        "R-8",
-        "R-9"
-      ],
-      "tags": [
-        "layer:1",
-        "archetype:cache"
-      ]
-    },
-    {
       "id": "C-10",
       "name": "Search index",
       "responsibility": "Full-text and filtered queries over the indexed entities.",
       "kind": "module",
-      "path": "app/search.py",
+      "path": "src/search.ts",
       "requires": [
         "I-1"
       ],
       "satisfies": [
-        "R-3",
-        "R-4",
-        "R-6",
-        "R-7",
+        "R-2",
         "R-8",
-        "R-9"
+        "R-10",
+        "R-16"
       ],
       "tags": [
         "layer:1",
@@ -395,96 +416,57 @@
     },
     {
       "id": "C-11",
-      "name": "Model server",
-      "responsibility": "Loads the model, serves predictions with batching and timeouts, versions the model.",
-      "kind": "service",
-      "path": "app/model.py",
-      "requires": [],
-      "satisfies": [
-        "R-3",
-        "R-5"
-      ],
-      "tags": [
-        "layer:1",
-        "archetype:model"
-      ]
-    },
-    {
-      "id": "C-12",
-      "name": "Scheduler",
-      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
-      "kind": "job",
-      "path": "app/scheduler.py",
+      "name": "Import/export",
+      "responsibility": "Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "kind": "module",
+      "path": "src/exporter.ts",
       "requires": [
         "I-6"
       ],
       "satisfies": [
-        "R-7",
-        "R-14"
+        "R-4"
       ],
       "tags": [
-        "layer:2",
-        "archetype:scheduler"
+        "layer:1",
+        "archetype:exporter"
       ]
     },
     {
-      "id": "C-13",
-      "name": "Batch job",
-      "responsibility": "Scheduled processing over stored records: extract, transform, aggregate, write results.",
-      "kind": "job",
-      "path": "app/batch.py",
-      "requires": [
-        "I-1",
-        "I-12",
-        "I-6",
-        "I-4"
-      ],
-      "satisfies": [
-        "R-7",
-        "R-14"
-      ],
-      "tags": [
-        "layer:2",
-        "archetype:batch"
-      ]
-    },
-    {
-      "id": "C-14",
-      "name": "Reporting",
-      "responsibility": "Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.",
-      "kind": "job",
-      "path": "app/reporting.py",
-      "requires": [
-        "I-1"
-      ],
+      "id": "C-12",
+      "name": "Localisation",
+      "responsibility": "Resolves locale, timezone and currency per request; formats messages, dates and amounts from message catalogues.",
+      "kind": "module",
+      "path": "src/i18n.ts",
+      "requires": [],
       "satisfies": [
         "R-7"
       ],
       "tags": [
-        "layer:2",
-        "archetype:reporting"
+        "layer:1",
+        "archetype:i18n"
       ]
     },
     {
-      "id": "C-15",
+      "id": "C-13",
       "name": "Public HTTP API",
       "responsibility": "Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "kind": "service",
-      "path": "app/surface_api.py",
+      "path": "src/surface_api.ts",
       "requires": [
-        "I-4",
         "I-6",
-        "I-7",
         "I-8",
-        "I-10"
+        "I-9",
+        "I-10",
+        "I-11"
       ],
       "satisfies": [
-        "R-1",
-        "R-10",
+        "R-3",
         "R-8",
         "R-9",
-        "R-17",
-        "R-19"
+        "R-10",
+        "R-14",
+        "R-16",
+        "R-17"
       ],
       "tags": [
         "layer:3",
@@ -652,7 +634,7 @@
           ],
           "output": "FileRef",
           "errors": [],
-          "pre": "stated values: 20 MB (R-2)",
+          "pre": "",
           "post": "",
           "description": ""
         },
@@ -677,360 +659,264 @@
     },
     {
       "id": "I-4",
-      "name": "Domain core interface",
+      "name": "Audit log interface",
       "owner": "C-4",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "append",
+          "inputs": [
+            {
+              "name": "actor",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "resource",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "details",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "query",
+          "inputs": [
+            {
+              "name": "resource",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "actor",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "entries",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Audit log. "
+    },
+    {
+      "id": "I-5",
+      "name": "CDN interface",
+      "owner": "C-5",
+      "kind": "http",
+      "operations": [
+        {
+          "name": "GET <signed url>",
+          "inputs": [],
+          "output": "bytes with range support",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by CDN. External; contract is theirs."
+    },
+    {
+      "id": "I-6",
+      "name": "Domain core interface",
+      "owner": "C-6",
       "kind": "module",
       "operations": [
         {
-          "name": "get_summary",
+          "name": "create_courses",
           "inputs": [
             {
-              "name": "summary",
-              "type": "Summary | id",
+              "name": "courses",
+              "type": "Courses | id",
               "description": ""
             }
           ],
-          "output": "Summary | None",
+          "output": "Courses | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
+          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
         },
         {
-          "name": "open_summary",
+          "name": "publish_courses",
           "inputs": [
             {
-              "name": "summary",
-              "type": "Summary | id",
+              "name": "courses",
+              "type": "Courses | id",
               "description": ""
             }
           ],
-          "output": "Summary | None",
+          "output": "Courses | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
+          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
         },
         {
-          "name": "upload_pdf",
+          "name": "search_courses",
           "inputs": [
             {
-              "name": "pdf",
-              "type": "Pdf | id",
+              "name": "courses",
+              "type": "Courses | id",
               "description": ""
             }
           ],
-          "output": "Pdf | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 20 MB (R-2)",
-          "post": "",
-          "description": "from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team."
-        },
-        {
-          "name": "tag_team",
-          "inputs": [
-            {
-              "name": "team",
-              "type": "Team | id",
-              "description": ""
-            }
-          ],
-          "output": "Team | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 20 MB (R-2)",
-          "post": "",
-          "description": "from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team."
-        },
-        {
-          "name": "extract_text",
-          "inputs": [
-            {
-              "name": "text",
-              "type": "Text | id",
-              "description": ""
-            }
-          ],
-          "output": "Text | None",
+          "output": "Courses | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "split_chunks",
+          "name": "save_playback",
           "inputs": [
             {
-              "name": "chunks",
-              "type": "Chunks | id",
+              "name": "playback",
+              "type": "Playback | id",
               "description": ""
             }
           ],
-          "output": "Chunks | None",
+          "output": "Playback | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "compute_embeddings",
+          "name": "get_grades",
           "inputs": [
             {
-              "name": "embeddings",
-              "type": "Embeddings | id",
+              "name": "grades",
+              "type": "Grades | id",
               "description": ""
             }
           ],
-          "output": "Embeddings | None",
+          "output": "Grades | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
+          "description": "from R-3: Employees can take tests. Employees can view explanations grades immediately."
         },
         {
-          "name": "index_semantic",
+          "name": "list_grades",
           "inputs": [
             {
-              "name": "semantic",
-              "type": "Semantic | id",
+              "name": "grades",
+              "type": "Grades | id",
               "description": ""
             }
           ],
-          "output": "Semantic | None",
+          "output": "Grades | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
+          "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
         },
         {
-          "name": "search_semantic",
+          "name": "export_managers",
           "inputs": [
             {
-              "name": "semantic",
-              "type": "Semantic | id",
+              "name": "managers",
+              "type": "Managers | id",
               "description": ""
             }
           ],
-          "output": "Semantic | None",
+          "output": "Managers | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
+          "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
         },
         {
-          "name": "search_natural-language",
+          "name": "notify_deadline",
           "inputs": [
             {
-              "name": "natural-language",
-              "type": "Natural-language | id",
+              "name": "deadline",
+              "type": "Deadline | id",
               "description": ""
             }
           ],
-          "output": "Natural-language | None",
+          "output": "Deadline | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 3 days (R-5)",
+          "post": "",
+          "description": "from R-5: The system must notify deadline 3 days before not yet taken employees email."
+        },
+        {
+          "name": "get_email",
+          "inputs": [
+            {
+              "name": "email",
+              "type": "Email | id",
+              "description": ""
+            }
+          ],
+          "output": "Email | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
-        },
-        {
-          "name": "query_passages",
-          "inputs": [
-            {
-              "name": "passages",
-              "type": "Passages | id",
-              "description": ""
-            }
-          ],
-          "output": "Passages | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
-        },
-        {
-          "name": "get_passages",
-          "inputs": [
-            {
-              "name": "passages",
-              "type": "Passages | id",
-              "description": ""
-            }
-          ],
-          "output": "Passages | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
-        },
-        {
-          "name": "generate_summary",
-          "inputs": [
-            {
-              "name": "summary",
-              "type": "Summary | id",
-              "description": ""
-            }
-          ],
-          "output": "Summary | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-5: For each result the system generates a three-sentence summary with an LLM and caches it."
-        },
-        {
-          "name": "delete_documents",
-          "inputs": [
-            {
-              "name": "documents",
-              "type": "Documents | id",
-              "description": ""
-            }
-          ],
-          "output": "Documents | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
-        },
-        {
-          "name": "search_results",
-          "inputs": [
-            {
-              "name": "results",
-              "type": "Results | id",
-              "description": ""
-            }
-          ],
-          "output": "Results | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
-        },
-        {
-          "name": "search_employee",
-          "inputs": [
-            {
-              "name": "employee",
-              "type": "Employee | id",
-              "description": ""
-            }
-          ],
-          "output": "Employee | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is"
-        },
-        {
-          "name": "query_employee",
-          "inputs": [
-            {
-              "name": "employee",
-              "type": "Employee | id",
-              "description": ""
-            }
-          ],
-          "output": "Employee | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is"
-        },
-        {
-          "name": "record_audit",
-          "inputs": [
-            {
-              "name": "audit",
-              "type": "Audit | id",
-              "description": ""
-            }
-          ],
-          "output": "Audit | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
-          "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
-        },
-        {
-          "name": "delete_job",
-          "inputs": [
-            {
-              "name": "job",
-              "type": "Job | id",
-              "description": ""
-            }
-          ],
-          "output": "Job | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
-          "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-7: The system must view pages email employees locale items."
         }
       ],
       "stability": "draft",
       "description": "Provided by Domain core. "
     },
     {
-      "id": "I-5",
+      "id": "I-7",
       "name": "Notifier interface",
-      "owner": "C-5",
+      "owner": "C-7",
       "kind": "module",
       "operations": [
         {
@@ -1065,9 +951,9 @@
       "description": "Provided by Notifier. "
     },
     {
-      "id": "I-6",
+      "id": "I-8",
       "name": "Observability interface",
-      "owner": "C-6",
+      "owner": "C-8",
       "kind": "module",
       "operations": [
         {
@@ -1173,9 +1059,9 @@
       "description": "Provided by Observability. "
     },
     {
-      "id": "I-7",
+      "id": "I-9",
       "name": "Authentication interface",
-      "owner": "C-7",
+      "owner": "C-9",
       "kind": "module",
       "operations": [
         {
@@ -1225,86 +1111,6 @@
       ],
       "stability": "draft",
       "description": "Provided by Authentication. "
-    },
-    {
-      "id": "I-8",
-      "name": "Rate limiter interface",
-      "owner": "C-8",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "check",
-          "inputs": [
-            {
-              "name": "key",
-              "type": "str",
-              "description": ""
-            },
-            {
-              "name": "cost",
-              "type": "int",
-              "description": ""
-            }
-          ],
-          "output": "Decision(allowed, retry_after)",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Rate limiter. "
-    },
-    {
-      "id": "I-9",
-      "name": "Cache interface",
-      "owner": "C-9",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "get_or_load",
-          "inputs": [
-            {
-              "name": "key",
-              "type": "str",
-              "description": ""
-            },
-            {
-              "name": "loader",
-              "type": "callable",
-              "description": ""
-            },
-            {
-              "name": "ttl",
-              "type": "int",
-              "description": ""
-            }
-          ],
-          "output": "value",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        },
-        {
-          "name": "invalidate",
-          "inputs": [
-            {
-              "name": "key",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "None",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Cache. "
     },
     {
       "id": "I-10",
@@ -1363,203 +1169,173 @@
     },
     {
       "id": "I-11",
-      "name": "Model server interface",
+      "name": "Import/export interface",
       "owner": "C-11",
       "kind": "module",
       "operations": [
         {
-          "name": "predict",
+          "name": "export",
           "inputs": [
             {
-              "name": "inputs",
-              "type": "list",
-              "description": ""
-            },
-            {
-              "name": "model_version",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "predictions",
-          "errors": [
-            "ModelError"
-          ],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Model server. "
-    },
-    {
-      "id": "I-12",
-      "name": "Scheduler interface",
-      "owner": "C-12",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "next_attempt",
-          "inputs": [
-            {
-              "name": "attempt",
-              "type": "int",
-              "description": ""
-            },
-            {
-              "name": "retry_after",
-              "type": "timedelta | None",
-              "description": ""
-            }
-          ],
-          "output": "datetime | None",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": "None when attempts are exhausted"
-        },
-        {
-          "name": "promote_due",
-          "inputs": [
-            {
-              "name": "now",
-              "type": "datetime",
-              "description": ""
-            }
-          ],
-          "output": "int moved",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Scheduler. "
-    },
-    {
-      "id": "I-13",
-      "name": "Batch job interface",
-      "owner": "C-13",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "run",
-          "inputs": [
-            {
-              "name": "window",
-              "type": "DateRange",
-              "description": ""
-            }
-          ],
-          "output": "JobReport",
-          "errors": [
-            "JobError"
-          ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Batch job. "
-    },
-    {
-      "id": "I-14",
-      "name": "Reporting interface",
-      "owner": "C-14",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "build",
-          "inputs": [
-            {
-              "name": "report",
-              "type": "str",
-              "description": ""
-            },
-            {
-              "name": "window",
-              "type": "TimeWindow",
-              "description": ""
-            }
-          ],
-          "output": "ReportRun",
-          "errors": [],
-          "pre": "",
-          "post": "aggregates written atomically; the previous version stays readable until then",
-          "description": ""
-        },
-        {
-          "name": "read",
-          "inputs": [
-            {
-              "name": "report",
-              "type": "str",
+              "name": "entity",
+              "type": "Entity",
               "description": ""
             },
             {
               "name": "filter",
               "type": "dict",
               "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
             }
           ],
-          "output": "rows",
+          "output": "byte stream",
           "errors": [],
           "pre": "",
           "post": "",
-          "description": "serves the last completed run"
+          "description": ""
+        },
+        {
+          "name": "import_",
+          "inputs": [
+            {
+              "name": "entity",
+              "type": "Entity",
+              "description": ""
+            },
+            {
+              "name": "stream",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
+              "description": ""
+            }
+          ],
+          "output": "ImportReport with per-row errors",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
         }
       ],
       "stability": "draft",
-      "description": "Provided by Reporting. "
+      "description": "Provided by Import/export. "
     },
     {
-      "id": "I-15",
-      "name": "Public HTTP API interface",
-      "owner": "C-15",
-      "kind": "http",
+      "id": "I-12",
+      "name": "Localisation interface",
+      "owner": "C-12",
+      "kind": "module",
       "operations": [
         {
-          "name": "GET /summaries/{id}",
+          "name": "t",
           "inputs": [
             {
-              "name": "id",
+              "name": "key",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "locale",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "args",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "falls back to the default locale; missing keys are logged, never blank"
+        },
+        {
+          "name": "format",
+          "inputs": [
+            {
+              "name": "value",
+              "type": "datetime | Money",
+              "description": ""
+            },
+            {
+              "name": "locale",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "tz",
               "type": "str",
               "description": ""
             }
           ],
-          "output": "200 summary",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
+          "output": "str",
+          "errors": [],
           "pre": "",
           "post": "",
-          "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
-        },
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Localisation. "
+    },
+    {
+      "id": "I-13",
+      "name": "Public HTTP API interface",
+      "owner": "C-13",
+      "kind": "http",
+      "operations": [
         {
-          "name": "POST /pdfs",
+          "name": "POST /courses",
           "inputs": [
             {
               "name": "body",
-              "type": "pdf fields",
+              "type": "courses fields",
               "description": ""
             }
           ],
-          "output": "201 {pdf id}",
+          "output": "201 {courses id}",
           "errors": [
             "400 invalid body",
             "401 unauthenticated",
             "409 conflict"
           ],
-          "pre": "stated values: 20 MB (R-2)",
+          "pre": "",
           "post": "",
-          "description": "from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team."
+          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
         },
         {
-          "name": "POST /teams/{id}/tag",
+          "name": "GET /courses",
+          "inputs": [
+            {
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
+              "description": ""
+            }
+          ],
+          "output": "200 [courses], next cursor",
+          "errors": [
+            "401 unauthenticated"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
+        },
+        {
+          "name": "POST /playbacks/{id}/save",
           "inputs": [
             {
               "name": "id",
@@ -1567,62 +1343,18 @@
               "description": ""
             }
           ],
-          "output": "202 tag accepted",
+          "output": "202 save accepted",
           "errors": [
             "401 unauthenticated",
             "404 unknown id",
             "409 not applicable in current state"
           ],
-          "pre": "stated values: 20 MB (R-2)",
-          "post": "",
-          "description": "from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team."
-        },
-        {
-          "name": "GET /natural-languages",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [natural-language], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "GET /passages",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [passages], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
-        },
-        {
-          "name": "GET /passages/{id}",
+          "name": "GET /grades/{id}",
           "inputs": [
             {
               "name": "id",
@@ -1630,35 +1362,17 @@
               "description": ""
             }
           ],
-          "output": "200 passages",
+          "output": "200 grades",
           "errors": [
             "401 unauthenticated",
             "404 unknown id"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Employees search with a natural-language query and get the ten best passages with links to"
+          "description": "from R-3: Employees can take tests. Employees can view explanations grades immediately."
         },
         {
-          "name": "DELETE /documents/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "204",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
-        },
-        {
-          "name": "GET /results",
+          "name": "GET /grades",
           "inputs": [
             {
               "name": "filter",
@@ -1671,13 +1385,35 @@
               "description": ""
             }
           ],
-          "output": "200 [results], next cursor",
+          "output": "200 [grades], next cursor",
           "errors": [
             "401 unauthenticated"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
+          "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
+        },
+        {
+          "name": "GET /managers",
+          "inputs": [
+            {
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
+              "description": ""
+            }
+          ],
+          "output": "200 [managers], next cursor",
+          "errors": [
+            "401 unauthenticated"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
         }
       ],
       "stability": "draft",
@@ -1771,8 +1507,8 @@
     },
     {
       "id": "E-4",
-      "name": "JobRun",
-      "owner": "C-1",
+      "name": "AuditEntry",
+      "owner": "C-4",
       "fields": [
         {
           "name": "id",
@@ -1781,32 +1517,26 @@
           "description": ""
         },
         {
-          "name": "job",
+          "name": "actor",
           "type": "str",
           "constraints": "",
           "description": ""
         },
         {
-          "name": "window_start",
+          "name": "action",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "resource",
+          "type": "str",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "at",
           "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "window_end",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "status",
-          "type": "enum",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "report",
-          "type": "json",
           "constraints": "",
           "description": ""
         }
@@ -1815,51 +1545,7 @@
     },
     {
       "id": "E-5",
-      "name": "ReportRun",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "report",
-          "type": "str",
-          "constraints": "indexed",
-          "description": ""
-        },
-        {
-          "name": "window_start",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "window_end",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "completed_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "rows",
-          "type": "int",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": ""
-    },
-    {
-      "id": "E-6",
-      "name": "Document",
+      "name": "Course",
       "owner": "C-1",
       "fields": [
         {
@@ -1875,7 +1561,67 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('document'); confirm the fields."
+      "description": "Domain entity named in the requirements ('course'); confirm the fields."
+    },
+    {
+      "id": "E-6",
+      "name": "Grade",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('grade'); confirm the fields."
+    },
+    {
+      "id": "E-7",
+      "name": "Test",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('test'); confirm the fields."
+    },
+    {
+      "id": "E-8",
+      "name": "Video",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('video'); confirm the fields."
     }
   ],
   "flows": [
@@ -1885,35 +1631,16 @@
       "trigger": "client calls the API",
       "steps": [
         {
-          "from": "C-15",
-          "to": "C-4",
-          "via": "I-4",
+          "from": "C-13",
+          "to": "C-6",
+          "via": "I-6",
           "description": "validate and apply"
         },
         {
-          "from": "C-4",
+          "from": "C-6",
           "to": "C-1",
           "via": "I-1",
           "description": "read/write"
-        }
-      ]
-    },
-    {
-      "id": "F-2",
-      "name": "Run the batch job",
-      "trigger": "schedule fires",
-      "steps": [
-        {
-          "from": "C-13",
-          "to": "C-1",
-          "via": "I-1",
-          "description": "read the window of records"
-        },
-        {
-          "from": "C-13",
-          "to": "C-1",
-          "via": "I-1",
-          "description": "write results and the job report"
         }
       ]
     }
@@ -1955,10 +1682,10 @@
         }
       ],
       "choice": "REST/JSON over HTTP",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.49; gRPC: 1.33; GraphQL: 1.16",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). REST/JSON over HTTP: 1.37; gRPC: 1.25; GraphQL: 1.13",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
-        "C-15"
+        "C-13"
       ],
       "status": "accepted"
     },
@@ -2011,7 +1738,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.18; In-memory: 1.31; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; In-memory: 1.31; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
       "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
       "affects": [
         "C-1"
@@ -2055,187 +1782,141 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88. stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
-      "affects": [
-        "C-7"
-      ],
-      "status": "accepted"
-    },
-    {
-      "id": "D-4",
-      "title": "Caching",
-      "context": "Repeated reads dominate the request mix.",
-      "options": [
-        {
-          "name": "Read-through cache with TTL and explicit invalidation on write",
-          "pros": [
-            "bounded staleness"
-          ],
-          "cons": [
-            "invalidation paths to maintain"
-          ]
-        },
-        {
-          "name": "No cache; rely on database indexes",
-          "pros": [
-            "no staleness"
-          ],
-          "cons": [
-            "hot rows become the bottleneck"
-          ]
-        }
-      ],
-      "choice": "Read-through cache with TTL and explicit invalidation on write",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.49; No cache: 1.33",
-      "consequences": "Not choosing 'No cache; rely on database indexes' gives up: no staleness.",
       "affects": [
         "C-9"
       ],
       "status": "accepted"
     },
     {
-      "id": "D-5",
-      "title": "Process topology",
-      "context": "The same code base serves requests and performs background work.",
+      "id": "D-4",
+      "title": "How media reaches viewers",
+      "context": "Large files are watched by many people at once; the application must not proxy the bytes.",
       "options": [
         {
-          "name": "One image, role by flag: `api` and `worker` processes scale independently",
+          "name": "Object storage behind a CDN, signed expiring URLs, HTTP range requests; the application never streams bytes",
           "pros": [
-            "stateless containers",
-            "independent scaling of ingress and outbound work",
-            "one build"
+            "scales with viewers, not with instances",
+            "resumable playback for free"
           ],
           "cons": [
-            "two deployables to operate"
+            "CDN cost by egress",
+            "URL signing and expiry to get right"
           ]
         },
         {
-          "name": "Single process with background threads",
+          "name": "Signed URLs straight from object storage (no CDN)",
           "pros": [
-            "one deployable"
+            "simplest",
+            "cheap at low volume"
           ],
           "cons": [
-            "request latency competes with outbound work",
-            "cannot scale roles separately"
+            "latency and egress from one region",
+            "storage bandwidth caps"
           ]
         },
         {
-          "name": "Separate services per concern (ingest, admin, delivery)",
+          "name": "Application streams the file",
           "pros": [
-            "clear ownership"
+            "one place for authorisation"
           ],
           "cons": [
-            "three deployables for a team of three",
-            "shared schema anyway"
+            "every viewer holds an application connection",
+            "memory and bandwidth on the instances"
           ]
         }
       ],
-      "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.96; Separate services per concern: 1.94; Single process with background threads: 1.33",
-      "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
+      "choice": "Object storage behind a CDN, signed expiring URLs, HTTP range requests; the application never streams bytes",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). Object storage behind a CDN, signed expiring URL: 1.81; Signed URLs straight from object storage: 1.46; Application streams the file: 0.91",
+      "consequences": "Not choosing 'Signed URLs straight from object storage' gives up: simplest, cheap at low volume. Not choosing 'Application streams the file' gives up: one place for authorisation.",
       "affects": [
-        "C-15",
+        "C-3",
+        "C-5"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-5",
+      "title": "Localisation approach",
+      "context": "Text, dates and amounts must appear in each user's language and locale.",
+      "options": [
+        {
+          "name": "Message catalogues in the code base (ICU message format), locale from the user's profile then the request",
+          "pros": [
+            "translations reviewed with code",
+            "plural and gender rules handled"
+          ],
+          "cons": [
+            "a release per translation change"
+          ]
+        },
+        {
+          "name": "Translations stored in the database and editable at runtime",
+          "pros": [
+            "no release for wording"
+          ],
+          "cons": [
+            "missing keys at runtime",
+            "caching"
+          ]
+        }
+      ],
+      "choice": "Message catalogues in the code base (ICU message format), locale from the user's profile then the request",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). Message catalogues in the code base: 1.55; Translations stored in the database and editable: 1.28",
+      "consequences": "Not choosing 'Translations stored in the database and editable' gives up: no release for wording.",
+      "affects": [
         "C-12"
       ],
       "status": "accepted"
     },
     {
       "id": "D-6",
-      "title": "Vector index for semantic search",
-      "context": "Embeddings must be stored and searched by similarity.",
+      "title": "Concurrency control for conflicting writes",
+      "context": "Two callers may change the same record at the same time and the result must be consistent.",
       "options": [
         {
-          "name": "pgvector in PostgreSQL",
+          "name": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
           "pros": [
-            "one database",
-            "transactional with the documents"
+            "no locks held across requests",
+            "works with stateless instances"
           ],
           "cons": [
-            "ANN performance limits at tens of millions of vectors"
+            "callers must handle 409"
           ]
         },
         {
-          "name": "Dedicated vector database",
+          "name": "Row locks inside a short transaction (SELECT ... FOR UPDATE)",
           "pros": [
-            "scales to hundreds of millions of vectors"
+            "simple mental model",
+            "no client retry"
           ],
           "cons": [
-            "a new service to operate",
-            "sync with the source of truth"
+            "lock waits under contention",
+            "needs a transactional store"
           ]
         },
         {
-          "name": "In-process index (FAISS/HNSW) rebuilt from the store",
+          "name": "Last write wins",
           "pros": [
-            "fast",
-            "no service"
+            "nothing to implement"
           ],
           "cons": [
-            "memory bound",
-            "rebuild on restart"
+            "lost updates"
           ]
         }
       ],
-      "choice": "pgvector in PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.49; In-process index: 1.49; Dedicated vector database: 1.33. stated in the constraints",
-      "consequences": "Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.",
+      "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). Optimistic concurrency: version column checked o: 1.81; Row locks inside a short transaction: 1.72; Last write wins: 1.55",
+      "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
       "affects": [
-        "C-10",
-        "C-1"
+        "C-1",
+        "C-6"
       ],
       "status": "accepted"
     },
     {
       "id": "D-7",
-      "title": "Where reports are computed",
-      "context": "Aggregations over history must not slow down the transactional path.",
-      "options": [
-        {
-          "name": "Materialised aggregates built by a scheduled job into report tables in the primary database",
-          "pros": [
-            "one database",
-            "reports are a read of precomputed rows"
-          ],
-          "cons": [
-            "freshness = job interval",
-            "aggregate design per report"
-          ]
-        },
-        {
-          "name": "Read replica queried directly",
-          "pros": [
-            "fresh",
-            "no aggregate design"
-          ],
-          "cons": [
-            "heavy queries still hit a copy of the OLTP schema",
-            "replica lag"
-          ]
-        },
-        {
-          "name": "Columnar analytics store (ClickHouse / warehouse) fed by a pipeline",
-          "pros": [
-            "fast over years of data",
-            "ad-hoc analytics"
-          ],
-          "cons": [
-            "a second store and a pipeline",
-            "eventual consistency"
-          ]
-        }
-      ],
-      "choice": "Materialised aggregates built by a scheduled job into report tables in the primary database",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.63; Read replica queried directly: 1.47; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)",
-      "consequences": "Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.",
-      "affects": [
-        "C-14",
-        "C-1"
-      ],
-      "status": "accepted"
-    },
-    {
-      "id": "D-8",
       "title": "Redundancy for the availability target",
       "context": "The availability target must be met through instance failures and deploys.",
       "options": [
@@ -2272,103 +1953,89 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.82; Active-active across two regions: 1.49; Single instance with health-based restart: 1.33",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). Two or more interchangeable instances per role b: 1.55; Active-active across two regions: 1.31; Single instance with health-based restart: 1.25",
       "consequences": "Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
-        "C-15"
+        "C-13"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-8",
+      "title": "Process topology",
+      "context": "The same code base serves requests and performs background work.",
+      "options": [
+        {
+          "name": "One image, role by flag: `api` and `worker` processes scale independently",
+          "pros": [
+            "stateless containers",
+            "independent scaling of ingress and outbound work",
+            "one build"
+          ],
+          "cons": [
+            "two deployables to operate"
+          ]
+        },
+        {
+          "name": "Single process with background threads",
+          "pros": [
+            "one deployable"
+          ],
+          "cons": [
+            "request latency competes with outbound work",
+            "cannot scale roles separately"
+          ]
+        },
+        {
+          "name": "Separate services per concern (ingest, admin, delivery)",
+          "pros": [
+            "clear ownership"
+          ],
+          "cons": [
+            "three deployables for a team of three",
+            "shared schema anyway"
+          ]
+        }
+      ],
+      "choice": "One image, role by flag: `api` and `worker` processes scale independently",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.86; Separate services per concern: 1.43; Single process with background threads: 1.40",
+      "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
+      "affects": [
+        "C-13"
       ],
       "status": "accepted"
     },
     {
       "id": "D-9",
-      "title": "Assumed answer: stack (Q-deploy)",
-      "context": "The requirements do not say. Question: Q-deploy. No evidence in the text; engine default.",
+      "title": "Assumed answer: load (Q-rate)",
+      "context": "The requirements do not say. Question: Q-rate. Evidence: count 2,000.",
       "options": [
         {
-          "name": "containers behind an ingress",
+          "name": "20 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "single VM",
+          "name": "2 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "serverless functions",
+          "name": "200 requests/s",
           "pros": [],
           "cons": []
         }
       ],
-      "choice": "containers behind an ingress",
-      "rationale": "The default for a networked service; keeps instances interchangeable.",
-      "consequences": "If the real answer differs: State the deployment; topology, statelessness conventions and store options change.",
+      "choice": "20 requests/s",
+      "rationale": "Derived from the largest stated count (2,000) at 1 request per 100 items per second.",
+      "consequences": "If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.",
       "affects": [
-        "C-15"
+        "C-13"
       ],
       "status": "proposed"
     },
     {
       "id": "D-10",
-      "title": "Assumed answer: quality (Q-availability)",
-      "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "99.9 %",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "99.5 %",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "99.99 %",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "99.9 %",
-      "rationale": "Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.",
-      "consequences": "If the real answer differs: State the target and what may be lost; topology and queue durability change.",
-      "affects": [
-        "C-6"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-11",
-      "title": "Assumed answer: data (Q-retention)",
-      "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "90 days / 1 year",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "30 days / 90 days",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
-      "affects": [
-        "C-13",
-        "C-1"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-12",
       "title": "Assumed answer: data (Q-backup)",
       "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
       "options": [
@@ -2397,7 +2064,34 @@
       "status": "proposed"
     },
     {
-      "id": "D-13",
+      "id": "D-11",
+      "title": "Assumed answer: data (Q-migration)",
+      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "greenfield",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "one-shot import",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "gradual cut-over",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "greenfield",
+      "rationale": "Nothing in the text names an existing system.",
+      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
+      "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-12",
       "title": "Assumed answer: security (Q-authz)",
       "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
       "options": [
@@ -2421,13 +2115,13 @@
       "rationale": "Ownership scoping is the minimum that prevents cross-tenant access.",
       "consequences": "If the real answer differs: State the roles; core operations and acceptance checks change.",
       "affects": [
-        "C-4",
-        "C-7"
+        "C-6",
+        "C-9"
       ],
       "status": "proposed"
     },
     {
-      "id": "D-14",
+      "id": "D-13",
       "title": "Assumed answer: resilience (Q-external)",
       "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
       "options": [
@@ -2450,8 +2144,35 @@
       "choice": "10 s / 5 retries / queue",
       "rationale": "Bounded retries with a durable queue keep the system responsive during a one-hour outage.",
       "consequences": "If the real answer differs: State the policy; the outbound client and scheduler contracts change.",
+      "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-14",
+      "title": "Assumed answer: operations (Q-alerting)",
+      "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "error rate + queue growth",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "per-endpoint SLO alerts",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "error rate + queue growth",
+      "rationale": "Two alerts catch most incidents without paging on noise.",
+      "consequences": "If the real answer differs: State the rules and the on-call; observability conventions change.",
       "affects": [
-        "C-12"
+        "C-8"
       ],
       "status": "proposed"
     },
@@ -2481,33 +2202,6 @@
       "consequences": "If the real answer differs: State the budget; options adding infrastructure become available.",
       "affects": [],
       "status": "proposed"
-    },
-    {
-      "id": "D-16",
-      "title": "Assumed answer: data (Q-migration)",
-      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "greenfield",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "one-shot import",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "gradual cut-over",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "greenfield",
-      "rationale": "Nothing in the text names an existing system.",
-      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
-      "affects": [],
-      "status": "proposed"
     }
   ],
   "risks": [
@@ -2518,7 +2212,7 @@
       "impact": "medium",
       "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
       "affects": [
-        "C-15",
+        "C-13",
         "C-3"
       ]
     },
@@ -2539,41 +2233,62 @@
       "impact": "medium",
       "mitigation": "Rate-limit notifications per owner and batch them.",
       "affects": [
-        "C-5"
+        "C-7"
       ]
     },
     {
       "id": "K-4",
+      "description": "Per-target labels on metrics explode cardinality.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Label by outcome and partition class, not by target id; expose per-target detail through the API instead.",
+      "affects": [
+        "C-8"
+      ]
+    },
+    {
+      "id": "K-5",
       "description": "A management operation reachable without authentication.",
       "likelihood": "low",
       "impact": "high",
       "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
       "affects": [
-        "C-7"
-      ]
-    },
-    {
-      "id": "K-5",
-      "description": "Dashboards show figures from a failed or late run without saying so.",
-      "likelihood": "medium",
-      "impact": "low",
-      "mitigation": "Every report row carries the run's completion time; the UI shows it; alert when a run is late.",
-      "affects": [
-        "C-14"
+        "C-9"
       ]
     },
     {
       "id": "K-6",
+      "description": "Media egress cost and bandwidth grow with viewers, not with the team's plans.",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Serve through the CDN with caching headers; monitor egress per day; cap bitrate variants.",
+      "affects": [
+        "C-5",
+        "C-3"
+      ]
+    },
+    {
+      "id": "K-7",
+      "description": "A missing message key ships as a blank or the key itself.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Fallback to the default locale; a build check that every key exists in the default catalogue.",
+      "affects": [
+        "C-12"
+      ]
+    },
+    {
+      "id": "K-8",
       "description": "Parts of the requirements were not recognised by the catalogue and received a generic decomposition.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Review the components marked generic; refine responsibilities and interfaces before briefing.",
       "affects": [
-        "C-4"
+        "C-6"
       ]
     },
     {
-      "id": "K-7",
+      "id": "K-9",
       "description": "[tampering] Store: Injection through query construction.",
       "likelihood": "medium",
       "impact": "medium",
@@ -2583,7 +2298,7 @@
       ]
     },
     {
-      "id": "K-8",
+      "id": "K-10",
       "description": "[information_disclosure] Store: Backups and dumps contain everything.",
       "likelihood": "medium",
       "impact": "high",
@@ -2593,7 +2308,7 @@
       ]
     },
     {
-      "id": "K-9",
+      "id": "K-11",
       "description": "[tampering] File storage: Uploaded content is not what its type claims.",
       "likelihood": "medium",
       "impact": "medium",
@@ -2603,7 +2318,7 @@
       ]
     },
     {
-      "id": "K-10",
+      "id": "K-12",
       "description": "[elevation] File storage: Path traversal through user-supplied names.",
       "likelihood": "medium",
       "impact": "high",
@@ -2613,53 +2328,33 @@
       ]
     },
     {
-      "id": "K-11",
+      "id": "K-13",
       "description": "[denial_of_service] Notifier: Notification storms and template injection.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
-      "affects": [
-        "C-5"
-      ]
-    },
-    {
-      "id": "K-12",
-      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
-      "likelihood": "medium",
-      "impact": "medium",
-      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
-      "affects": [
-        "C-7"
-      ]
-    },
-    {
-      "id": "K-13",
-      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
-      "likelihood": "medium",
-      "impact": "high",
-      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
       "affects": [
         "C-7"
       ]
     },
     {
       "id": "K-14",
-      "description": "[denial_of_service] Model server: Adversarial or oversized inputs exhaust inference capacity.",
+      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
       "likelihood": "medium",
       "impact": "medium",
-      "mitigation": "Input size limits; batching with timeouts. Check: oversize input rejected before inference",
+      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
       "affects": [
-        "C-11"
+        "C-9"
       ]
     },
     {
       "id": "K-15",
-      "description": "[information_disclosure] Reporting: Aggregates over small groups re-identify people.",
+      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
       "likelihood": "medium",
       "impact": "high",
-      "mitigation": "Suppress rows below a minimum group size in person-level reports. Check: a report over a group of one shows no row",
+      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
       "affects": [
-        "C-14"
+        "C-9"
       ]
     },
     {
@@ -2669,7 +2364,7 @@
       "impact": "medium",
       "mitigation": "Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials",
       "affects": [
-        "C-15"
+        "C-13"
       ]
     },
     {
@@ -2679,7 +2374,7 @@
       "impact": "medium",
       "mitigation": "Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413",
       "affects": [
-        "C-15"
+        "C-13"
       ]
     },
     {
@@ -2689,7 +2384,7 @@
       "impact": "medium",
       "mitigation": "Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected",
       "affects": [
-        "C-15"
+        "C-13"
       ]
     },
     {
@@ -2699,13 +2394,43 @@
       "impact": "high",
       "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
       "affects": [
-        "C-15"
+        "C-13"
       ]
     }
   ],
   "work_packages": [
     {
       "id": "WP-1",
+      "title": "Audit log",
+      "goal": "Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.",
+      "components": [
+        "C-4"
+      ],
+      "implements": [
+        "I-4"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-6"
+      ],
+      "files": [
+        "src/audit.ts",
+        "tests/audit.test.ts"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Audit log pass",
+          "kind": "test",
+          "command": "npx vitest run tests/audit.test.ts",
+          "metric": ""
+        }
+      ],
+      "notes": "family: audit_log"
+    },
+    {
+      "id": "WP-2",
       "title": "File storage",
       "goal": "Implement File storage: Stores and serves uploaded files/blobs with content-type and size limits.",
       "components": [
@@ -2716,197 +2441,157 @@
       ],
       "depends_on": [],
       "satisfies": [
+        "R-1",
         "R-2"
       ],
       "files": [
-        "app/files.py",
-        "tests/test_files.py"
+        "src/files.ts",
+        "tests/files.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-1",
+          "id": "A-2",
           "description": "unit tests of File storage pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_files.py",
+          "command": "npx vitest run tests/files.test.ts",
           "metric": ""
         }
       ],
       "notes": "family: file_storage"
     },
     {
-      "id": "WP-2",
-      "title": "Store + Observability + Rate limiter",
-      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Rate limiter: Per-principal or per-key request budgets with a sliding window.",
+      "id": "WP-3",
+      "title": "Localisation",
+      "goal": "Implement Localisation: Resolves locale, timezone and currency per request; formats messages, dates and amounts from message catalogues.",
+      "components": [
+        "C-12"
+      ],
+      "implements": [
+        "I-12"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-7"
+      ],
+      "files": [
+        "src/i18n.ts",
+        "tests/i18n.test.ts"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-3",
+          "description": "unit tests of Localisation pass",
+          "kind": "test",
+          "command": "npx vitest run tests/i18n.test.ts",
+          "metric": ""
+        }
+      ],
+      "notes": "family: i18n"
+    },
+    {
+      "id": "WP-4",
+      "title": "Store + Observability",
+      "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "components": [
         "C-1",
-        "C-6",
         "C-8"
       ],
       "implements": [
         "I-1",
-        "I-6",
         "I-8"
       ],
       "depends_on": [],
       "satisfies": [
         "R-9",
         "R-11",
-        "R-16",
-        "R-18"
+        "R-12",
+        "R-13",
+        "R-18",
+        "R-19"
       ],
       "files": [
-        "app/store.py",
-        "tests/test_store.py",
-        "app/observability.py",
-        "tests/test_observability.py",
-        "app/ratelimit.py",
-        "tests/test_ratelimit.py"
+        "src/store.ts",
+        "tests/store.test.ts",
+        "src/observability.ts",
+        "tests/observability.test.ts"
       ],
       "size": "M",
       "acceptance": [
         {
-          "id": "A-2",
-          "description": "unit tests of Store, Observability, Rate limiter pass",
+          "id": "A-4",
+          "description": "unit tests of Store, Observability pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py",
+          "command": "npx vitest run tests/store.test.ts tests/observability.test.ts",
           "metric": ""
         },
         {
-          "id": "A-3",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-5",
+          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-4",
-          "description": "R-16: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-6",
+          "description": "R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
-          "metric": "R-16"
+          "metric": "R-11"
         },
         {
-          "id": "A-5",
+          "id": "A-7",
+          "description": "R-12: ratio >= 99.9 % % — kill one instance under load; error rate stays within the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-12"
+        },
+        {
+          "id": "A-8",
           "description": "R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-18"
+        },
+        {
+          "id": "A-9",
+          "description": "R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-19"
         }
       ],
       "notes": "family: infra"
     },
     {
-      "id": "WP-3",
-      "title": "Cache",
-      "goal": "Implement Cache: Read-through cache with TTL and explicit invalidation.",
+      "id": "WP-5",
+      "title": "Authentication",
+      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
       "components": [
         "C-9"
       ],
       "implements": [
         "I-9"
       ],
-      "depends_on": [],
-      "satisfies": [
-        "R-5",
-        "R-8",
-        "R-9"
-      ],
-      "files": [
-        "app/cache.py",
-        "tests/test_cache.py"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-6",
-          "description": "unit tests of Cache pass",
-          "kind": "test",
-          "command": "python -m pytest -q tests/test_cache.py",
-          "metric": ""
-        },
-        {
-          "id": "A-7",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
-        },
-        {
-          "id": "A-8",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-9"
-        }
-      ],
-      "notes": "family: infra"
-    },
-    {
-      "id": "WP-4",
-      "title": "Model server",
-      "goal": "Implement Model server: Loads the model, serves predictions with batching and timeouts, versions the model.",
-      "components": [
-        "C-11"
-      ],
-      "implements": [
-        "I-11"
-      ],
-      "depends_on": [],
-      "satisfies": [
-        "R-3",
-        "R-5"
-      ],
-      "files": [
-        "app/model.py",
-        "tests/test_model.py"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-9",
-          "description": "unit tests of Model server pass",
-          "kind": "test",
-          "command": "python -m pytest -q tests/test_model.py",
-          "metric": ""
-        }
-      ],
-      "notes": "family: ml_inference"
-    },
-    {
-      "id": "WP-5",
-      "title": "Authentication + Scheduler",
-      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
-      "components": [
-        "C-7",
-        "C-12"
-      ],
-      "implements": [
-        "I-7",
-        "I-12"
-      ],
       "depends_on": [
-        "WP-2"
+        "WP-4"
       ],
       "satisfies": [
-        "R-7",
-        "R-13",
         "R-14",
         "R-15"
       ],
       "files": [
-        "app/auth.py",
-        "tests/test_auth.py",
-        "app/scheduler.py",
-        "tests/test_scheduler.py"
+        "src/auth.ts",
+        "tests/auth.test.ts"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-10",
-          "description": "unit tests of Authentication, Scheduler pass",
+          "description": "unit tests of Authentication pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
+          "command": "npx vitest run tests/auth.test.ts",
           "metric": ""
         }
       ],
@@ -2917,20 +2602,21 @@
       "title": "Notifier",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
-        "C-5"
+        "C-7"
       ],
       "implements": [
-        "I-5"
+        "I-7"
       ],
       "depends_on": [
-        "WP-2"
+        "WP-4"
       ],
       "satisfies": [
+        "R-5",
         "R-7"
       ],
       "files": [
-        "app/notifier.py",
-        "tests/test_notifier.py"
+        "src/notifier.ts",
+        "tests/notifier.test.ts"
       ],
       "size": "S",
       "acceptance": [
@@ -2938,7 +2624,7 @@
           "id": "A-11",
           "description": "unit tests of Notifier pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_notifier.py",
+          "command": "npx vitest run tests/notifier.test.ts",
           "metric": ""
         }
       ],
@@ -2946,38 +2632,6 @@
     },
     {
       "id": "WP-7",
-      "title": "Reporting",
-      "goal": "Implement Reporting: Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.",
-      "components": [
-        "C-14"
-      ],
-      "implements": [
-        "I-14"
-      ],
-      "depends_on": [
-        "WP-2"
-      ],
-      "satisfies": [
-        "R-7"
-      ],
-      "files": [
-        "app/reporting.py",
-        "tests/test_reporting.py"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-12",
-          "description": "unit tests of Reporting pass",
-          "kind": "test",
-          "command": "python -m pytest -q tests/test_reporting.py",
-          "metric": ""
-        }
-      ],
-      "notes": "family: reporting"
-    },
-    {
-      "id": "WP-8",
       "title": "Search index",
       "goal": "Implement Search index: Full-text and filtered queries over the indexed entities.",
       "components": [
@@ -2987,77 +2641,79 @@
         "I-10"
       ],
       "depends_on": [
-        "WP-2"
+        "WP-4"
       ],
       "satisfies": [
-        "R-3",
-        "R-4",
-        "R-6",
-        "R-7",
+        "R-2",
         "R-8",
-        "R-9"
+        "R-10",
+        "R-16"
       ],
       "files": [
-        "app/search.py",
-        "tests/test_search.py"
+        "src/search.ts",
+        "tests/search.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-12",
           "description": "unit tests of Search index pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_search.py",
+          "command": "npx vitest run tests/search.test.ts",
           "metric": ""
         },
         {
-          "id": "A-14",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "id": "A-13",
+          "description": "R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-15",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-14",
+          "description": "R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
-          "metric": "R-9"
+          "metric": "R-10"
+        },
+        {
+          "id": "A-15",
+          "description": "R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-16"
         }
       ],
       "notes": "family: search"
     },
     {
-      "id": "WP-9",
+      "id": "WP-8",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
-        "C-4"
+        "C-6"
       ],
       "implements": [
-        "I-4"
+        "I-6"
       ],
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-3",
         "WP-4",
         "WP-6"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
         "R-3",
-        "R-5",
-        "R-10",
+        "R-4",
+        "R-9",
         "R-11",
-        "R-12",
+        "R-13",
         "R-20",
         "R-21"
       ],
       "files": [
-        "app/core.py",
-        "tests/test_core.py"
+        "src/core.ts",
+        "tests/core.test.ts"
       ],
       "size": "S",
       "acceptance": [
@@ -3065,16 +2721,62 @@
           "id": "A-16",
           "description": "unit tests of Domain core pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_core.py",
+          "command": "npx vitest run tests/core.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-17",
+          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
+        },
+        {
+          "id": "A-18",
+          "description": "R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
         }
       ],
       "notes": "family: crud_api"
     },
     {
+      "id": "WP-9",
+      "title": "Import/export",
+      "goal": "Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "components": [
+        "C-11"
+      ],
+      "implements": [
+        "I-11"
+      ],
+      "depends_on": [
+        "WP-8"
+      ],
+      "satisfies": [
+        "R-4"
+      ],
+      "files": [
+        "src/exporter.ts",
+        "tests/exporter.test.ts"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-19",
+          "description": "unit tests of Import/export pass",
+          "kind": "test",
+          "command": "npx vitest run tests/exporter.test.ts",
+          "metric": ""
+        }
+      ],
+      "notes": "family: import_export"
+    },
+    {
       "id": "WP-10",
-      "title": "Batch job",
-      "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "title": "Public HTTP API",
+      "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
         "C-13"
       ],
@@ -3082,83 +2784,64 @@
         "I-13"
       ],
       "depends_on": [
-        "WP-2",
+        "WP-4",
         "WP-5",
-        "WP-9"
-      ],
-      "satisfies": [
-        "R-7",
-        "R-14"
-      ],
-      "files": [
-        "app/batch.py",
-        "tests/test_batch.py"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-17",
-          "description": "unit tests of Batch job pass",
-          "kind": "test",
-          "command": "python -m pytest -q tests/test_batch.py",
-          "metric": ""
-        }
-      ],
-      "notes": "family: batch_pipeline"
-    },
-    {
-      "id": "WP-11",
-      "title": "Public HTTP API",
-      "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
-      "components": [
-        "C-15"
-      ],
-      "implements": [
-        "I-15"
-      ],
-      "depends_on": [
-        "WP-2",
-        "WP-5",
+        "WP-7",
         "WP-8",
         "WP-9"
       ],
       "satisfies": [
-        "R-1",
+        "R-3",
         "R-8",
         "R-9",
         "R-10",
-        "R-17",
-        "R-19"
+        "R-14",
+        "R-16",
+        "R-17"
       ],
       "files": [
-        "app/surface_api.py",
-        "tests/test_surface_api.py"
+        "src/surface_api.ts",
+        "tests/surface_api.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-18",
+          "id": "A-20",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
-          "command": "python -m pytest -q tests/test_surface_api.py",
+          "command": "npx vitest run tests/surface_api.test.ts",
           "metric": ""
         },
         {
-          "id": "A-19",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "id": "A-21",
+          "description": "R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-20",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-22",
+          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-21",
+          "id": "A-23",
+          "description": "R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        },
+        {
+          "id": "A-24",
+          "description": "R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-16"
+        },
+        {
+          "id": "A-25",
           "description": "R-17: time at 4 h 24 h h",
           "kind": "metric",
           "command": "",

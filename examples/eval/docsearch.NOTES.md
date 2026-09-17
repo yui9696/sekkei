@@ -22,8 +22,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-1 | C-14 Public HTTP API, C-4 Domain core | surface+core | human actor 'employees': a use case |
-| R-10 | C-14 Public HTTP API, C-4 Domain core | surface+core | human actor 'members': a use case |
+| R-1 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'employees': a use case |
+| R-10 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'members': a use case |
 
 ## 2. Capacity estimates
 
@@ -43,13 +43,13 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **26 person-days**; critical path **12 days**; with a team of 3: **about 12 working days** (3 weeks).
+- Total effort: **28 person-days**; critical path **12 days**; with a team of 3: **about 14 working days** (3 weeks).
 - Wave 1: WP-1, WP-2, WP-3, WP-4
-- Wave 2: WP-5, WP-6, WP-7
-- Wave 3: WP-8
-- Wave 4: WP-10, WP-9
+- Wave 2: WP-5, WP-6, WP-7, WP-8
+- Wave 3: WP-9
+- Wave 4: WP-10, WP-11
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
-- Assumption: Team of 3; packages in one wave run in parallel up to the team size.
+- Assumption: Team of 3; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
 ## 4. Threat model (STRIDE-lite)
 
@@ -65,10 +65,11 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 | C-7 Authentication | spoofing | Credential stuffing or leaked keys. | Hash keys at rest; allow revocation; rate-limit failures. | revoked key is rejected within seconds; brute force is throttled |
 | C-7 Authentication | elevation | A caller acts on another tenant's resources. | Every core operation takes the principal and checks ownership. | cross-tenant request returns 404/403 for every operation |
 | C-11 Model server | denial_of_service | Adversarial or oversized inputs exhaust inference capacity. | Input size limits; batching with timeouts. | oversize input rejected before inference |
-| C-14 Public HTTP API | spoofing | Requests without a verified caller identity reach domain operations. | Authenticate every route in one middleware; deny by default. | every route returns 401 without credentials |
-| C-14 Public HTTP API | tampering | Malformed or oversized bodies reach the core. | Schema-validate and size-limit at the surface; reject before parsing fully. | fuzz the body; oversize returns 413 |
-| C-14 Public HTTP API | denial_of_service | A single caller saturates the service. | Per-caller rate limit and request timeouts. | burst from one key returns 429; others unaffected |
-| C-14 Public HTTP API | information_disclosure | Stack traces or internal ids leak in error responses. | Map exceptions to fixed error shapes; log details server-side only. | no traceback text in any 4xx/5xx body |
+| C-14 Reporting | information_disclosure | Aggregates over small groups re-identify people. | Suppress rows below a minimum group size in person-level reports. | a report over a group of one shows no row |
+| C-15 Public HTTP API | spoofing | Requests without a verified caller identity reach domain operations. | Authenticate every route in one middleware; deny by default. | every route returns 401 without credentials |
+| C-15 Public HTTP API | tampering | Malformed or oversized bodies reach the core. | Schema-validate and size-limit at the surface; reject before parsing fully. | fuzz the body; oversize returns 413 |
+| C-15 Public HTTP API | denial_of_service | A single caller saturates the service. | Per-caller rate limit and request timeouts. | burst from one key returns 429; others unaffected |
+| C-15 Public HTTP API | information_disclosure | Stack traces or internal ids leak in error responses. | Map exceptions to fixed error shapes; log details server-side only. | no traceback text in any 4xx/5xx body |
 
 ## 5. What the engine could not decide
 
@@ -87,23 +88,24 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-4 Caching: **Read-through cache with TTL and explicit invalidation on write**
 - D-5 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-6 Vector index for semantic search: **pgvector in PostgreSQL**
-- D-7 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
-- D-8 Assumed answer: stack (Q-deploy): **containers behind an ingress**
-- D-9 Assumed answer: quality (Q-availability): **99.9 %**
-- D-10 Assumed answer: data (Q-retention): **90 days / 1 year**
-- D-11 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-12 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-13 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
-- D-14 Assumed answer: cost (Q-budget): **existing only**
-- D-15 Assumed answer: data (Q-migration): **greenfield**
+- D-7 Where reports are computed: **Materialised aggregates built by a scheduled job into report tables in the primary database**
+- D-8 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
+- D-9 Assumed answer: stack (Q-deploy): **containers behind an ingress**
+- D-10 Assumed answer: quality (Q-availability): **99.9 %**
+- D-11 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-12 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-13 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-14 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-15 Assumed answer: cost (Q-budget): **existing only**
+- D-16 Assumed answer: data (Q-migration): **greenfield**
 
 ### Notes
 
-- 14 components for a team of 3; consider merging adjacent layers.
+- 15 components for a team of 3; consider merging adjacent layers.
 
 ## 6. How the text was read
 
-- Patterns recognised: crud_api, notification, auth, rate_limiting, cache, search, file_storage, batch_pipeline, ml_inference
+- Patterns recognised: crud_api, notification, auth, rate_limiting, cache, search, file_storage, batch_pipeline, ml_inference, semantic_search, reporting
 - Quality attributes (weight): durability 1.0, performance 0.8, isolation 0.7, availability 0.9, scalability 0.7, simplicity 0.8
 - Constraint tokens: containers, idp, multi_instance, object_storage, postgres, vector_db; languages: python; team: 3
 
@@ -111,16 +113,16 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 |---|---|---|---|---|---|
 | R-1 | functional | must | **none** | performance | — |
 | R-2 | functional | must | file_storage | — | — |
-| R-3 | functional | must | search, ml_inference | — | — |
+| R-3 | functional | must | search, ml_inference, semantic_search | — | — |
 | R-4 | functional | must | search | — | — |
 | R-5 | functional | must | cache, ml_inference | — | — |
 | R-6 | functional | must | search | — | — |
-| R-7 | functional | must | notification, search, batch_pipeline | — | — |
+| R-7 | functional | must | notification, search, batch_pipeline, reporting | — | — |
 | R-8 | nonfunctional | should | search | performance | p95 latency at 50,000 <= 800 ms ms |
-| R-9 | nonfunctional | must | file_storage, ml_inference | durability, performance, isolation | latency <= 1 s s |
+| R-9 | nonfunctional | must | file_storage, ml_inference, semantic_search | durability, performance, isolation | latency <= 1 s s |
 | R-10 | functional | must | **none** | — | — |
 | R-11 | constraint | must | file_storage | simplicity | — |
-| R-12 | constraint | must | rate_limiting, ml_inference | — | — |
+| R-12 | constraint | must | rate_limiting, ml_inference, semantic_search | — | — |
 | R-13 | constraint | must | auth | security | — |
 | R-14 | functional | must | batch_pipeline | compliance | — |
 | R-15 | functional | could | auth | operability | — |
