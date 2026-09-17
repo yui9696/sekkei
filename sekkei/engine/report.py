@@ -51,6 +51,17 @@ class Notes:
     answers: list[Answer] = field(default_factory=list)
     placements_md: str = ""
 
+    def machine(self) -> dict:
+        """Machine-readable notes: every estimate as expression + inputs + value; effort as its DAG and waves; SLOs."""
+        return {
+            "capacity": {"estimates": [e.machine() for e in self.capacity.estimates], "assumptions": self.capacity.assumptions, "missing": self.capacity.missing},
+            "effort": self.effort.machine(),
+            "questions": [q.__dict__ for q in self.questions],
+            "answers": [{"question_id": a.question_id, "answer": a.answer, "evidence": a.evidence} for a in self.answers],
+            "unaddressed": self.review.unaddressed,
+            "unrecognised": self.review.unrecognised,
+        }
+
     def to_markdown(self) -> str:
         s = ["# Architect's notes (engine)\n",
              "Everything a solution architect hands over besides the design: the questions still open, the\n"

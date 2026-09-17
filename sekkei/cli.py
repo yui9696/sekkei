@@ -321,6 +321,9 @@ def cmd_design(args: argparse.Namespace) -> int:
     if args.trace:
         _write(args.trace, json.dumps(result.trace_json(), indent=2, ensure_ascii=False))
         print(f"wrote {args.trace}")
+    if args.notes_json:
+        _write(args.notes_json, json.dumps(result.notes.machine(), indent=2, ensure_ascii=False))
+        print(f"wrote {args.notes_json}")
     for line in result.log:
         print("  repair: " + line)
     sys.stdout.write(R.format_text(result.diagnostics, hints=False))
@@ -552,6 +555,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--render", metavar="DESIGN.md", help="also write the Markdown design document")
     sp.add_argument("--review", metavar="NOTES.md", help="also write the architect's notes: questions, capacity, effort, threats, self-review")
     sp.add_argument("--trace", metavar="TRACE.json", help="also write the element-to-sentence/rule trace")
+    sp.add_argument("--notes-json", metavar="NOTES.json", help="also write the notes in machine-readable form (every estimate as expression + inputs + value)")
     sp.add_argument("--augmented", metavar="REQ.md", help="also write the requirements with the engine's assumed answers appended")
     sp.add_argument("--no-assume", action="store_true", help="do not answer open questions; leave them in the notes")
 

@@ -105,3 +105,20 @@ def test_cli_ask_and_template(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "requirements.md").read_text().startswith("# <System name>")
     assert main(["design", "r.md", "-o", "d.json", "--review", "n.md", "--no-assume"]) == 0
     assert "open questions" in capsys.readouterr().out and "Threat model" in (tmp_path / "n.md").read_text()
+
+
+def test_notes_machine_form_carries_expression_inputs_and_value():
+    from pathlib import Path
+    from sekkei.engine import design
+    r = design((Path(__file__).parent / "fixtures" / "saas.md").read_text(encoding="utf-8"))
+    m = r.notes.machine()
+    est = m["capacity"]["estimates"]
+    assert est and all(e["expr"] and isinstance(e["inputs"], dict) and e["value"] is not None for e in est)
+    # the expression really evaluates to the value with the given inputs (a tiny independent evaluator)
+    for e in est:
+        env = dict(e["inputs"])
+        got = eval(e["expr"], {"__builtins__": {}}, env)   # expressions are + - * / over names only
+        assert abs(got - e["value"]) <= 1e-9 * max(1.0, abs(e["value"])), e["name"]
+    eff = m["effort"]
+    assert sum(eff["phase_days"]) == eff["calendar_days"] and len(eff["wave_days"]) == len(eff["waves"])
+    assert set(eff["tasks"]) == {w.id for w in r.design.work_packages}

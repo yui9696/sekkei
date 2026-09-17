@@ -460,6 +460,7 @@ def package(result, prices: dict[str, float] | None = None) -> Package:
     pk.files["design.json"] = M.dumps(d)
     pk.files["DESIGN.md"] = RD.render_markdown(d)
     pk.files["NOTES.md"] = notes.to_markdown()
+    pk.files["notes.json"] = json.dumps(notes.machine(), indent=2, ensure_ascii=False) + "\n"
     pk.files["00_EXECUTIVE_SUMMARY.md"] = executive_summary(d, notes)
     for name, body in adrs(d).items():
         pk.files["adr/" + name] = body
@@ -483,7 +484,8 @@ def index_markdown(pk: Package, design: Design) -> str:
             "RISK_REGISTER.md": "risks scored and owned", "FMEA.md": "failure modes and their effects from the dependency graph",
             "ROADMAP.md": "phases, calendar, milestones", "RACI.md": "who builds, approves, is consulted, is informed",
             "SLO.md": "service-level objectives and error budgets", "COST_MODEL.md": "monthly quantities and formulas (prices from you)",
-            "RUNBOOKS.md": "operational procedures per running component", "design.json": "the machine-readable design (input to lint/plan/brief/check)"}
+            "RUNBOOKS.md": "operational procedures per running component", "design.json": "the machine-readable design (input to lint/plan/brief/check)",
+            "notes.json": "the notes in machine-readable form: every estimate as expression + inputs + value, the effort DAG and waves"}
     for name in pk.files:
         if name.startswith("adr/"):
             continue

@@ -32,6 +32,15 @@ def implied_rate(an: Analysis) -> tuple[float, str] | None:
     q, u = max(pops, key=lambda t: t[0].value)
     return q.value / interval, f"{q.raw} {q.noun} ({u.id}) ÷ every {interval:g} s ({src})"
 
+def implied_inputs(an: Analysis) -> tuple[float, float]:
+    """The (count, interval seconds) pair behind ``implied_rate``; (0, 0) when not derivable."""
+    interval = next((interval_seconds(u.sentence.text) for u in an.requirements if interval_seconds(u.sentence.text)), None)
+    if not interval:
+        return 0.0, 0.0
+    pops = [q for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and (q.value >= 100 or q.noun in POPULATION_NOUNS or q.noun in ("drivers", "trucks", "devices", "sensors", "vehicles"))]
+    return (max(q.value for q in pops) if pops else 0.0), interval
+
+
 DEFAULT_PAYLOAD_BYTES = 2048
 DEFAULT_SERVICE_MS = 200          # mean time of one outbound/handler call
 DEFAULT_OUTAGE_HOURS = 1.0
@@ -48,6 +57,13 @@ class Estimate:
     value: str
     formula: str
     inputs: str
+    #: machine-readable form of the same estimate: an expression over named numeric inputs and the value it gives
+    expr: str = ""
+    terms: dict = field(default_factory=dict)
+    number: float | None = None
+
+    def machine(self) -> dict:
+        return {"name": self.name, "value": self.number, "expr": self.expr, "inputs": self.terms, "shown": self.value, "formula": self.formula, "inputs_text": self.inputs}
 
 
 @dataclass
@@ -94,38 +110,51 @@ def capacity(an: Analysis) -> Capacity:
     implied = implied_rate(an)
     if implied and not [r for r in rates if not r[0].sentence.assumed]:
         rate_val, derivation = implied
-        cap.estimates.append(Estimate("implied update rate", _fmt(rate_val) + "/s", "count ÷ interval", derivation))
-        cap.estimates.append(Estimate("implied updates per day", _fmt(rate_val * 86400), "implied rate × 86,400 s", derivation))
-        cap.estimates.append(Estimate("storage growth per day (updates)", _fmt(rate_val * 86400 * payload) + "B", "implied rate × 86,400 × record size", derivation + f"; {payload_src}"))
+        n_pop, interval = implied_inputs(an)
+        cap.estimates.append(Estimate("implied update rate", _fmt(rate_val) + "/s", "count ÷ interval", derivation,
+                                      "count / interval", {"count": n_pop, "interval": interval}, rate_val))
+        cap.estimates.append(Estimate("implied updates per day", _fmt(rate_val * 86400), "implied rate × 86,400 s", derivation,
+                                      "count / interval * 86400", {"count": n_pop, "interval": interval}, rate_val * 86400))
+        cap.estimates.append(Estimate("storage growth per day (updates)", _fmt(rate_val * 86400 * payload) + "B", "implied rate × 86,400 × record size", derivation + f"; {payload_src}",
+                                      "count / interval * 86400 * payload", {"count": n_pop, "interval": interval, "payload": payload}, rate_val * 86400 * payload))
     if not rates and not implied:
         cap.missing.append("no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated")
     for u, q, r in rates[:2]:
         what = q.noun or "requests"
-        cap.estimates.append(Estimate(f"{what} per day", _fmt(r * 86400), "rate × 86,400 s", f"{q.raw} ({u.id})"))
+        base = {"rate": r}
+        cap.estimates.append(Estimate(f"{what} per day", _fmt(r * 86400), "rate × 86,400 s", f"{q.raw} ({u.id})",
+                                      "rate * 86400", base, r * 86400))
         cap.estimates.append(Estimate(f"storage growth per day ({what})", _fmt(r * 86400 * payload) + "B",
-                                      "rate × 86,400 × record size", f"{q.raw} ({u.id}); {payload_src}"))
+                                      "rate × 86,400 × record size", f"{q.raw} ({u.id}); {payload_src}",
+                                      "rate * 86400 * payload", {**base, "payload": payload}, r * 86400 * payload))
         cap.estimates.append(Estimate(f"storage after 30 days ({what})", _fmt(r * 86400 * 30 * payload) + "B",
-                                      "daily growth × 30", "same inputs; no retention stated" if not durations else "same inputs"))
+                                      "daily growth × 30", "same inputs; no retention stated" if not durations else "same inputs",
+                                      "rate * 86400 * payload * 30", {**base, "payload": payload}, r * 86400 * 30 * payload))
         cap.estimates.append(Estimate(f"backlog after a {DEFAULT_OUTAGE_HOURS:g} h downstream outage", _fmt(r * 3600 * DEFAULT_OUTAGE_HOURS) + f" {what}",
-                                      "rate × outage seconds", f"{q.raw} ({u.id}); outage length assumed"))
+                                      "rate × outage seconds", f"{q.raw} ({u.id}); outage length assumed",
+                                      "rate * 3600 * outage_hours", {**base, "outage_hours": DEFAULT_OUTAGE_HOURS}, r * 3600 * DEFAULT_OUTAGE_HOURS))
         conc = r * DEFAULT_SERVICE_MS / 1000
         cap.estimates.append(Estimate(f"concurrent handlers to sustain the rate ({what})", _fmt(conc),
-                                      "Little's law: rate × mean service time", f"{q.raw} ({u.id}); mean service time assumed {DEFAULT_SERVICE_MS} ms"))
+                                      "Little's law: rate × mean service time", f"{q.raw} ({u.id}); mean service time assumed {DEFAULT_SERVICE_MS} ms",
+                                      "rate * service_ms / 1000", {**base, "service_ms": DEFAULT_SERVICE_MS}, conc))
         if "async_delivery" in an.patterns:
             for k in (1, 10):
                 cap.estimates.append(Estimate(f"outbound deliveries per second if each event matches {k} target(s)", _fmt(r * k),
-                                              "event rate × fan-out", f"{q.raw} ({u.id}); fan-out {k} assumed"))
+                                              "event rate × fan-out", f"{q.raw} ({u.id}); fan-out {k} assumed",
+                                              "rate * fanout", {**base, "fanout": k}, r * k))
         for lu, lq in latencies[:1]:
             secs = lq.value / (1000 if lq.unit.lower().startswith("ms") else 1)
             cap.estimates.append(Estimate("in-flight items at the latency target", _fmt(r * secs),
-                                          "rate × latency target (Little's law upper bound)", f"{q.raw} ({u.id}) × {lq.raw} ({lu.id})"))
+                                          "rate × latency target (Little's law upper bound)", f"{q.raw} ({u.id}) × {lq.raw} ({lu.id})",
+                                          "rate * latency_s", {**base, "latency_s": secs}, r * secs))
     populations = [(u, q) for u, q in counts if q.value >= 100 or q.noun in POPULATION_NOUNS]
     for u, q in populations[:3]:
-        cap.estimates.append(Estimate(f"number of {q.noun}", _fmt(q.value), "stated", f"{q.raw} {q.noun} ({u.id})"))
+        cap.estimates.append(Estimate(f"number of {q.noun}", _fmt(q.value), "stated", f"{q.raw} {q.noun} ({u.id})", "count", {"count": q.value}, q.value))
         if rates:
             r = rates[0][2]
             cap.estimates.append(Estimate(f"average rate per {q.noun[:-1] if q.noun.endswith('s') else q.noun} (if evenly spread)",
-                                          _fmt(r / q.value) + "/s", "rate ÷ count", f"{rates[0][1].raw} ÷ {q.raw}"))
+                                          _fmt(r / q.value) + "/s", "rate ÷ count", f"{rates[0][1].raw} ÷ {q.raw}",
+                                          "rate / count", {"rate": r, "count": q.value}, r / q.value))
     cap.assumptions.append(f"Mean service time {DEFAULT_SERVICE_MS} ms and a {DEFAULT_OUTAGE_HOURS:g} h outage are engine assumptions; replace with measurements.")
     return cap
 
@@ -140,6 +169,14 @@ class Effort:
     assumptions: list[str]
     #: calendar length of each wave: max(longest package, ceil(person-days / team)); their sum is calendar_days
     phase_days: list[int] = field(default_factory=list)
+    #: person-days of each package in each wave, in wave order (the inputs of phase_days)
+    wave_days: list[list[int]] = field(default_factory=list)
+    #: package -> (days, packages it depends on): the DAG behind critical_path_days
+    tasks: dict = field(default_factory=dict)
+
+    def machine(self) -> dict:
+        return {"person_days": self.person_days, "critical_path_days": self.critical_path_days, "calendar_days": self.calendar_days,
+                "team": self.team, "waves": self.waves, "phase_days": self.phase_days, "wave_days": self.wave_days, "tasks": self.tasks}
 
 
 def effort(design: Design, an: Analysis) -> Effort:
@@ -162,7 +199,9 @@ def effort(design: Design, an: Analysis) -> Effort:
     return Effort(total, critical, calendar, team, waves,
                   [f"Package sizes S/M/L = {SIZE_DAYS['S']}/{SIZE_DAYS['M']}/{SIZE_DAYS['L']} person-days (assumption).",
                    f"Team of {team}" + ("" if an.team_size else " (assumed; no team size stated)") + "; packages in one wave run in parallel up to the team size; "
-                   "a wave lasts max(longest package, person-days ÷ team) and waves run one after another."], phase)
+                   "a wave lasts max(longest package, person-days ÷ team) and waves run one after another."], phase,
+                  [[days[w] for w in wave] for wave in waves],
+                  {w.id: {"duration": days[w.id], "after": list(w.depends_on)} for w in design.work_packages})
 
 
 def capacity_markdown(cap: Capacity) -> str:
