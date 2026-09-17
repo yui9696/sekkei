@@ -99,6 +99,43 @@ Two things an architect normally does in the meeting room, the engine does on it
   or closes the roof vents" → `Vents controller`), with an interface, a path and a work
   package. Every placement is listed in the notes with how it was made.
 
+## The whole hand-over, and its own red team
+
+```sh
+sekkei deliver requirements.md -o deliverables/ [--prices prices.json]
+sekkei redteam requirements.md
+```
+
+`deliver` writes what a solution architect hands over besides the design: an executive
+summary, one ADR per decision (MADR), C4 context and container diagrams (Mermaid), a risk
+register scored and owned by work package, an FMEA computed from the dependency graph
+(which requirements stop being met when a component fails), a roadmap by wave with one
+calendar formula shared with the notes, a RACI, SLOs with error budgets and burn-rate
+alerts, a cost model, and runbooks per running component. Every number is either in the
+text, computed by a formula printed next to it, or marked as an assumption. **Unit prices
+are never guessed**: the cost model lists quantities and formulas and takes prices from a
+file you supply; without one the total is a formula.
+
+`redteam` attacks the design with the requirements as the oracle and exits 1 on a high
+finding: a sentence whose deletion changes nothing in the design (recorded, not honoured),
+a number that reaches no metric or contract, a `can` and a `must not` on the same verb and
+object, a metric with two targets, more decisions guessed than taken from the text, and
+which decisions flip when every rate is doubled or a constraint is dropped. On the
+document-search evaluation spec it finds the gap the evaluation had found by hand
+(per-team visibility is recorded and ignored) in 19 engine runs.
+
+## Japanese input
+
+Requirements may be written in Japanese. A glossary (actors, verbs, domain nouns,
+qualities, technologies), a number grammar (「300ms以内」→ `within 300 ms`, 「毎秒1万件」→
+`10000 requests/s`, 「チームは3名」→ `Team of 3`) and a particle-driven reorder
+(「利用者は注文を登録できる」→ `Users can register orders`) rewrite each sentence into the
+engine's canonical English. No translation is claimed: the notes print every rewrite next
+to its source so the reader checks what was actually designed, words the glossary does not
+know are listed and dropped rather than guessed, and each requirement keeps its Japanese
+sentence as `source (ja)`. [`examples/ja/zaiko.md`](examples/ja/zaiko.md) is a Japanese
+inventory spec that designs lint-clean.
+
 ## What you get
 
 | file | contents |
@@ -170,11 +207,13 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 192 |
-| engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 4 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse) + the two-line minimal spec |
+| tests | 229 |
+| engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 22 patterns, 31 archetypes, 12 decision points / 36 options, 12 quality tactics, 13 risks, 9 language layouts |
+| catalogue | 37 patterns, 49 archetypes, 25 decision points / 73 options, 12 quality tactics, 23 risks, 9 language layouts, 44 threats |
+| `sekkei deliver` on the SaaS fixture | 31 files (18 ADRs) in about 0.5 s |
+| `sekkei redteam` on the SaaS fixture | 18 engine runs in about 0.8 s |
 
 ## How good is it, measured
 
