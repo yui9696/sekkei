@@ -147,12 +147,12 @@ def effort(design: Design, an: Analysis) -> Effort:
     try:
         waves = G.waves(g)
     except ValueError:
-        waves = [[w.id for w in design.work_packages]]
+        waves = [[w.id for w in design.work_packages]]   # a dependency cycle (lint C-rules report it); no critical path
     # critical path in days
     best: dict[str, int] = {}
     for wave in waves:
         for w in wave:
-            best[w] = days[w] + max((best[d] for d in g[w]), default=0)
+            best[w] = days[w] + max((best.get(d, 0) for d in g[w]), default=0)
     critical = max(best.values(), default=0)
     team = an.team_size or 2
     calendar = max(critical, -(-total // team))

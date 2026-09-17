@@ -74,6 +74,37 @@ THREATS: dict[str, list[Threat]] = {
     "model": [
         Threat("denial_of_service", "Adversarial or oversized inputs exhaust inference capacity.", "Input size limits; batching with timeouts.", "oversize input rejected before inference"),
     ],
+    "tenancy": [
+        Threat("information_disclosure", "A store access without the tenant predicate returns another tenant's rows.", "All reads and writes go through the tenant context; no raw store access from surfaces.", "each operation issued as tenant A with tenant B's ids returns 404"),
+        Threat("elevation", "The tenant id is taken from the request instead of the principal.", "Resolve the tenant from the authenticated principal only; reject tenant ids in bodies or headers.", "a request naming another tenant is ignored or refused"),
+    ],
+    "workflow": [
+        Threat("elevation", "A requester approves their own item or skips a step.", "Transition rules name the roles allowed per action and exclude the requester; no direct state writes.", "self-approval and out-of-order transitions return NotPermitted/InvalidTransition"),
+        Threat("repudiation", "Approvals cannot be attributed later.", "Every transition records the principal, time and comment in an append-only history.", "history has one row per transition with the actor"),
+    ],
+    "backup": [
+        Threat("information_disclosure", "Backups are readable by whoever reaches the bucket.", "Encrypt backups; separate credentials for the backup location; restrict restore.", "backup object is unreadable without the key"),
+        Threat("tampering", "A restore replaces live data with a stale or altered copy.", "Restores go to a scratch target first and require an operator confirmation; checksums verified.", "restore without confirmation is refused"),
+    ],
+    "sync": [
+        Threat("tampering", "A device pushes changes to records it does not own.", "Apply pushed changes through the core with the device's principal; ownership checked per record.", "push for a foreign record returns 403 and is not applied"),
+        Threat("denial_of_service", "A device pushes an unbounded change set.", "Cap changes per push; paginate pulls.", "oversize push returns 413"),
+    ],
+    "legacy_adapter": [
+        Threat("spoofing", "The adapter trusts anything that looks like the legacy system.", "Authenticate the legacy endpoint (mTLS or credentials); pin its address.", "connection to an impostor host fails"),
+        Threat("tampering", "Malformed legacy records corrupt the domain.", "Validate and translate every record; quarantine rejects with a report.", "a malformed record is quarantined, not applied"),
+    ],
+    "messaging": [
+        Threat("information_disclosure", "A user reads a conversation they are not part of.", "Membership check on every read and send.", "non-member read returns 404"),
+        Threat("denial_of_service", "A user floods a conversation.", "Per-sender rate limit and body size limit.", "burst from one sender returns 429"),
+    ],
+    "data_protection": [
+        Threat("repudiation", "A deletion cannot be proven later.", "Record what was deleted where, with timestamps, in the audit log.", "each completed request has a proof entry"),
+        Threat("information_disclosure", "An export goes to the wrong person.", "Exports are delivered only to the verified subject or an authorised operator; time-limited links.", "export link expires and is bound to the requester"),
+    ],
+    "reporting": [
+        Threat("information_disclosure", "Aggregates over small groups re-identify people.", "Suppress rows below a minimum group size in person-level reports.", "a report over a group of one shows no row"),
+    ],
 }
 
 
