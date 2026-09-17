@@ -406,6 +406,21 @@ def cmd_deliver(args: argparse.Namespace) -> int:
     return 0 if result.ok else 1
 
 
+def cmd_redteam(args: argparse.Namespace) -> int:
+    """Attack the design with the requirements as the oracle: inert requirements, lost numbers, fragile decisions, contradictions."""
+    from . import redteam as RT
+
+    text = _read(args.input)
+    rt = RT.run(text)
+    if args.json:
+        print(json.dumps(rt.to_json(), indent=2, ensure_ascii=False))
+    else:
+        sys.stdout.write(rt.to_markdown())
+    if args.output:
+        _write(args.output, rt.to_markdown())
+    return 1 if rt.high else 0
+
+
 def cmd_template(args: argparse.Namespace) -> int:
     from .engine import REQUIREMENTS_TEMPLATE
 
@@ -555,6 +570,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("-o", "--output", default="deliverables", help="output directory (default: deliverables/)")
     sp.add_argument("--prices", metavar="PRICES.json", help="unit prices for the cost model (keys listed in COST_MODEL.md); never guessed")
     sp.add_argument("--no-assume", action="store_true", help="do not answer open questions; leave them in the notes")
+
+    sp = add("redteam", cmd_redteam, "adversarial self-audit: which sentences the design ignores, which numbers it lost, which decisions are fragile (exit 1 on high findings)", design=False)
+    sp.add_argument("input", help="requirements text file")
+    sp.add_argument("-o", "--output", metavar="REDTEAM.md", help="also write the report")
+    sp.add_argument("--json", action="store_true")
 
     sp = add("template", cmd_template, "print a requirements template that makes the engine's job easiest", design=False)
     sp.add_argument("-o", "--output", help="write to a file, e.g. requirements.md")
