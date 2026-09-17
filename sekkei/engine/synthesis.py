@@ -395,6 +395,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         rationale = "assumed by the engine; confirm or override" if u.sentence.assumed else ""
         if not u.recognised:
             rationale = (rationale + "; " if rationale else "") + "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+        if an.normalisation and u.sentence.text in an.normalisation.sources:
+            rationale = (rationale + "; " if rationale else "") + "source (ja): " + an.normalisation.sources[u.sentence.text]
         d.requirements.append(Requirement(u.id, u.sentence.text, u.kind, u.priority, _metric_of(u), rationale=rationale))
         trace[u.id] = {"sentences": [u.sentence.index], "rules": [f"pattern:{p}" for p in u.patterns] + [f"quality:{q}" for q in u.qualities]}
 

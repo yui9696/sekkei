@@ -46,6 +46,7 @@ class Notes:
     effort: Effort
     threats_md: str
     analysis_md: str = ""
+    normalisation_md: str = ""
     sections: list[str] = field(default_factory=list)
     answers: list[Answer] = field(default_factory=list)
     placements_md: str = ""
@@ -84,6 +85,8 @@ class Notes:
         if self.analysis_md:
             s.append("## 6. How the text was read\n")
             s.append(self.analysis_md)
+        if self.normalisation_md:
+            s.append(self.normalisation_md.replace("## ", "### ", 1).replace("### Input", "## 7. Input", 1))
         return "\n".join(s).rstrip() + "\n"
 
 
@@ -101,4 +104,5 @@ def analysis_markdown(an: Analysis) -> str:
 def notes(design: Design, an: Analysis, review: Review, answers: list[Answer] | None = None,
           placements: list[Placement] | None = None) -> Notes:
     return Notes(review, questions(an), capacity(an), effort(design, an), threats_markdown(design), analysis_markdown(an),
+                 normalisation_md=an.normalisation.to_markdown() if an.normalisation else "",
                  answers=list(answers or []), placements_md=placements_markdown(placements, design) if placements else "")

@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 
 from . import catalog as K
+from . import ja
 from . import text as T
 
 
@@ -51,6 +52,7 @@ class Analysis:
     actors: list[str]
     unrecognised: list[ReqUnit]
     assumptions: list[str]
+    normalisation: ja.Normalised | None = None   # set when the input was Japanese
 
 
 _TEAM_RE = re.compile(r"team of (\d+)|(\d+)[- ]person team|(\d+) (?:engineers|developers)", re.I)
@@ -122,6 +124,10 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
     """``hints`` maps the text of an engine-assumed bullet to the patterns it legitimately activates;
     assumed bullets never activate patterns by their wording (they are policy, not capability)."""
     hints = hints or {}
+    norm = None
+    if ja.is_japanese(text):
+        norm = ja.normalise(text)
+        text = norm.text
     sentences = T.segment(text)
     low = " ".join(s.text for s in sentences if s.section != "nongoal").lower()
     active = _match_patterns(" ".join(s.text for s in sentences if s.section != "nongoal" and not s.assumed).lower())
@@ -179,5 +185,7 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
         assumptions.append("No database stated; the store decision is scored without a database constraint.")
     if not any(u.kind == "nonfunctional" for u in reqs):
         assumptions.append("No non-functional requirements found; performance and availability targets are unset.")
+    if norm and norm.untranslated:
+        assumptions.append("Japanese words the glossary does not know were dropped: " + ", ".join(f"「{w}」" for w in sorted(set(norm.untranslated))) + ".")
     return Analysis(T.title_of(text), _summary(sentences), non_goals, sentences, reqs, active, qualities, constraints,
-                    languages, team, actors, unrec, assumptions)
+                    languages, team, actors, unrec, assumptions, norm)
