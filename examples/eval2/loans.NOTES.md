@@ -11,7 +11,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 |---|---|---|---|---|---|
 | 1 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 2 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
-| 3 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
+| 3 | data | Q-migration | An existing system stays the system of record; records are exchanged, nothing is migrated in one shot. | evidence: legacy_integration pattern — The text names an existing system and describes an exchange with it. | State whether data moves; a migration package and risk are added. |
 | 4 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
 | 5 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 | 6 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
@@ -81,7 +81,7 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 - D-7 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-8 Assumed answer: load (Q-payload): **2 KB / 256 KB**
 - D-9 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-10 Assumed answer: data (Q-migration): **greenfield**
+- D-10 Assumed answer: data (Q-migration): **integrate, no migration**
 - D-11 Assumed answer: security (Q-authz): **owner-scoped + admin role**
 - D-12 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 - D-13 Assumed answer: cost (Q-budget): **existing only**
@@ -92,7 +92,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: observability, auth, file_storage, batch_pipeline, ml_inference, audit_log, import_export, kyc, workflow, compliance_data, legacy_integration
 - Quality attributes (weight): durability 0.55, performance 0.62, availability 0.78, security 0.62, operability 1.0, simplicity 0.7, compliance 0.55
-- Constraint tokens: containers, idp, object_storage, postgres, single_region; languages: python, go; team: 5
+- Constraint tokens: containers, idp, nightly_batch, object_storage, postgres, single_region; languages: python; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -103,15 +103,15 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-5 | functional | must | batch_pipeline, import_export, workflow, legacy_integration | — | — |
 | R-6 | functional | must | audit_log | — | — |
 | R-7 | functional | must | compliance_data | compliance | — |
-| R-8 | nonfunctional | should | — | performance | p95 latency at 2,000, 1,000 <= 2 s s |
+| R-8 | nonfunctional | must | — | performance | p95 latency at 2,000, 1,000 <= 2 s |
 | R-9 | nonfunctional | must | — | durability | records lost across a process crash = 0 records |
-| R-10 | nonfunctional | should | — | security | time 7 years years |
-| R-11 | nonfunctional | should | observability | availability, operability | ratio 99.9 % % |
+| R-10 | nonfunctional | should | — | security | time 7 years |
+| R-11 | nonfunctional | must | observability | availability, operability | ratio 99.9 % |
 | R-12 | constraint | must | file_storage | scalability, simplicity | — |
 | R-13 | constraint | must | auth | security | — |
 | R-14 | functional | could | auth | operability | — |
-| R-15 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-16 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-17 | nonfunctional | should | — | operability | ratio at 5 minutes, 10 minutes 1 % % |
+| R-15 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-16 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-17 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-18 | constraint | must | — | — | — |
 | R-19 | constraint | must | — | — | — |

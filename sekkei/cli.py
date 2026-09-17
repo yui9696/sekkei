@@ -161,7 +161,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print("Waves (packages in one wave may run in parallel):")
     for n, wave in enumerate(ws, 1):
         print(f"  {n}. " + ", ".join(f"{w}[{state.status(w)}]" for w in wave))
-    print(f"Critical path (weight {weight}): " + " -> ".join(path))
+    print(f"Critical path ({weight} person-days): " + " -> ".join(path))
     print("Ready now: " + (", ".join(ready) or "(nothing; all done or blocked)"))
     for a, b, i in implied:
         print(f"  note: {a} uses {i} from {b} without depends_on (C007)")
@@ -389,8 +389,15 @@ def cmd_deliver(args: argparse.Namespace) -> int:
     prices = None
     if args.prices:
         try:
-            prices = {k: float(v) for k, v in json.loads(_read(args.prices)).items()}
-        except (ValueError, AttributeError) as exc:
+            raw = json.loads(_read(args.prices))
+            if not isinstance(raw, dict):
+                raise ValueError("not a JSON object")
+            prices = {}
+            for k, v in raw.items():
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or v != v or v in (float("inf"), float("-inf")) or v < 0:
+                    raise ValueError(f"price {k!r} must be a finite number >= 0, got {v!r}")
+                prices[k] = float(v)
+        except (ValueError, TypeError, AttributeError) as exc:
             print(f"error: --prices must be a JSON object of unit prices: {exc}", file=sys.stderr)
             return 2
     result = run_engine(text, assume=not args.no_assume)

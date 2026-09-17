@@ -10,12 +10,12 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | # | topic | question answered | engine's answer | basis | if the real answer differs |
 |---|---|---|---|---|---|
 | 1 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
-| 2 | data | Q-retention | Records kept 90 days, audit history 1 year, then deleted by a nightly job. | default — Bounded retention limits storage growth and satisfies most data-minimisation rules. | State the retention; the deletion job and capacity change. |
+| 2 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
 | 3 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
-| 4 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
+| 4 | data | Q-migration | An existing system stays the system of record; records are exchanged, nothing is migrated in one shot. | evidence: legacy_integration pattern — The text names an existing system and describes an exchange with it. | State whether data moves; a migration package and risk are added. |
 | 5 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
 | 6 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
-| 7 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | evidence: personal data mentioned — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
+| 7 | compliance | Q-compliance | The regime named in the text applies; deletion on request and access logging are designed. | evidence: compliance_data pattern — The requirements name a data-protection regime or a deletion right. | State the statutory deadline; the deletion job's deadline changes. |
 | 8 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 | 9 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
 
@@ -23,8 +23,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-1 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'doctors': a use case |
-| R-2 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'patients': a use case |
+| R-1 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'doctor': a use case |
+| R-2 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'patient': a use case |
 
 ## 2. Capacity estimates
 
@@ -85,10 +85,6 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - **R-1**: Patients departments choose doctors. The system can register, change and cancel available slots from appointments.
 - **R-2**: Staff can accept and register bookings patients. Staff can view bookings list the same day departments each.
 
-### Assumptions made
-
-- Japanese words the glossary does not know were dropped: 「いつ」, 「ったか」, 「ポータル」, 「代わり」, 「使う」, 「保険」, 「入っ」, 「入院」, 「取」, 「従って」, 「操作」, 「月末」, 「来診療」, 「減らす」, 「規模病院」, 「誰」, 「配置」, 「電話対応」.
-
 ### Decisions taken (scored trade-offs)
 
 - D-1 API style: **REST/JSON over HTTP**
@@ -96,52 +92,48 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-4 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-5 Protection of personal data: **Encryption at rest by the platform plus strict access control and audit**
-- D-6 Integration with the existing system: **API façade (anti-corruption layer) calling the legacy system's interfaces, with a translation layer and retries**
+- D-6 Integration with the existing system: **Scheduled batch file exchange (CSV/fixed format) through a shared drop**
 - D-7 Concurrency control for conflicting writes: **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
 - D-8 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-9 Assumed answer: load (Q-payload): **2 KB / 256 KB**
-- D-10 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-10 Assumed answer: data (Q-retention): **indefinite / 1 year**
 - D-11 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-12 Assumed answer: data (Q-migration): **greenfield**
+- D-12 Assumed answer: data (Q-migration): **integrate, no migration**
 - D-13 Assumed answer: security (Q-authz): **owner-scoped + admin role**
 - D-14 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
-- D-15 Assumed answer: compliance (Q-compliance): **GDPR-style deletion + audit**
+- D-15 Assumed answer: compliance (Q-compliance): **named regime + deletion + audit**
 - D-16 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 - D-17 Assumed answer: cost (Q-budget): **existing only**
-
-### Notes
-
-- R-9 is a quality statement without a number; agree a target before accepting the metric check.
 
 ## 6. How the text was read
 
 - Patterns recognised: crud_api, notification, observability, auth, search, batch_pipeline, scheduler_jobs, sms_notification, audit_log, compliance_data, legacy_integration
 - Quality attributes (weight): consistency 0.76, durability 0.64, performance 1.0, availability 1.0, security 0.76, operability 1.0, simplicity 0.88, compliance 0.76
-- Constraint tokens: containers, idp, postgres, single_region; languages: python; team: 3
+- Constraint tokens: containers, idp, nightly_batch, postgres, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
 | R-1 | functional | must | **none** | — | — |
 | R-2 | functional | must | **none** | — | — |
-| R-3 | functional | must | notification, sms_notification | — | — |
+| R-3 | functional | must | notification, scheduler_jobs, sms_notification | — | — |
 | R-4 | functional | must | scheduler_jobs | — | — |
 | R-5 | functional | must | batch_pipeline | — | — |
 | R-6 | functional | must | audit_log | operability, compliance | — |
 | R-7 | functional | must | batch_pipeline, legacy_integration | operability | — |
-| R-8 | nonfunctional | must | search | performance | p95 latency <= 500 ms ms |
-| R-9 | nonfunctional | must | — | consistency | target to be agreed review |
-| R-10 | nonfunctional | must | compliance_data | security | unauthenticated or cross-tenant requests accepted = 0 requests |
-| R-11 | nonfunctional | should | — | availability | ratio >= 99.5 % % |
-| R-12 | nonfunctional | should | — | performance | sustained rate at 20 3000 requests /day requests /day |
+| R-8 | nonfunctional | must | search | performance | p95 latency <= 500 ms |
+| R-9 | nonfunctional | must | — | consistency | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-10 | nonfunctional | must | compliance_data | security | retention/deletion rules exercised = all |
+| R-11 | nonfunctional | must | — | availability | ratio >= 99.5 % |
+| R-12 | nonfunctional | must | — | performance | sustained rate at 20 3000 requests /day |
 | R-13 | constraint | must | — | scalability, simplicity | — |
 | R-14 | constraint | must | auth | security | — |
-| R-15 | functional | must | batch_pipeline | compliance | — |
+| R-15 | functional | must | batch_pipeline | operability, compliance | — |
 | R-16 | functional | could | auth | operability | — |
-| R-17 | functional | must | audit_log | performance, compliance | — |
-| R-18 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-19 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-20 | nonfunctional | should | — | durability | time at 5 10 s s |
-| R-21 | nonfunctional | should | — | operability | ratio at 5 minutes, 10 minutes 1 % % |
+| R-17 | functional | must | compliance_data | compliance | — |
+| R-18 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-19 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-20 | nonfunctional | should | — | durability | time at 5 10 s |
+| R-21 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-22 | constraint | must | — | — | — |
 | R-23 | constraint | must | — | — | — |
 
@@ -157,18 +149,18 @@ The engine reads English. Each Japanese sentence was rewritten with a glossary a
 | 患者は予約の前日にメールまたは SMS でリマインドを受け取る。 | Patients bookings the day before email or SMS receive reminders. |
 | 医師は自分の診察予定と患者の基本情報(氏名、生年月日、保険証番号)を閲覧できる。 | Doctors can view basic information name date of birth insurance number their own appointments schedule patients. |
 | 予約枠は診療科ごとの診療時間と医師のシフトから毎週自動生成する。 | The system must generate slots departments each opening hours doctors shifts from weekly. |
-| 予約・変更・キャンセルの操作履歴を、誰がいつ行ったかとともに記録する。 | The system must change and record audit log bookings cancel rows. |
+| 予約・変更・キャンセルの操作履歴を、誰がいつ行ったかとともに記録する。 | The system must change and record audit log bookings cancel who when rows. |
 | 既存の電子カルテシステム(基幹システム)へ、確定した予約を夜間に連携する。 | The system must integrate confirmed bookings existing electronic health record system external services nightly. |
 | 空き枠の検索は 500ms 以内(p95)に応答すること。 | The system must respond available slots search within 500 ms p95. |
 | 同じ枠に二重に予約が入ってはならない。 | Same must never be slots double-applied bookings. |
-| 患者情報は暗号化して保存し、個人情報保護法に従って本人の求めに応じて削除できること。 | The system must save patient records encrypted. The system can delete appi on request. |
+| 患者情報は暗号化して保存し、個人情報保護法に従って本人の求めに応じて削除できること。 | The system must save patient records encrypted. The system can delete appi in accordance with on request. |
 | 月間稼働率 99.5% 以上。 | Monthly availability at least 99.5 %. |
 | 1 日あたり 3,000 件の予約操作、月末には毎秒 20 件のピーク。 | 3000 requests/day bookings 20 requests/s peak. |
 | Python 3.12、PostgreSQL を利用可能。 | The system can use Python 3.12 PostgreSQL. |
 | チームは 3 名。 | Team of 3. |
 | コンテナで単一リージョンに配置する。 | Containers single region. |
-| 患者の認証は既存の患者ポータル(OIDC)を使う。 | Patients authenticate existing patients OIDC. |
+| 患者の認証は既存の患者ポータル(OIDC)を使う。 | Patients authenticate existing patient portal OIDC. |
 | 会計・保険請求。 | Accounting invoices. |
-| 入院予約。 | Bookings. |
+| 入院予約。 | Inpatient bookings. |
 
-Words the glossary does not know (dropped from the English; add them to the text in English or extend the glossary): 「いつ」, 「ったか」, 「ポータル」, 「代わり」, 「使う」, 「保険」, 「入っ」, 「入院」, 「取」, 「従って」, 「操作」, 「月末」, 「来診療」, 「減らす」, 「規模病院」, 「誰」, 「配置」, 「電話対応」
+Words the glossary does not know (dropped from the English; add them to the text in English or extend the glossary): 「ったか」, 「代わり」, 「使う」, 「保険」, 「入っ」, 「取」, 「操作」, 「月末」, 「来診療」, 「減らす」, 「規模病院」, 「配置」, 「電話対応」

@@ -127,7 +127,7 @@
     },
     {
       "id": "R-12",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -136,7 +136,7 @@
       "id": "R-13",
       "statement": "The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "sustained rate at 2,000, 5 s",
         "target": "4000 updates /s",
@@ -148,7 +148,7 @@
       "id": "R-14",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "size at 2 KB",
         "target": "<= 256 kb",
@@ -216,10 +216,8 @@
       "path": "internal/store/store.go",
       "requires": [],
       "satisfies": [
-        "R-7",
         "R-8",
         "R-10",
-        "R-15",
         "R-17"
       ],
       "tags": [
@@ -260,7 +258,6 @@
         "R-6",
         "R-1",
         "R-3",
-        "R-7",
         "R-10",
         "R-18",
         "R-19"
@@ -870,22 +867,40 @@
           "description": "from R-6: Operators receive an alert when no driver accepts a request within 2 minutes."
         },
         {
-          "name": "record_audit",
+          "name": "record_kept",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "kept",
+              "type": "Kept | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Kept | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-12); 1 year (R-12)",
+          "pre": "stated values: 1 year (R-12)",
           "post": "",
-          "description": "from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
+          "name": "log_history",
+          "inputs": [
+            {
+              "name": "history",
+              "type": "History | id",
+              "description": ""
+            }
+          ],
+          "output": "History | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-12)",
+          "post": "",
+          "description": "from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         },
         {
           "name": "delete_job",
@@ -901,9 +916,9 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-12); 1 year (R-12)",
+          "pre": "stated values: 1 year (R-12)",
           "post": "",
-          "description": "from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1292,7 +1307,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 15 seconds (R-2); 90 days (R-12); 1 year (R-12)",
+          "pre": "stated values: 15 seconds (R-2); 1 year (R-12)",
           "post": "",
           "description": ""
         }
@@ -1770,7 +1785,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; In-memory: 1.63; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.26; In-memory: 1.64; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
       "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
       "affects": [
         "C-1"
@@ -1815,7 +1830,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.83; Single process with background threads: 1.49; Separate services per concern: 1.35",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.85; Single process with background threads: 1.50; Separate services per concern: 1.34",
       "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
         "C-11",
@@ -1860,7 +1875,7 @@
         }
       ],
       "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.75; Last write wins: 1.56",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.74; Row locks inside a short transaction: 1.74; Last write wins: 1.55",
       "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
       "affects": [
         "C-1",
@@ -1906,7 +1921,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.52; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-11",
@@ -2007,6 +2022,11 @@
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
         {
+          "name": "indefinite / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
           "name": "90 days / 1 year",
           "pros": [],
           "cons": []
@@ -2015,16 +2035,11 @@
           "name": "30 days / 90 days",
           "pros": [],
           "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
         }
       ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "choice": "indefinite / 1 year",
+      "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
         "C-10",
         "C-1"
@@ -2301,7 +2316,6 @@
       ],
       "depends_on": [],
       "satisfies": [
-        "R-7",
         "R-8",
         "R-10",
         "R-15",
@@ -2324,31 +2338,17 @@
         },
         {
           "id": "A-2",
-          "description": "R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-7"
-        },
-        {
-          "id": "A-3",
           "description": "R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-4",
-          "description": "R-15: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-3",
+          "description": "R-15: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-15"
-        },
-        {
-          "id": "A-5",
-          "description": "R-17: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-17"
         }
       ],
       "notes": "family: infra"
@@ -2374,7 +2374,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-6",
+          "id": "A-4",
           "description": "unit tests of Event bus pass",
           "kind": "test",
           "command": "go test ./internal/bus/",
@@ -2406,7 +2406,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-5",
           "description": "unit tests of Geospatial index pass",
           "kind": "test",
           "command": "go test ./internal/geo/",
@@ -2444,7 +2444,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-6",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "go test ./internal/auth/",
@@ -2476,7 +2476,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-7",
           "description": "unit tests of Payments pass",
           "kind": "test",
           "command": "go test ./internal/payments/",
@@ -2506,7 +2506,6 @@
         "R-3",
         "R-5",
         "R-6",
-        "R-7",
         "R-10",
         "R-18",
         "R-19"
@@ -2518,18 +2517,11 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-8",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "go test ./internal/core/",
           "metric": ""
-        },
-        {
-          "id": "A-11",
-          "description": "R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-7"
         }
       ],
       "notes": "family: geo"
@@ -2560,7 +2552,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-9",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "go test ./internal/batch/",
@@ -2601,46 +2593,25 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-10",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "go test ./internal/surface_api/",
           "metric": ""
         },
         {
-          "id": "A-14",
-          "description": "R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-11",
+          "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-7"
         },
         {
-          "id": "A-15",
-          "description": "R-9: time 30 days days",
+          "id": "A-12",
+          "description": "R-9: time 30 days",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
-        },
-        {
-          "id": "A-16",
-          "description": "R-13: sustained rate at 2,000, 5 s 4000 updates /s updates /s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-13"
-        },
-        {
-          "id": "A-17",
-          "description": "R-14: size at 2 KB <= 256 kb kb",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-14"
-        },
-        {
-          "id": "A-18",
-          "description": "R-16: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
         }
       ],
       "notes": "family: infra"
@@ -2672,7 +2643,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-13",
           "description": "unit tests of Push gateway pass",
           "kind": "test",
           "command": "go test ./internal/push/",

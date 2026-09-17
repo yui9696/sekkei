@@ -39,6 +39,17 @@ def _table(header: list[str], rows: list[list[str]]) -> str:
     return "\n".join(out) + "\n"
 
 
+def _decision(design: Design, word: str):
+    """The decision about *word* — a catalogue decision by title, else the engine's assumed answer (title 'Assumed answer: … (Q-word)')."""
+    for d in design.decisions:
+        if d.status == "accepted" and word in d.title.lower():
+            return d
+    for d in design.decisions:
+        if word in d.title.lower():
+            return d
+    return None
+
+
 def _wp_of(design: Design) -> dict[str, WorkPackage]:
     return {c: w for w in design.work_packages for c in w.components}
 
@@ -128,9 +139,21 @@ def adrs(design: Design) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+def _people(actors: list[str]) -> list[str]:
+    from .engine import text as T
+    out: list[str] = []
+    for a in actors:
+        if a not in T.HUMAN_ACTORS:
+            continue
+        base = a[:-1] if a.endswith("s") and a[:-1] in actors else a
+        if base not in out:
+            out.append(base)
+    return out
+
+
 def c4_context(design: Design, actors: list[str]) -> str:
     out = ["graph TB", f'  SYS["{design.name}"]']
-    for a in actors:
+    for a in _people(actors):
         out.append(f'  A_{_slug(a).replace("-", "_")}(["{a}"])')
         out.append(f'  A_{_slug(a).replace("-", "_")} --> SYS')
     for c in design.components:
@@ -191,6 +214,8 @@ def risk_register(design: Design) -> str:
 # ---------------------------------------------------------------------------
 
 _MODES = (("unavailable", "calls fail or time out"), ("slow", "latency above target; queues grow"), ("corrupt", "wrong or lost data"))
+#: archetypes whose failure degrades a side effect (notifications, telemetry, exports) but does not stop the request path
+_ASYNC = {"notifier", "email", "sms", "observability", "audit", "bus", "cdn", "backup", "reporting", "batch", "scheduler", "exporter", "sftp_target", "legacy_adapter", "legacy_system"}
 
 
 def fmea(design: Design) -> str:
@@ -198,14 +223,16 @@ def fmea(design: Design) -> str:
     names = {c.id: c.name for c in design.components}
     req = {r.id: r for r in design.requirements}
     has_obs = any("observability" in " ".join(c.tags) for c in design.components)
-    redundancy = next((d for d in design.decisions if d.title.startswith("Redundancy")), None)
-    backup = next((d for d in design.decisions if d.title.startswith("Backup")), None)
+    redundancy = _decision(design, "redundancy")
+    backup = _decision(design, "backup")
     rows = []
+    arch = {c.id: {t.split(":", 1)[1] for t in c.tags if t.startswith("archetype:")} for c in design.components}
     for c in design.components:
-        affected = {c.id} | deps.get(c.id, set())
+        is_async = bool(arch[c.id] & _ASYNC)
+        affected = {c.id} if is_async else {c.id} | deps.get(c.id, set())
         sat = sorted({r for x in design.components if x.id in affected for r in x.satisfies})
         musts = [r for r in sat if r in req and req[r].priority == "must"]
-        sev = "high" if musts else "medium" if sat else "low"
+        sev = ("medium" if musts else "low") if is_async else ("high" if musts else "medium" if sat else "low")
         for mode, effect in _MODES:
             if mode == "corrupt" and c.kind not in ("datastore", "job", "module"):
                 continue
@@ -220,10 +247,12 @@ def fmea(design: Design) -> str:
             else:
                 mitig = "health check + restart; dependents degrade (read-only / queue) rather than fail"
             detect = "metrics + alert (observability component present)" if has_obs else "**none** — no observability component in the design"
-            rows.append([c.id + " " + names[c.id], mode, effect, ", ".join(sorted(names[x] for x in affected - {c.id})) or "—",
+            rows.append([c.id + " " + names[c.id], mode, effect + (" (side effect only: notifications/telemetry/exports degrade, the request path continues)" if is_async and mode != "corrupt" else ""),
+                         ", ".join(sorted(names[x] for x in affected - {c.id})) or "—",
                          ", ".join(sat) or "—", sev, detect, mitig])
     return ("# FMEA — failure modes and effects\n\nEffects are computed from the dependency graph (who requires this component's interfaces, transitively) "
-            "and from `satisfies` (which requirements stop being met). Severity: high when a must-have requirement is affected.\n\n"
+            "and from `satisfies` (which requirements stop being met). Components whose work is a side effect (notifier, email/SMS provider, observability, audit, exports, batch, CDN, "
+            "legacy exchange) do not propagate: their failure degrades that side effect, not the request path. Severity: high when a must-have requirement on the request path is affected.\n\n"
             + _table(["component", "failure mode", "local effect", "dependents affected", "requirements at risk", "severity", "detection", "mitigation"], rows))
 
 
@@ -231,7 +260,7 @@ def fmea(design: Design) -> str:
 # 6. Roadmap and RACI
 # ---------------------------------------------------------------------------
 
-SIZE_DAYS = {"S": 2, "M": 5, "L": 10}
+SIZE_DAYS = G.SIZE_WEIGHT
 
 
 def roadmap(design: Design, effort) -> str:
@@ -303,9 +332,11 @@ def _slo_target(m) -> str:
 def slos(design: Design) -> str:
     rows = []
     for r in design.requirements:
-        if r.kind != "nonfunctional" or not r.metric:
+        if r.kind != "nonfunctional" or not r.metric or r.rationale.startswith("assumed"):
             continue
         m = r.metric
+        if not any(k in m.name for k in ("latency", "availability", "ratio", "rate", "lost", "time")) or m.target == "review":
+            continue
         cmp, val = _num(m.target)
         budget = ""
         if val is not None and (m.unit.strip().startswith("%") or "%" in m.target) and 90 <= val < 100:
@@ -322,8 +353,9 @@ def slos(design: Design) -> str:
             budget = "**target to agree** (quality statement without a number)"
             alert = "—"
         rows.append([r.id, m.name, _slo_target(m), budget, alert, r.statement[:120]])
-    return ("# SLOs\n\nOne row per measurable quality requirement. Error budgets use a 30-day window. Burn-rate thresholds are the usual SRE defaults; tune after a month of data.\n\n"
-            + _table(["req", "SLI", "SLO", "budget", "alerting", "source"], rows))
+    return ("# SLOs\n\nOne row per measurable quality requirement stated in the text (latency, availability, rate, loss, time); engine assumptions are not SLOs. "
+            "Error budgets use a 30-day window. Burn-rate thresholds are the usual SRE defaults; tune after a month of data.\n\n"
+            + (_table(["req", "SLI", "SLO", "budget", "alerting", "source"], rows) if rows else "No measurable quality requirement stated; agree SLOs before go-live.\n"))
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +382,7 @@ def cost_lines(design: Design, notes, prices: dict[str, float] | None = None) ->
     lines: list[CostLine] = []
     services = [c for c in design.components if c.kind == "service"]
     jobs = [c for c in design.components if c.kind == "job"]
-    redundancy = next((d for d in design.decisions if d.title.startswith("Redundancy")), None)
+    redundancy = _decision(design, "redundancy")
     per_role = 2 if redundancy and redundancy.choice.startswith("Two or more") else 1
     if services:
         lines.append(CostLine("application instances (services)", per_role * len(services), "instance-month",
@@ -378,6 +410,10 @@ def cost_lines(design: Design, notes, prices: dict[str, float] | None = None) ->
     return lines
 
 
+def unknown_price_keys(lines: list[CostLine], prices: dict[str, float] | None) -> list[str]:
+    return sorted(set(prices or {}) - {ln.price_key for ln in lines})
+
+
 def cost_model(design: Design, notes, prices: dict[str, float] | None = None) -> str:
     lines = cost_lines(design, notes, prices)
     rows = [[ln.item, f"{ln.qty:g}", ln.unit, ln.formula, ln.price_key, "?" if ln.price is None else f"{ln.price:g}",
@@ -394,6 +430,9 @@ def cost_model(design: Design, notes, prices: dict[str, float] | None = None) ->
          "Unit prices are **not** guessed: supply them with `--prices prices.json` (keys in the *price key* column), otherwise the column reads `?` and the total is a formula.\n",
          _table(["item", "qty", "unit", "how the quantity was derived", "price key", "unit price", "monthly"], rows),
          f"\n**Total per month: {total}**\n"]
+    extra = unknown_price_keys(lines, prices)
+    if extra:
+        s.append(f"\n**Warning**: price keys not used by any line: {', '.join(extra)} (check the spelling against the *price key* column).\n")
     if unknown:
         s.append("\nExample prices file:\n\n```json\n" + json.dumps({k: 0 for k in sorted(set(unknown))}, indent=2) + "\n```\n")
     s.append("\nNot in this model: people (see the roadmap for person-days), egress, licences, and one-off migration work.\n")
@@ -408,7 +447,7 @@ def cost_model(design: Design, notes, prices: dict[str, float] | None = None) ->
 def runbooks(design: Design) -> str:
     s = ["# Runbooks\n", "One section per component that runs or stores. Steps are the standard ones for the component's kind; fill the command column when the code exists.\n"]
     alerting = next((r for r in design.requirements if "alert" in r.statement.lower()), None)
-    backup = next((d for d in design.decisions if d.title.startswith("Backup")), None)
+    backup = _decision(design, "backup")
     for c in design.components:
         if c.kind not in ("service", "job", "datastore"):
             continue

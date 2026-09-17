@@ -21,7 +21,7 @@ _version 0.1.0 · schema sekkei/1_
 **Non-goals**
 
 - Accounting invoices.
-- Bookings.
+- Inpatient bookings.
 
 ## Requirements
 
@@ -32,23 +32,23 @@ _version 0.1.0 · schema sekkei/1_
 | R-3 | functional | must | Patients bookings the day before email or SMS receive reminders. | — |
 | R-4 | functional | must | Doctors can view basic information name date of birth insurance number their own appointments schedule patients. | — |
 | R-5 | functional | must | The system must generate slots departments each opening hours doctors shifts from weekly. | — |
-| R-6 | functional | must | The system must change and record audit log bookings cancel rows. | — |
+| R-6 | functional | must | The system must change and record audit log bookings cancel who when rows. | — |
 | R-7 | functional | must | The system must integrate confirmed bookings existing electronic health record system external services nightly. | — |
-| R-8 | nonfunctional | must | The system must respond available slots search within 500 ms p95. | p95 latency <= 500 ms ms |
-| R-9 | nonfunctional | must | Same must never be slots double-applied bookings. | target to be agreed review |
-| R-10 | nonfunctional | must | The system must save patient records encrypted. The system can delete appi on request. | unauthenticated or cross-tenant requests accepted = 0 requests |
-| R-11 | nonfunctional | should | Monthly availability at least 99.5 %. | ratio >= 99.5 % % |
-| R-12 | nonfunctional | should | 3000 requests/day bookings 20 requests/s peak. | sustained rate at 20 3000 requests /day requests /day |
+| R-8 | nonfunctional | must | The system must respond available slots search within 500 ms p95. | p95 latency <= 500 ms |
+| R-9 | nonfunctional | must | Same must never be slots double-applied bookings. | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-10 | nonfunctional | must | The system must save patient records encrypted. The system can delete appi in accordance with on request. | retention/deletion rules exercised = all |
+| R-11 | nonfunctional | must | Monthly availability at least 99.5 %. | ratio >= 99.5 % |
+| R-12 | nonfunctional | must | 3000 requests/day bookings 20 requests/s peak. | sustained rate at 20 3000 requests /day |
 | R-13 | constraint | must | The system can use Python 3.12 PostgreSQL. Team of 3. Containers single region. | — |
-| R-14 | constraint | must | Patients authenticate existing patients OIDC. | — |
-| R-15 | functional | must | Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
+| R-14 | constraint | must | Patients authenticate existing patient portal OIDC. | — |
+| R-15 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-16 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-17 | functional | must | Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine). | — |
-| R-18 | nonfunctional | should | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb kb |
-| R-19 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-20 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s s |
-| R-21 | nonfunctional | should | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % % |
-| R-22 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-17 | functional | must | Personal data is deleted on request and access to it is logged, under the regime the requirements name (assumed by the engine: regime named). | — |
+| R-18 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-19 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-20 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-21 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-22 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
 | R-23 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
 ## Components
@@ -100,7 +100,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-9, R-13, R-20
+- **satisfies**: R-9, R-10, R-13, R-20
 
 ### C-2 — Email provider
 
@@ -124,7 +124,7 @@ graph LR
 - **responsibility**: Append-only record of who did what to which resource, queryable by resource and actor.
 - **provides**: I-4
 - **requires**: —
-- **satisfies**: R-6, R-17
+- **satisfies**: R-6, R-10, R-17
 
 ### C-5 — Existing system
 
@@ -164,7 +164,7 @@ graph LR
 - **responsibility**: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.
 - **provides**: I-9
 - **requires**: I-1
-- **satisfies**: R-10, R-14, R-16
+- **satisfies**: R-14, R-16
 
 ### C-10 — Search index
 
@@ -180,7 +180,7 @@ graph LR
 - **responsibility**: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 - **provides**: I-11
 - **requires**: I-8
-- **satisfies**: R-4, R-5, R-7, R-15
+- **satisfies**: R-3, R-4, R-5, R-7, R-15
 
 ### C-12 — Batch job
 
@@ -204,7 +204,7 @@ graph LR
 - **responsibility**: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 - **provides**: I-14
 - **requires**: I-1, I-4
-- **satisfies**: R-13
+- **satisfies**: R-10, R-17
 
 ### C-15 — Public HTTP API
 
@@ -306,17 +306,21 @@ graph LR
 | `open_shifts` | `shifts`: Shifts \| id | Shifts \| None | ValidationError, NotFound | — |
 | | from R-5: The system must generate slots departments each opening hours doctors shifts from weekly. | | | |
 | `update_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel rows. | | | |
+| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel rows. | | | |
+| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `log_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel rows. | | | |
+| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `cancel_rows` | `rows`: Rows \| id | Rows \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel rows. | | | |
+| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `record_external` | `external`: External \| id | External \| None | ValidationError, NotFound | — |
 | | from R-7: The system must integrate confirmed bookings existing electronic health record system exte | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-15); 1 year (R-15) |
-| | from R-15: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
+| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
+| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
+| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
+| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-7 — Notifier interface
 
@@ -380,7 +384,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `run` | `window`: DateRange | JobReport | JobError | stated values: 90 days (R-15); 1 year (R-15) |
+| `run` | `window`: DateRange | JobReport | JobError | stated values: 1 year (R-15) |
 
 ### I-13 — Legacy system adapter interface
 
@@ -712,11 +716,11 @@ _Affects:_ C-14, C-1
 
 **Context.** Records must flow between the new system and the one that already exists.
 
-- ✔ **API façade (anti-corruption layer) calling the legacy system's interfaces, with a translation layer and retries**
+- ✘ **API façade (anti-corruption layer) calling the legacy system's interfaces, with a translation layer and retries**
   - + legacy schema never leaks in
   - + quirks isolated in one module
   - − depends on the legacy system's uptime
-- ✘ **Scheduled batch file exchange (CSV/fixed format) through a shared drop**
+- ✔ **Scheduled batch file exchange (CSV/fixed format) through a shared drop**
   - + works with any system
   - + no live coupling
   - − latency of the schedule
@@ -727,9 +731,9 @@ _Affects:_ C-14, C-1
   - − coupled to the legacy schema
   - − capture tooling to operate
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). API façade: 1.63; Scheduled batch file exchange: 1.59; Change data capture from the legacy database: 1.41
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.59; API façade: 1.63; Change data capture from the legacy database: 1.41. stated in the constraints
 
-**Consequences.** Not choosing 'Scheduled batch file exchange' gives up: works with any system, no live coupling. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
+**Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
 _Affects:_ C-13
 
@@ -798,13 +802,13 @@ _Affects:_ C-15
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
-- ✔ **90 days / 1 year**
+- ✔ **indefinite / 1 year**
+- ✘ **90 days / 1 year**
 - ✘ **30 days / 90 days**
-- ✘ **indefinite**
 
-**Rationale.** Bounded retention limits storage growth and satisfies most data-minimisation rules.
+**Rationale.** Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.
 
-**Consequences.** If the real answer differs: State the retention; the deletion job and capacity change.
+**Consequences.** If the real answer differs: State the retention per record class; the deletion job and capacity change.
 
 _Affects:_ C-12, C-1
 
@@ -824,15 +828,17 @@ _Affects:_ C-1
 
 ### D-12 — Assumed answer: data (Q-migration) (proposed)
 
-**Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
+**Context.** The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.
 
-- ✔ **greenfield**
+- ✔ **integrate, no migration**
 - ✘ **one-shot import**
 - ✘ **gradual cut-over**
 
-**Rationale.** Nothing in the text names an existing system.
+**Rationale.** The text names an existing system and describes an exchange with it.
 
-**Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
+**Consequences.** If the real answer differs: State whether data moves; a migration package and risk are added.
+
+_Affects:_ C-13
 
 ### D-13 — Assumed answer: security (Q-authz) (proposed)
 
@@ -864,17 +870,17 @@ _Affects:_ C-11
 
 ### D-15 — Assumed answer: compliance (Q-compliance) (proposed)
 
-**Context.** The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.
+**Context.** The requirements do not say. Question: Q-compliance. Evidence: compliance_data pattern.
 
-- ✔ **GDPR-style deletion + audit**
+- ✔ **named regime + deletion + audit**
 - ✘ **no regime**
 - ✘ **HIPAA/PCI controls**
 
-**Rationale.** Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.
+**Rationale.** The requirements name a data-protection regime or a deletion right.
 
-**Consequences.** If the real answer differs: State the regime; audit and deletion paths change.
+**Consequences.** If the real answer differs: State the statutory deadline; the deletion job's deadline changes.
 
-_Affects:_ C-4, C-1
+_Affects:_ C-14, C-4
 
 ### D-16 — Assumed answer: operations (Q-alerting) (proposed)
 
@@ -967,17 +973,18 @@ graph LR
 3. WP-7
 4. WP-10, WP-8, WP-9
 
-_Critical path (weight 5):_ WP-2 → WP-5 → WP-7 → WP-9
+_Critical path (12 person-days):_ WP-2 → WP-4 → WP-9
 
 ### WP-1 — Audit log (S)
 
 Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: — · **satisfies**: R-6, R-17
+- **depends on**: — · **satisfies**: R-6, R-10, R-17
 - **write scope**: `app/audit.py`, `tests/test_audit.py`
 - **acceptance**:
   - A-1 (test) unit tests of Audit log pass — `python -m pytest -q tests/test_audit.py`
+  - A-2 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: audit_log
 
 ### WP-2 — Store + Observability (M)
@@ -985,14 +992,13 @@ Implement Audit log: Append-only record of who did what to which resource, query
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
 - **components**: C-1, C-8 · **implements**: I-1, I-8
-- **depends on**: — · **satisfies**: R-9, R-11, R-13, R-20, R-21
+- **depends on**: — · **satisfies**: R-9, R-10, R-11, R-13, R-20, R-21
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
 - **acceptance**:
-  - A-2 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
-  - A-3 (metric) R-9: target to be agreed review — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
-  - A-4 (metric) R-11: ratio >= 99.5 % % — kill one instance under load; error rate stays within the target — metric R-11
-  - A-5 (metric) R-20: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-20
-  - A-6 (metric) R-21: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload — metric R-21
+  - A-3 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
+  - A-4 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-5 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
+  - A-6 (metric) R-11: ratio >= 99.5 % — kill one instance under load; error rate stays within the target — metric R-11
 - **notes**: family: infra
 
 ### WP-3 — Data protection (S)
@@ -1000,10 +1006,11 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 Implement Data protection: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 
 - **components**: C-14 · **implements**: I-14
-- **depends on**: WP-1, WP-2 · **satisfies**: —
+- **depends on**: WP-1, WP-2 · **satisfies**: R-10, R-17
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
   - A-7 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
+  - A-8 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: compliance_data
 
 ### WP-4 — Authentication + Scheduler (M)
@@ -1011,11 +1018,10 @@ Implement Data protection: Retention schedules, deletion and export requests for
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
 - **components**: C-9, C-11 · **implements**: I-9, I-11
-- **depends on**: WP-2 · **satisfies**: R-4, R-5, R-7, R-10, R-14, R-15, R-16
+- **depends on**: WP-2 · **satisfies**: R-3, R-4, R-5, R-7, R-14, R-15, R-16
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-8 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
-  - A-9 (metric) R-10: unauthenticated or cross-tenant requests accepted = 0 requests — security test: unauthenticated and cross-tenant requests are rejected; outbound calls to private ranges are blocked — metric R-10
+  - A-9 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
 - **notes**: family: infra
 
 ### WP-5 — Notifier (S)
@@ -1038,8 +1044,8 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
   - A-11 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-12 (metric) R-8: p95 latency <= 500 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-13 (metric) R-12: sustained rate at 20 3000 requests /day requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
+  - A-12 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-13 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: search
 
 ### WP-7 — Domain core (S)
@@ -1051,7 +1057,7 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-14 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
-  - A-15 (metric) R-9: target to be agreed review — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-15 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
 - **notes**: family: crud_api
 
 ### WP-8 — Batch job (S)
@@ -1074,10 +1080,8 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-18 (metric) R-8: p95 latency <= 500 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-19 (metric) R-12: sustained rate at 20 3000 requests /day requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
-  - A-20 (metric) R-18: size at 2 KB <= 256 kb kb — metric R-18
-  - A-21 (metric) R-19: time at 4 h 24 h h — metric R-19
+  - A-18 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-19 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: crud_api
 
 ### WP-10 — Legacy system adapter (S)
@@ -1088,34 +1092,34 @@ Implement Legacy system adapter: Anti-corruption layer in front of the existing 
 - **depends on**: WP-7 · **satisfies**: R-7
 - **write scope**: `app/legacy_adapter.py`, `tests/test_legacy_adapter.py`
 - **acceptance**:
-  - A-22 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
+  - A-20 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
 - **notes**: family: legacy_integration
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19, A-20, A-21 |
-| R-2 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19, A-20, A-21 |
-| R-3 | must | C-2, C-3, C-7 | WP-5 | A-10 |
-| R-4 | must | C-11 | WP-4 | A-8, A-9 |
-| R-5 | must | C-11, C-12 | WP-4, WP-8 | A-8, A-9, A-16 |
-| R-6 | must | C-4 | WP-1 | A-1 |
-| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-4, WP-7, WP-8, WP-10 | A-8, A-9, A-14, A-15, A-16, A-22 |
-| R-8 | must | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19, A-20, A-21 |
-| R-9 | must | C-1, C-6 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-6, A-14, A-15 |
-| R-10 | must | C-9 | WP-4 | A-8, A-9 |
-| R-11 | should | C-8 | WP-2 | A-2, A-3, A-4, A-5, A-6 |
-| R-12 | should | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19, A-20, A-21 |
-| R-13 | must | C-1, C-6, C-14, C-15 | WP-2, WP-7, WP-9 | A-2, A-3, A-4, A-5, A-6, A-14, A-15, A-17, A-18, A-19, A-20, A-21 |
-| R-14 | must | C-9 | WP-4 | A-8, A-9 |
-| R-15 | must | C-11, C-12 | WP-4, WP-8 | A-8, A-9, A-16 |
-| R-16 | could | C-9 | WP-4 | A-8, A-9 |
-| R-17 | must | C-4 | WP-1 | A-1 |
-| R-18 | should | C-15 | WP-9 | A-17, A-18, A-19, A-20, A-21 |
-| R-19 | should | C-15 | WP-9 | A-17, A-18, A-19, A-20, A-21 |
-| R-20 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5, A-6 |
-| R-21 | should | C-8 | WP-2 | A-2, A-3, A-4, A-5, A-6 |
+| R-1 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19 |
+| R-2 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19 |
+| R-3 | must | C-2, C-3, C-7, C-11 | WP-4, WP-5 | A-9, A-10 |
+| R-4 | must | C-11 | WP-4 | A-9 |
+| R-5 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
+| R-6 | must | C-4 | WP-1 | A-1, A-2 |
+| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-4, WP-7, WP-8, WP-10 | A-9, A-14, A-15, A-16, A-20 |
+| R-8 | must | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19 |
+| R-9 | must | C-1, C-6 | WP-2, WP-7 | A-3, A-4, A-5, A-6, A-14, A-15 |
+| R-10 | must | C-1, C-4, C-14 | WP-1, WP-2, WP-3 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8 |
+| R-11 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
+| R-12 | must | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19 |
+| R-13 | must | C-1, C-6, C-15 | WP-2, WP-7, WP-9 | A-3, A-4, A-5, A-6, A-14, A-15, A-17, A-18, A-19 |
+| R-14 | must | C-9 | WP-4 | A-9 |
+| R-15 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
+| R-16 | could | C-9 | WP-4 | A-9 |
+| R-17 | must | C-4, C-14 | WP-1, WP-3 | A-1, A-2, A-7, A-8 |
+| R-18 | must | C-15 | WP-9 | A-17, A-18, A-19 |
+| R-19 | should | C-15 | WP-9 | A-17, A-18, A-19 |
+| R-20 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |
+| R-21 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
 | R-22 | must | C-6 | WP-7 | A-14, A-15 |
 | R-23 | must | C-6 | WP-7 | A-14, A-15 |
 

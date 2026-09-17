@@ -12,6 +12,7 @@ _version 0.1.0 · schema sekkei/1_
 - Callers are authenticated and authorized.
 - Users search and filter records.
 - Files are uploaded, stored and served.
+- Work runs on a schedule.
 - Changes are recorded append-only with the actor.
 - Records move in and out as files.
 - Large media files are stored once and played by many.
@@ -19,7 +20,7 @@ _version 0.1.0 · schema sekkei/1_
 
 **Non-goals**
 
-- Videos existing service.
+- Videos transcoding existing service delegated to.
 - Outside learners external.
 
 ## Requirements
@@ -27,24 +28,24 @@ _version 0.1.0 · schema sekkei/1_
 | id | kind | priority | statement | metric |
 |---|---|---|---|---|
 | R-1 | functional | must | Admins can create, publish and unpublish courses videos files tests. | — |
-| R-2 | functional | could | Employees can search and take courses. Employees can save and resume playback position videos later. | — |
+| R-2 | functional | must | Employees can search and take courses. Employees can save and resume playback position videos later. | — |
 | R-3 | functional | must | Employees can take tests. Employees can view explanations grades immediately. | — |
 | R-4 | functional | must | Managers can list and view grades their reports progress. Managers can export CSV. | — |
 | R-5 | functional | must | The system must notify deadline 3 days before not yet taken employees email. | — |
 | R-6 | functional | must | Courses completions grades audit for 5 years retention. | — |
-| R-7 | functional | must | The system must view pages email employees locale items. | — |
-| R-8 | nonfunctional | must | Videos files up to 2 GB. The system must complete upload within 10 min. | latency at 2 GB <= 10 min min |
-| R-9 | nonfunctional | must | The system must view videos concurrently 2000 users playback must not stall. | number of users 2000 users users |
-| R-10 | nonfunctional | must | The system must respond courses list within 300 ms p95. | p95 latency <= 300 ms ms |
-| R-11 | nonfunctional | must | Grades must never be lost. Grades must not record double-applied. | records lost across a process crash = 0 records |
-| R-12 | nonfunctional | must | Monthly availability at least 99.9 %. The system must export Prometheus for metrics. | ratio >= 99.9 % % |
+| R-7 | functional | must | The system must view pages email employees locale Japanese English. | — |
+| R-8 | nonfunctional | must | Videos files up to 2 GB. The system must complete upload within 10 min. | latency at 2 GB <= 10 min |
+| R-9 | nonfunctional | must | The system must view videos concurrently 2000 users playback must not stall. | number of users 2000 users |
+| R-10 | nonfunctional | must | The system must respond courses list within 300 ms p95. | p95 latency <= 300 ms |
+| R-11 | nonfunctional | must | Grades must never be lost. Grades must not record double-applied. | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-12 | nonfunctional | must | Monthly availability at least 99.9 %. The system must export Prometheus for metrics. | ratio >= 99.9 % |
 | R-13 | constraint | must | The system can use object storage TypeScript Node 20 PostgreSQL S3. Team of 4. | — |
 | R-14 | constraint | must | Employees authenticate internal SSO OIDC. Containers existing ingress behind. | — |
 | R-15 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-16 | nonfunctional | should | The system sustains 20 requests/s with peaks of 200 requests/s (assumed by the engine). | sustained rate 20 requests /s requests /s |
-| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s s |
-| R-19 | nonfunctional | should | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % % |
+| R-16 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
+| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-19 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
 | R-20 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
 | R-21 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
@@ -64,7 +65,8 @@ graph LR
   C_10["C-10 Search index"]
   C_11["C-11 Import/export"]
   C_12["C-12 Localisation"]
-  C_13["C-13 Public HTTP API"]
+  C_13["C-13 Scheduler"]
+  C_14["C-14 Public HTTP API"]
   C_6 -->|I-1| C_1
   C_6 -->|I-8| C_8
   C_6 -->|I-3| C_3
@@ -75,11 +77,12 @@ graph LR
   C_9 -->|I-1| C_1
   C_10 -->|I-1| C_1
   C_11 -->|I-6| C_6
-  C_13 -->|I-6| C_6
   C_13 -->|I-8| C_8
-  C_13 -->|I-9| C_9
-  C_13 -->|I-10| C_10
-  C_13 -->|I-11| C_11
+  C_14 -->|I-6| C_6
+  C_14 -->|I-8| C_8
+  C_14 -->|I-9| C_9
+  C_14 -->|I-10| C_10
+  C_14 -->|I-11| C_11
 ```
 
 ### C-1 — Store
@@ -104,7 +107,7 @@ graph LR
 - **responsibility**: Stores and serves uploaded files/blobs with content-type and size limits.
 - **provides**: I-3
 - **requires**: —
-- **satisfies**: R-1, R-2
+- **satisfies**: R-1, R-2, R-8, R-9
 
 ### C-4 — Audit log
 
@@ -120,7 +123,7 @@ graph LR
 - **responsibility**: Edge cache in front of the object store; serves media by signed, expiring URLs.
 - **provides**: I-5
 - **requires**: —
-- **satisfies**: R-1, R-2
+- **satisfies**: R-1, R-2, R-8, R-9
 
 ### C-6 — Domain core
 
@@ -168,7 +171,7 @@ graph LR
 - **responsibility**: Streams records to and from CSV/JSON with validation and partial-failure reporting.
 - **provides**: I-11
 - **requires**: I-6
-- **satisfies**: R-4
+- **satisfies**: R-4, R-12
 
 ### C-12 — Localisation
 
@@ -178,21 +181,29 @@ graph LR
 - **requires**: —
 - **satisfies**: R-7
 
-### C-13 — Public HTTP API
+### C-13 — Scheduler
+
+- **kind**: job · **path**: `src/scheduler.ts`
+- **responsibility**: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
+- **provides**: I-13
+- **requires**: I-8
+- **satisfies**: R-5
+
+### C-14 — Public HTTP API
 
 - **kind**: service · **path**: `src/surface_api.ts`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
-- **provides**: I-13
+- **provides**: I-14
 - **requires**: I-6, I-8, I-9, I-10, I-11
 - **satisfies**: R-3, R-8, R-9, R-10, R-14, R-16, R-17
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-12, C-2, C-3, C-4, C-5, C-8
-1. C-10, C-7, C-9
+1. C-10, C-13, C-7, C-9
 2. C-6
 3. C-11
-4. C-13
+4. C-14
 
 ## Interfaces
 
@@ -270,7 +281,7 @@ graph LR
 | `notify_deadline` | `deadline`: Deadline \| id | Deadline \| None | ValidationError, NotFound | stated values: 3 days (R-5) |
 | | from R-5: The system must notify deadline 3 days before not yet taken employees email. | | | |
 | `get_email` | `email`: Email \| id | Email \| None | ValidationError, NotFound | — |
-| | from R-7: The system must view pages email employees locale items. | | | |
+| | from R-7: The system must view pages email employees locale Japanese English. | | | |
 
 ### I-7 — Notifier interface
 
@@ -337,9 +348,20 @@ graph LR
 | | falls back to the default locale; missing keys are logged, never blank | | | |
 | `format` | `value`: datetime \| Money, `locale`: str, `tz`: str | str | — | — |
 
-### I-13 — Public HTTP API interface
+### I-13 — Scheduler interface
 
-- **kind**: http · **owner**: C-13 · **stability**: draft
+- **kind**: module · **owner**: C-13 · **stability**: draft
+- Provided by Scheduler. 
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `next_attempt` | `attempt`: int, `retry_after`: timedelta \| None | datetime \| None | — | — |
+| | None when attempts are exhausted | | | |
+| `promote_due` | `now`: datetime | int moved | — | stated values: 3 days (R-5) |
+
+### I-14 — Public HTTP API interface
+
+- **kind**: http · **owner**: C-14 · **stability**: draft
 - Provided by Public HTTP API. 
 
 | operation | inputs | output | errors | pre / post |
@@ -438,16 +460,16 @@ Domain entity named in the requirements ('video'); confirm the fields.
 
 _Trigger:_ client calls the API
 
-1. C-13 → C-6 via I-6: validate and apply
+1. C-14 → C-6 via I-6: validate and apply
 2. C-6 → C-1 via I-1: read/write
 
 ```mermaid
 sequenceDiagram
-  participant C_13 as C-13 Public HTTP API
+  participant C_14 as C-14 Public HTTP API
   participant C_6 as C-6 Domain core
   participant C_1 as C-1 Store
-  Note over C_13: client calls the API
-  C_13->>C_6: I-6 validate and apply
+  Note over C_14: client calls the API
+  C_14->>C_6: I-6 validate and apply
   C_6->>C_1: I-1 read/write
 ```
 
@@ -473,7 +495,7 @@ sequenceDiagram
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
-_Affects:_ C-13
+_Affects:_ C-14
 
 ### D-2 — Primary store (accepted)
 
@@ -616,7 +638,7 @@ _Affects:_ C-1, C-6
 
 **Consequences.** Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
-_Affects:_ C-13
+_Affects:_ C-14
 
 ### D-8 — Process topology (accepted)
 
@@ -640,21 +662,21 @@ _Affects:_ C-13
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
-_Affects:_ C-13
+_Affects:_ C-14, C-13
 
 ### D-9 — Assumed answer: load (Q-rate) (proposed)
 
-**Context.** The requirements do not say. Question: Q-rate. Evidence: count 2,000.
+**Context.** The requirements do not say. Question: Q-rate. No evidence in the text; engine default.
 
-- ✔ **20 requests/s**
-- ✘ **2 requests/s**
-- ✘ **200 requests/s**
+- ✔ **100 requests/s**
+- ✘ **10 requests/s**
+- ✘ **1,000 requests/s**
 
-**Rationale.** Derived from the largest stated count (2,000) at 1 request per 100 items per second.
+**Rationale.** No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.
 
 **Consequences.** If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.
 
-_Affects:_ C-13
+_Affects:_ C-14
 
 ### D-10 — Assumed answer: data (Q-backup) (proposed)
 
@@ -707,6 +729,8 @@ _Affects:_ C-6, C-9
 **Rationale.** Bounded retries with a durable queue keep the system responsive during a one-hour outage.
 
 **Consequences.** If the real answer differs: State the policy; the outbound client and scheduler contracts change.
+
+_Affects:_ C-13
 
 ### D-14 — Assumed answer: operations (Q-alerting) (proposed)
 
@@ -766,7 +790,7 @@ graph LR
   WP_2["WP-2 File storage (S)"]
   WP_3["WP-3 Localisation (S)"]
   WP_4["WP-4 Store + Observability (M)"]
-  WP_5["WP-5 Authentication (S)"]
+  WP_5["WP-5 Authentication + Scheduler (M)"]
   WP_6["WP-6 Notifier (S)"]
   WP_7["WP-7 Search index (S)"]
   WP_8["WP-8 Domain core (S)"]
@@ -795,7 +819,7 @@ graph LR
 4. WP-9
 5. WP-10
 
-_Critical path (weight 6):_ WP-4 → WP-6 → WP-8 → WP-9 → WP-10
+_Critical path (13 person-days):_ WP-4 → WP-6 → WP-8 → WP-9 → WP-10
 
 ### WP-1 — Audit log (S)
 
@@ -813,10 +837,12 @@ Implement Audit log: Append-only record of who did what to which resource, query
 Implement File storage: Stores and serves uploaded files/blobs with content-type and size limits.
 
 - **components**: C-3 · **implements**: I-3
-- **depends on**: — · **satisfies**: R-1, R-2
+- **depends on**: — · **satisfies**: R-1, R-2, R-8, R-9
 - **write scope**: `src/files.ts`, `tests/files.test.ts`
 - **acceptance**:
   - A-2 (test) unit tests of File storage pass — `npx vitest run tests/files.test.ts`
+  - A-3 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-4 (metric) R-9: number of users 2000 users — metric R-9
 - **notes**: family: file_storage
 
 ### WP-3 — Localisation (S)
@@ -827,7 +853,7 @@ Implement Localisation: Resolves locale, timezone and currency per request; form
 - **depends on**: — · **satisfies**: R-7
 - **write scope**: `src/i18n.ts`, `tests/i18n.test.ts`
 - **acceptance**:
-  - A-3 (test) unit tests of Localisation pass — `npx vitest run tests/i18n.test.ts`
+  - A-5 (test) unit tests of Localisation pass — `npx vitest run tests/i18n.test.ts`
 - **notes**: family: i18n
 
 ### WP-4 — Store + Observability (M)
@@ -838,23 +864,21 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **depends on**: — · **satisfies**: R-9, R-11, R-12, R-13, R-18, R-19
 - **write scope**: `src/store.ts`, `tests/store.test.ts`, `src/observability.ts`, `tests/observability.test.ts`
 - **acceptance**:
-  - A-4 (test) unit tests of Store, Observability pass — `npx vitest run tests/store.test.ts tests/observability.test.ts`
-  - A-5 (metric) R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
-  - A-6 (metric) R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
-  - A-7 (metric) R-12: ratio >= 99.9 % % — kill one instance under load; error rate stays within the target — metric R-12
-  - A-8 (metric) R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-18
-  - A-9 (metric) R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload — metric R-19
+  - A-6 (test) unit tests of Store, Observability pass — `npx vitest run tests/store.test.ts tests/observability.test.ts`
+  - A-7 (metric) R-9: number of users 2000 users — metric R-9
+  - A-8 (metric) R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
+  - A-9 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: infra
 
-### WP-5 — Authentication (S)
+### WP-5 — Authentication + Scheduler (M)
 
-Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.
+Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
-- **components**: C-9 · **implements**: I-9
-- **depends on**: WP-4 · **satisfies**: R-14, R-15
-- **write scope**: `src/auth.ts`, `tests/auth.test.ts`
+- **components**: C-9, C-13 · **implements**: I-9, I-13
+- **depends on**: WP-4 · **satisfies**: R-5, R-14, R-15
+- **write scope**: `src/auth.ts`, `tests/auth.test.ts`, `src/scheduler.ts`, `tests/scheduler.test.ts`
 - **acceptance**:
-  - A-10 (test) unit tests of Authentication pass — `npx vitest run tests/auth.test.ts`
+  - A-10 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
 - **notes**: family: infra
 
 ### WP-6 — Notifier (S)
@@ -877,9 +901,8 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **write scope**: `src/search.ts`, `tests/search.test.ts`
 - **acceptance**:
   - A-12 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
-  - A-13 (metric) R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-14 (metric) R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
-  - A-15 (metric) R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target — metric R-16
+  - A-13 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-14 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: search
 
 ### WP-8 — Domain core (S)
@@ -890,9 +913,9 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-4, R-9, R-11, R-13, R-20, R-21
 - **write scope**: `src/core.ts`, `tests/core.test.ts`
 - **acceptance**:
-  - A-16 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
-  - A-17 (metric) R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
-  - A-18 (metric) R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
+  - A-15 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
+  - A-16 (metric) R-9: number of users 2000 users — metric R-9
+  - A-17 (metric) R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
 - **notes**: family: crud_api
 
 ### WP-9 — Import/export (S)
@@ -900,53 +923,52 @@ Implement Domain core: Business rules and validation for the domain entities; th
 Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.
 
 - **components**: C-11 · **implements**: I-11
-- **depends on**: WP-8 · **satisfies**: R-4
+- **depends on**: WP-8 · **satisfies**: R-4, R-12
 - **write scope**: `src/exporter.ts`, `tests/exporter.test.ts`
 - **acceptance**:
-  - A-19 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-18 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-19 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: import_export
 
 ### WP-10 — Public HTTP API (S)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
-- **components**: C-13 · **implements**: I-13
+- **components**: C-14 · **implements**: I-14
 - **depends on**: WP-4, WP-5, WP-7, WP-8, WP-9 · **satisfies**: R-3, R-8, R-9, R-10, R-14, R-16, R-17
 - **write scope**: `src/surface_api.ts`, `tests/surface_api.test.ts`
 - **acceptance**:
   - A-20 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
-  - A-21 (metric) R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-22 (metric) R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
-  - A-23 (metric) R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
-  - A-24 (metric) R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target — metric R-16
-  - A-25 (metric) R-17: time at 4 h 24 h h — metric R-17
+  - A-21 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-22 (metric) R-9: number of users 2000 users — metric R-9
+  - A-23 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-5 | WP-2 | A-2 |
-| R-2 | could | C-3, C-5, C-10 | WP-2, WP-7 | A-2, A-12, A-13, A-14, A-15 |
-| R-3 | must | C-6, C-13 | WP-8, WP-10 | A-16, A-17, A-18, A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-4 | must | C-6, C-11 | WP-8, WP-9 | A-16, A-17, A-18, A-19 |
-| R-5 | must | C-2, C-7 | WP-6 | A-11 |
+| R-1 | must | C-3, C-5 | WP-2 | A-2, A-3, A-4 |
+| R-2 | must | C-3, C-5, C-10 | WP-2, WP-7 | A-2, A-3, A-4, A-12, A-13, A-14 |
+| R-3 | must | C-6, C-14 | WP-8, WP-10 | A-15, A-16, A-17, A-20, A-21, A-22, A-23 |
+| R-4 | must | C-6, C-11 | WP-8, WP-9 | A-15, A-16, A-17, A-18, A-19 |
+| R-5 | must | C-2, C-7, C-13 | WP-5, WP-6 | A-10, A-11 |
 | R-6 | must | C-4 | WP-1 | A-1 |
-| R-7 | must | C-2, C-7, C-12 | WP-3, WP-6 | A-3, A-11 |
-| R-8 | must | C-10, C-13 | WP-7, WP-10 | A-12, A-13, A-14, A-15, A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-9 | must | C-1, C-6, C-13 | WP-4, WP-8, WP-10 | A-4, A-5, A-6, A-7, A-8, A-9, A-16, A-17, A-18, A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-10 | must | C-10, C-13 | WP-7, WP-10 | A-12, A-13, A-14, A-15, A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-11 | must | C-1, C-6 | WP-4, WP-8 | A-4, A-5, A-6, A-7, A-8, A-9, A-16, A-17, A-18 |
-| R-12 | must | C-8 | WP-4 | A-4, A-5, A-6, A-7, A-8, A-9 |
-| R-13 | must | C-1, C-6 | WP-4, WP-8 | A-4, A-5, A-6, A-7, A-8, A-9, A-16, A-17, A-18 |
-| R-14 | must | C-9, C-13 | WP-5, WP-10 | A-10, A-20, A-21, A-22, A-23, A-24, A-25 |
+| R-7 | must | C-2, C-7, C-12 | WP-3, WP-6 | A-5, A-11 |
+| R-8 | must | C-3, C-5, C-10, C-14 | WP-2, WP-7, WP-10 | A-2, A-3, A-4, A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
+| R-9 | must | C-1, C-3, C-5, C-6, C-14 | WP-2, WP-4, WP-8, WP-10 | A-2, A-3, A-4, A-6, A-7, A-8, A-9, A-15, A-16, A-17, A-20, A-21, A-22, A-23 |
+| R-10 | must | C-10, C-14 | WP-7, WP-10 | A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
+| R-11 | must | C-1, C-6 | WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15, A-16, A-17 |
+| R-12 | must | C-8, C-11 | WP-4, WP-9 | A-6, A-7, A-8, A-9, A-18, A-19 |
+| R-13 | must | C-1, C-6 | WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15, A-16, A-17 |
+| R-14 | must | C-9, C-14 | WP-5, WP-10 | A-10, A-20, A-21, A-22, A-23 |
 | R-15 | could | C-9 | WP-5 | A-10 |
-| R-16 | should | C-10, C-13 | WP-7, WP-10 | A-12, A-13, A-14, A-15, A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-17 | should | C-13 | WP-10 | A-20, A-21, A-22, A-23, A-24, A-25 |
-| R-18 | should | C-1 | WP-4 | A-4, A-5, A-6, A-7, A-8, A-9 |
-| R-19 | should | C-8 | WP-4 | A-4, A-5, A-6, A-7, A-8, A-9 |
-| R-20 | must | C-6 | WP-8 | A-16, A-17, A-18 |
-| R-21 | must | C-6 | WP-8 | A-16, A-17, A-18 |
+| R-16 | must | C-10, C-14 | WP-7, WP-10 | A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
+| R-17 | should | C-14 | WP-10 | A-20, A-21, A-22, A-23 |
+| R-18 | should | C-1 | WP-4 | A-6, A-7, A-8, A-9 |
+| R-19 | must | C-8 | WP-4 | A-6, A-7, A-8, A-9 |
+| R-20 | must | C-6 | WP-8 | A-15, A-16, A-17 |
+| R-21 | must | C-6 | WP-8 | A-15, A-16, A-17 |
 
 ## Conventions
 

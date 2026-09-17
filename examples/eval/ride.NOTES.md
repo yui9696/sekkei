@@ -12,7 +12,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | 1 | load | Q-rate | 400 updates/s sustained (derived), 10x at peak. | evidence: 2,000 online (R-7) ÷ every 5 s (R-3) — Derived from the text: 2,000 online (R-7) ÷ every 5 s (R-3). | State the measured rate; capacity estimates and the queue decision change. |
 | 2 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 3 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
-| 4 | data | Q-retention | Records kept 90 days, audit history 1 year, then deleted by a nightly job. | default — Bounded retention limits storage growth and satisfies most data-minimisation rules. | State the retention; the deletion job and capacity change. |
+| 4 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
 | 5 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
 | 6 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
 | 7 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
@@ -22,7 +22,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-5 | C-11 Public HTTP API, C-3 Domain core | surface+core | human actor 'operators': a use case |
+| R-5 | C-11 Public HTTP API, C-3 Domain core | surface+core | human actor 'operator': a use case |
 | R-6 | C-11 Public HTTP API, C-3 Domain core | surface+core | human actor 'driver': a use case |
 
 ## 2. Capacity estimates
@@ -32,18 +32,10 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | implied update rate | 400/s | count ÷ interval | 2,000 online (R-7) ÷ every 5 s (R-3) |
 | implied updates per day | 34.56 M | implied rate × 86,400 s | 2,000 online (R-7) ÷ every 5 s (R-3) |
 | storage growth per day (updates) | 70.78 GB | implied rate × 86,400 × record size | 2,000 online (R-7) ÷ every 5 s (R-3); 2 KB stated in R-14 |
-| updates per day | 345.6 M | rate × 86,400 s | 4,000 (R-13) |
-| storage growth per day (updates) | 707.79 GB | rate × 86,400 × record size | 4,000 (R-13); 2 KB stated in R-14 |
-| storage after 30 days (updates) | 21.23 TB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 14.4 M updates | rate × outage seconds | 4,000 (R-13); outage length assumed |
-| concurrent handlers to sustain the rate (updates) | 800 | Little's law: rate × mean service time | 4,000 (R-13); mean service time assumed 200 ms |
-| in-flight items at the latency target | 8 k | rate × latency target (Little's law upper bound) | 4,000 (R-13) × 2 s (R-7) |
+| concurrent handlers at the stated peak (updates) | 800 | Little's law: peak rate × mean service time | 4,000 (R-13); mean service time assumed 200 ms |
 | number of concurrent | 300 | stated | 300 concurrent (R-7) |
-| average rate per concurrent (if evenly spread) | 13.33/s | rate ÷ count | 4,000 ÷ 300 |
 | number of online | 2 k | stated | 2,000 online (R-7) |
-| average rate per online (if evenly spread) | 2/s | rate ÷ count | 4,000 ÷ 2,000 |
 | number of online | 2 k | stated | 2,000 online (R-13) |
-| average rate per online (if evenly spread) | 2/s | rate ÷ count | 4,000 ÷ 2,000 |
 
 - Assumption: Record size: 2 KB stated in R-14.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -94,7 +86,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-6 Assumed answer: load (Q-rate): **400 updates/s**
 - D-7 Assumed answer: load (Q-payload): **2 KB / 256 KB**
 - D-8 Assumed answer: quality (Q-availability): **99.9 %**
-- D-9 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-9 Assumed answer: data (Q-retention): **indefinite / 1 year**
 - D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
 - D-11 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-12 Assumed answer: cost (Q-budget): **existing only**
@@ -103,8 +95,8 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 ## 6. How the text was read
 
 - Patterns recognised: observability, auth, batch_pipeline, geo, realtime, payments
-- Quality attributes (weight): consistency 0.57, durability 1.0, performance 0.83, availability 0.83, operability 0.74, simplicity 0.8
-- Constraint tokens: containers, idp, postgres, redis, single_region; languages: go; team: 4
+- Quality attributes (weight): consistency 0.57, durability 1.0, performance 0.83, availability 0.83, operability 0.83, simplicity 0.8
+- Constraint tokens: containers, idp, nightly_batch, postgres, redis, single_region; languages: go; team: 4
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -114,16 +106,16 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-4 | functional | must | payments | — | — |
 | R-5 | functional | must | **none** | operability | — |
 | R-6 | functional | must | **none** | performance, operability | — |
-| R-7 | nonfunctional | must | — | consistency, performance | p95 latency at 300, 2,000 <= 2 s s |
+| R-7 | nonfunctional | must | — | consistency, performance | p95 latency at 300, 2,000 <= 2 s |
 | R-8 | nonfunctional | should | — | durability | records lost across a process crash = 0 records |
-| R-9 | nonfunctional | should | — | — | time 30 days days |
+| R-9 | nonfunctional | should | — | — | time 30 days |
 | R-10 | constraint | must | geo | simplicity | — |
 | R-11 | constraint | must | auth | security, operability | — |
-| R-12 | functional | must | batch_pipeline | compliance | — |
-| R-13 | nonfunctional | should | — | performance | sustained rate at 2,000, 5 s 4000 updates /s updates /s |
-| R-14 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-15 | nonfunctional | must | — | durability, availability | ratio 99.9 % % |
-| R-16 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-17 | nonfunctional | should | — | durability | time at 5 10 s s |
+| R-12 | functional | must | batch_pipeline | operability, compliance | — |
+| R-13 | nonfunctional | must | — | performance | sustained rate at 2,000, 5 s 4000 updates /s |
+| R-14 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-15 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
+| R-16 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-17 | nonfunctional | should | — | durability | time at 5 10 s |
 | R-18 | constraint | must | — | — | — |
 | R-19 | constraint | must | — | — | — |

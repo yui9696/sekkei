@@ -19,6 +19,7 @@
     "lint_command": "./gradlew check",
     "rules": [
       "Constructor injection; no static state.",
+      "Every component logs one structured line per unit of work with the correlation id.",
       "Prefer the boring option; a new piece of infrastructure needs a decision record.",
       "Java 21 as stated in the constraints.",
       "Stateless processes: configuration from the environment, no local files that a second instance would not see."
@@ -69,7 +70,7 @@
       "id": "R-6",
       "statement": "5,000 trucks, 20,000 readings/s at peak; a reading is visible to managers within 10 s p95.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "p95 latency at 5,000, 20,000",
         "target": "<= 10 s",
@@ -117,7 +118,7 @@
     },
     {
       "id": "R-11",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -133,7 +134,7 @@
       "id": "R-13",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "size at 2 KB",
         "target": "<= 256 kb",
@@ -179,20 +180,32 @@
     },
     {
       "id": "R-17",
+      "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "ratio at 5 minutes, 10 minutes",
+        "target": "1 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-18",
       "statement": "Authentication via an OIDC identity provider (assumed by the engine: internal users).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-18",
+      "id": "R-19",
       "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-19",
+      "id": "R-20",
       "statement": "No existing data or system to migrate from (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
@@ -210,7 +223,6 @@
       "satisfies": [
         "R-7",
         "R-9",
-        "R-14",
         "R-16"
       ],
       "tags": [
@@ -229,7 +241,8 @@
         "R-1",
         "R-7",
         "R-14",
-        "R-16"
+        "R-16",
+        "R-17"
       ],
       "tags": [
         "layer:0",
@@ -314,8 +327,8 @@
         "R-5",
         "R-9",
         "R-10",
-        "R-18",
-        "R-19"
+        "R-19",
+        "R-20"
       ],
       "tags": [
         "layer:1",
@@ -349,7 +362,8 @@
       "path": "src/main/java/app/Observability.java",
       "requires": [],
       "satisfies": [
-        "R-14"
+        "R-14",
+        "R-17"
       ],
       "tags": [
         "layer:1",
@@ -367,7 +381,7 @@
       ],
       "satisfies": [
         "R-12",
-        "R-17"
+        "R-18"
       ],
       "tags": [
         "layer:1",
@@ -405,6 +419,7 @@
       "satisfies": [
         "R-1",
         "R-5",
+        "R-8",
         "R-11"
       ],
       "tags": [
@@ -429,6 +444,7 @@
       "satisfies": [
         "R-1",
         "R-5",
+        "R-8",
         "R-11"
       ],
       "tags": [
@@ -451,7 +467,6 @@
       "satisfies": [
         "R-3",
         "R-6",
-        "R-8",
         "R-9",
         "R-13",
         "R-15"
@@ -999,22 +1014,40 @@
           "description": "from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV"
         },
         {
-          "name": "record_audit",
+          "name": "record_kept",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "kept",
+              "type": "Kept | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Kept | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-11); 1 year (R-11)",
+          "pre": "stated values: 1 year (R-11)",
           "post": "",
-          "description": "from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
+          "name": "log_history",
+          "inputs": [
+            {
+              "name": "history",
+              "type": "History | id",
+              "description": ""
+            }
+          ],
+          "output": "History | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-11)",
+          "post": "",
+          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         },
         {
           "name": "delete_job",
@@ -1030,9 +1063,9 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-11); 1 year (R-11)",
+          "pre": "stated values: 1 year (R-11)",
           "post": "",
-          "description": "from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1361,7 +1394,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 30 seconds (R-1); 90 days (R-11); 1 year (R-11)",
+          "pre": "stated values: 30 seconds (R-1); 1 year (R-11)",
           "post": "",
           "description": ""
         }
@@ -1773,7 +1806,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
@@ -1829,7 +1862,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.29; In-memory: 1.63; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.42; In-memory: 1.70; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
       "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
       "affects": [
         "C-1"
@@ -1874,8 +1907,8 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.71; Separate services per concern: 1.51; Single process with background threads: 1.40",
-      "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.95; Single process with background threads: 1.51; Separate services per concern: 1.42",
+      "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
         "C-14",
         "C-12"
@@ -1933,7 +1966,7 @@
         }
       ],
       "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.07; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
       "consequences": "",
       "affects": [
         "C-2"
@@ -1978,7 +2011,7 @@
         }
       ],
       "choice": "TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.29; Plain PostgreSQL tables partitioned by day: 2.23; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.42; Plain PostgreSQL tables partitioned by day: 2.19; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'Plain PostgreSQL tables partitioned by day' gives up: no extension.",
       "affects": [
         "C-1"
@@ -2023,7 +2056,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.71; Single instance with health-based restart: 1.40; Active-active across two regions: 1.31",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.58; Single instance with health-based restart: 1.33; Active-active across two regions: 1.26",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.",
       "affects": [
         "C-14"
@@ -2095,6 +2128,11 @@
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
         {
+          "name": "indefinite / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
           "name": "90 days / 1 year",
           "pros": [],
           "cons": []
@@ -2103,16 +2141,11 @@
           "name": "30 days / 90 days",
           "pros": [],
           "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
         }
       ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "choice": "indefinite / 1 year",
+      "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
         "C-13",
         "C-1"
@@ -2288,6 +2321,35 @@
       "affects": [
         "C-12",
         "C-2"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-16",
+      "title": "Assumed answer: operations (Q-alerting)",
+      "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "error rate + queue growth",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "per-endpoint SLO alerts",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "error rate + queue growth",
+      "rationale": "Two alerts catch most incidents without paging on noise.",
+      "consequences": "If the real answer differs: State the rules and the on-call; observability conventions change.",
+      "affects": [
+        "C-9"
       ],
       "status": "proposed"
     }
@@ -2495,7 +2557,8 @@
         "R-7",
         "R-9",
         "R-14",
-        "R-16"
+        "R-16",
+        "R-17"
       ],
       "files": [
         "src/main/java/app/Store.java",
@@ -2523,17 +2586,10 @@
         },
         {
           "id": "A-3",
-          "description": "R-14: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-14: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-14"
-        },
-        {
-          "id": "A-4",
-          "description": "R-16: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
         }
       ],
       "notes": "family: infra"
@@ -2556,9 +2612,10 @@
       "satisfies": [
         "R-1",
         "R-5",
+        "R-8",
         "R-11",
         "R-12",
-        "R-17"
+        "R-18"
       ],
       "files": [
         "src/main/java/app/Auth.java",
@@ -2569,11 +2626,18 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-5",
+          "id": "A-4",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "./gradlew test --tests app.AuthTest",
           "metric": ""
+        },
+        {
+          "id": "A-5",
+          "description": "R-8: time at 5 years 90 days",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
         }
       ],
       "notes": "family: infra"
@@ -2663,8 +2727,8 @@
         "R-5",
         "R-9",
         "R-10",
-        "R-18",
-        "R-19"
+        "R-19",
+        "R-20"
       ],
       "files": [
         "src/main/java/app/Core.java",
@@ -2766,6 +2830,7 @@
       "satisfies": [
         "R-1",
         "R-5",
+        "R-8",
         "R-11"
       ],
       "files": [
@@ -2780,6 +2845,13 @@
           "kind": "test",
           "command": "./gradlew test --tests app.BatchTest",
           "metric": ""
+        },
+        {
+          "id": "A-12",
+          "description": "R-8: time at 5 years 90 days",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
         }
       ],
       "notes": "family: batch_pipeline"
@@ -2803,7 +2875,6 @@
       "satisfies": [
         "R-3",
         "R-6",
-        "R-8",
         "R-9",
         "R-13",
         "R-15"
@@ -2815,39 +2886,18 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-13",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "./gradlew test --tests app.Surface_apiTest",
           "metric": ""
         },
         {
-          "id": "A-13",
-          "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s s — load test at the stated rate; the stated percentile must meet the target",
+          "id": "A-14",
+          "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-6"
-        },
-        {
-          "id": "A-14",
-          "description": "R-8: time at 5 years 90 days days",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
-        },
-        {
-          "id": "A-15",
-          "description": "R-13: size at 2 KB <= 256 kb kb",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-13"
-        },
-        {
-          "id": "A-16",
-          "description": "R-15: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-15"
         }
       ],
       "notes": "family: infra"

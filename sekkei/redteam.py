@@ -107,12 +107,17 @@ _NUM_RE = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?(?![\w.])")
 # ---------------------------------------------------------------------------
 
 
+RT01_CAP = 80   # engine runs for the deletion attack; beyond this the attack samples (reported in the findings)
+
+
 def _inert(text: str, base: EngineResult, rt: RedTeam) -> None:
     ref = shape(base.design)
     sources = base.analysis.normalisation.sources if base.analysis.normalisation else {}
-    for u in base.analysis.requirements:
-        if u.sentence.assumed:
-            continue
+    units = [u for u in base.analysis.requirements if not u.sentence.assumed]
+    if len(units) > RT01_CAP:
+        rt.findings.append(Finding("RT01", "info", "sampling", f"{len(units)} stated requirements; the deletion attack ran on the first {RT01_CAP} only (one engine run each)"))
+        units = units[:RT01_CAP]
+    for u in units:
         src = sources.get(u.sentence.text)
         cut = _remove_sentence(text, u.sentence.text, src)
         if cut is None:

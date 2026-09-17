@@ -91,7 +91,7 @@
       "id": "R-8",
       "statement": "1,000 events/s sustained publish rate, 5,000 endpoints; delivery latency p95 under 5 s for a healthy endpoint.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "p95 latency at 1,000, 5,000",
         "target": "< 5 s",
@@ -151,7 +151,7 @@
     },
     {
       "id": "R-14",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -167,7 +167,7 @@
       "id": "R-16",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "size at 2 KB",
         "target": "<= 256 kb",
@@ -203,7 +203,7 @@
       "id": "R-19",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio at 5 minutes, 10 minutes",
         "target": "1 %",
@@ -243,8 +243,7 @@
       "requires": [],
       "satisfies": [
         "R-9",
-        "R-12",
-        "R-17"
+        "R-12"
       ],
       "tags": [
         "layer:0",
@@ -266,8 +265,9 @@
         "R-6",
         "R-8",
         "R-9",
-        "R-10",
-        "R-17"
+        "R-11",
+        "R-17",
+        "R-19"
       ],
       "tags": [
         "layer:0",
@@ -317,7 +317,9 @@
         "R-1",
         "R-4",
         "R-5",
-        "R-6"
+        "R-6",
+        "R-8",
+        "R-11"
       ],
       "tags": [
         "layer:0",
@@ -382,7 +384,9 @@
         "R-1",
         "R-4",
         "R-5",
-        "R-6"
+        "R-6",
+        "R-8",
+        "R-11"
       ],
       "tags": [
         "layer:1",
@@ -434,7 +438,6 @@
       "path": "app/observability.py",
       "requires": [],
       "satisfies": [
-        "R-8",
         "R-11",
         "R-17",
         "R-19"
@@ -508,6 +511,8 @@
         "R-4",
         "R-5",
         "R-6",
+        "R-8",
+        "R-11",
         "R-14"
       ],
       "tags": [
@@ -571,7 +576,7 @@
         "R-2",
         "R-6",
         "R-8",
-        "R-11",
+        "R-10",
         "R-13",
         "R-16",
         "R-18"
@@ -597,9 +602,8 @@
         "R-3",
         "R-8",
         "R-9",
-        "R-11",
-        "R-13",
-        "R-17"
+        "R-10",
+        "R-13"
       ],
       "tags": [
         "layer:3",
@@ -1266,40 +1270,58 @@
           "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
         },
         {
-          "name": "record_audit",
+          "name": "record_kept",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "kept",
+              "type": "Kept | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Kept | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         },
         {
-          "name": "delete_engine",
+          "name": "log_history",
           "inputs": [
             {
-              "name": "engine",
-              "type": "Engine | id",
+              "name": "history",
+              "type": "History | id",
               "description": ""
             }
           ],
-          "output": "Engine | None",
+          "output": "History | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
+          "name": "delete_job",
+          "inputs": [
+            {
+              "name": "job",
+              "type": "Job | id",
+              "description": ""
+            }
+          ],
+          "output": "Job | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-14)",
+          "post": "",
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1734,7 +1756,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
           "description": ""
         }
@@ -3008,6 +3030,11 @@
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
         {
+          "name": "indefinite / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
           "name": "90 days / 1 year",
           "pros": [],
           "cons": []
@@ -3016,16 +3043,11 @@
           "name": "30 days / 90 days",
           "pros": [],
           "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
         }
       ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "choice": "indefinite / 1 year",
+      "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
         "C-16",
         "C-1"
@@ -3566,9 +3588,10 @@
         "R-6",
         "R-8",
         "R-9",
-        "R-10",
+        "R-11",
         "R-12",
-        "R-17"
+        "R-17",
+        "R-19"
       ],
       "files": [
         "app/store.py",
@@ -3589,7 +3612,7 @@
         },
         {
           "id": "A-3",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
@@ -3603,14 +3626,14 @@
         },
         {
           "id": "A-5",
-          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
+          "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
-          "metric": "R-10"
+          "metric": "R-11"
         },
         {
           "id": "A-6",
-          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-17: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-17"
@@ -3630,7 +3653,6 @@
       ],
       "depends_on": [],
       "satisfies": [
-        "R-8",
         "R-11",
         "R-17",
         "R-19"
@@ -3650,31 +3672,17 @@
         },
         {
           "id": "A-8",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
-        },
-        {
-          "id": "A-9",
-          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
         },
         {
-          "id": "A-10",
-          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-9",
+          "description": "R-17: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-17"
-        },
-        {
-          "id": "A-11",
-          "description": "R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-19"
         }
       ],
       "notes": "family: infra"
@@ -3696,7 +3704,9 @@
         "R-1",
         "R-4",
         "R-5",
-        "R-6"
+        "R-6",
+        "R-8",
+        "R-11"
       ],
       "files": [
         "app/dispatcher.py",
@@ -3705,11 +3715,25 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-10",
           "description": "unit tests of Outbound HTTP client pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_dispatcher.py",
           "metric": ""
+        },
+        {
+          "id": "A-11",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-12",
+          "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
         }
       ],
       "notes": "family: async_delivery"
@@ -3736,6 +3760,8 @@
         "R-4",
         "R-5",
         "R-6",
+        "R-8",
+        "R-11",
         "R-14",
         "R-21"
       ],
@@ -3753,6 +3779,20 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
           "metric": ""
+        },
+        {
+          "id": "A-14",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-15",
+          "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-11"
         }
       ],
       "notes": "family: infra"
@@ -3780,7 +3820,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-14",
+          "id": "A-16",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -3814,7 +3854,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-17",
           "description": "unit tests of Signer pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_signer.py",
@@ -3858,7 +3898,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-18",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -3888,7 +3928,7 @@
         "R-2",
         "R-6",
         "R-8",
-        "R-11",
+        "R-10",
         "R-13",
         "R-16",
         "R-18"
@@ -3900,39 +3940,25 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-19",
           "description": "unit tests of Admin HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_admin_api.py",
           "metric": ""
         },
         {
-          "id": "A-18",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "id": "A-20",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-19",
-          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-11"
-        },
-        {
-          "id": "A-20",
-          "description": "R-16: size at 2 KB <= 256 kb kb",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
-        },
-        {
           "id": "A-21",
-          "description": "R-18: time at 4 h 24 h h",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
-          "metric": "R-18"
+          "metric": "R-10"
         }
       ],
       "notes": "family: admin_api"
@@ -3980,21 +4006,21 @@
         },
         {
           "id": "A-23",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-24",
-          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — one target stalled (timeouts) while others must keep meeting their latency target",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
         },
         {
           "id": "A-25",
-          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
@@ -4057,9 +4083,8 @@
         "R-3",
         "R-8",
         "R-9",
-        "R-11",
-        "R-13",
-        "R-17"
+        "R-10",
+        "R-13"
       ],
       "files": [
         "app/ingest_api.py",
@@ -4076,7 +4101,7 @@
         },
         {
           "id": "A-28",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s s — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
@@ -4090,17 +4115,10 @@
         },
         {
           "id": "A-30",
-          "description": "R-11: required metrics exposed = all listed — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
-          "metric": "R-11"
-        },
-        {
-          "id": "A-31",
-          "description": "R-17: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-17"
+          "metric": "R-10"
         }
       ],
       "notes": "family: event_ingest"
@@ -4130,7 +4148,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-32",
+          "id": "A-31",
           "description": "unit tests of Health policy pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_policy.py",

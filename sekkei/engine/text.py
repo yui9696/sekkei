@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 MODALITY = {
     "must": ("must", "shall", "required", "always", "never", "at least once", "exactly once", "mandatory"),
     "should": ("should", "expected", "normally", "ought"),
-    "could": ("could", "may", "optionally", "nice to have", "ideally", "later", "optional"),
+    "could": ("could", "may", "optionally", "nice to have", "ideally", "optional"),
 }
 
 SECTION_HEADINGS = {
@@ -125,7 +125,7 @@ _UNIT_KIND = {
     "x": "factor",
 }
 
-_NUM = r"(?<![\w.-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB])?(?=[\s%/a-zA-Z)]|$)"
+_NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB])?(?![:\d])(?=[\s%/a-zA-Z)]|$)"
 _UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
 _QUANT_RE = re.compile(_NUM + r"\s?" + _UNIT + r"(?![a-zA-Z])", re.I)
 _PERCENTILE_RE = re.compile(r"\bp(50|90|95|99|999)\b", re.I)
@@ -256,6 +256,8 @@ def _units(text: str) -> list[tuple[str, bool]]:
 
 def modality(text: str) -> str:
     low = text.lower()
+    if re.search(r"\bmay not\b|\bmay never\b|\bmust not\b|\bshall not\b", low):
+        return "must"          # a prohibition is a hard requirement, not an option
     for kind in ("must", "should", "could"):
         for cue in MODALITY[kind]:
             if re.search(r"\b" + re.escape(cue) + r"\b", low):
@@ -355,7 +357,7 @@ def analyse_sentence(index: int, text: str, section: str, is_bullet: bool) -> Se
     nouns = [w for w in words if w not in STOPWORDS and not verb_of(w) and len(w) > 2
              and not w.replace(".", "").isdigit()]
     low = text.lower()
-    actors = sorted({a for a in ACTORS if re.search(r"\b" + re.escape(a) + r"\b", low)}, key=len, reverse=True)
+    actors = sorted({a for a in ACTORS if re.search(r"\b" + re.escape(a) + r"s?\b", low)}, key=len, reverse=True)
     return Sentence(index, text, section, modality(text), is_bullet, quantities(text), actors, verbs, nouns, words)
 
 

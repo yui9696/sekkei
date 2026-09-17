@@ -148,7 +148,7 @@ b.component("C-17", "Evaluation", "Scores decision options against the active qu
 b.component("C-18", "Repair", "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
             path="sekkei/engine/repair.py", requires=["I-1", "I-2"], satisfies=["R-13"])
 b.component("C-19", "Engine facade", "design(text, assume): analyse, answer open questions and re-analyse, synthesise, record assumed decisions, inject threats, repair, review, notes; ask(text): questions only.",
-            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
+            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-27", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
             satisfies=["R-13", "R-14", "R-15", "R-16", "R-17"])
 b.component("C-24", "Answers", "Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.",
             path="sekkei/engine/answers.py", requires=["I-15", "I-20", "I-21"], satisfies=["R-17"])
@@ -168,7 +168,7 @@ b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort,
 b.component("C-27", "Japanese input", "Glossary, number/unit grammar, modality lexicon and particle-driven reorder that rewrite Japanese requirements into canonical English, with an audit table of every rewrite.",
             path="sekkei/engine/ja.py", satisfies=["R-20"])
 b.component("C-28", "Deliverables", "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
-            path="sekkei/deliverables.py", requires=["I-1", "I-3", "I-4"], satisfies=["R-21"])
+            path="sekkei/deliverables.py", requires=["I-1", "I-3", "I-4", "I-13"], satisfies=["R-21"])
 b.component("C-29", "Red team", "Adversarial self-audit: re-runs the engine on perturbed requirements and compares design shapes; contradictions, lost numbers, assumption load, determinism.",
             path="sekkei/redteam.py", requires=["I-1", "I-13", "I-19"], satisfies=["R-22"])
 

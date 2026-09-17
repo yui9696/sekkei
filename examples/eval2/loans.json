@@ -93,7 +93,7 @@
       "id": "R-8",
       "statement": "2,000 applications per day; 1,000 pending applications at any time; scoring returns within 2 s p95.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "p95 latency at 2,000, 1,000",
         "target": "<= 2 s",
@@ -129,7 +129,7 @@
       "id": "R-11",
       "statement": "99.9 % monthly availability for the applicant surface; metrics for Prometheus; structured logs.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio",
         "target": "99.9 %",
@@ -162,7 +162,7 @@
       "id": "R-15",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "size at 2 KB",
         "target": "<= 256 kb",
@@ -186,7 +186,7 @@
       "id": "R-17",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio at 5 minutes, 10 minutes",
         "target": "1 %",
@@ -196,7 +196,7 @@
     },
     {
       "id": "R-18",
-      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "statement": "The existing system named in the requirements stays in place; integration, not migration (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -523,7 +523,8 @@
         "I-4"
       ],
       "satisfies": [
-        "R-7"
+        "R-7",
+        "R-10"
       ],
       "tags": [
         "layer:2",
@@ -2624,7 +2625,7 @@
         }
       ],
       "choice": "Scheduled batch file exchange (CSV/fixed format) through a shared drop",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 1.73; API façade: 1.67; Change data capture from the legacy database: 1.23",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.73; API façade: 1.67; Change data capture from the legacy database: 1.23. stated in the constraints",
       "consequences": "Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
       "affects": [
         "C-17"
@@ -2737,10 +2738,10 @@
     {
       "id": "D-10",
       "title": "Assumed answer: data (Q-migration)",
-      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "context": "The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.",
       "options": [
         {
-          "name": "greenfield",
+          "name": "integrate, no migration",
           "pros": [],
           "cons": []
         },
@@ -2755,10 +2756,12 @@
           "cons": []
         }
       ],
-      "choice": "greenfield",
-      "rationale": "Nothing in the text names an existing system.",
-      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
-      "affects": [],
+      "choice": "integrate, no migration",
+      "rationale": "The text names an existing system and describes an exchange with it.",
+      "consequences": "If the real answer differs: State whether data moves; a migration package and risk are added.",
+      "affects": [
+        "C-17"
+      ],
       "status": "proposed"
     },
     {
@@ -3227,17 +3230,10 @@
         },
         {
           "id": "A-5",
-          "description": "R-11: ratio 99.9 % % — kill one instance under load; error rate stays within the target",
+          "description": "R-11: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
-        },
-        {
-          "id": "A-6",
-          "description": "R-17: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-17"
         }
       ],
       "notes": "family: infra"
@@ -3263,7 +3259,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-6",
           "description": "unit tests of Model server pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_model.py",
@@ -3287,7 +3283,8 @@
         "WP-3"
       ],
       "satisfies": [
-        "R-7"
+        "R-7",
+        "R-10"
       ],
       "files": [
         "app/data_protection.py",
@@ -3296,11 +3293,18 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-7",
           "description": "unit tests of Data protection pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_data_protection.py",
           "metric": ""
+        },
+        {
+          "id": "A-8",
+          "description": "R-10: time 7 years",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
         }
       ],
       "notes": "family: compliance_data"
@@ -3343,7 +3347,7 @@
         },
         {
           "id": "A-10",
-          "description": "R-10: time 7 years years — security test: unauthenticated and cross-tenant requests are rejected; outbound calls to private ranges are blocked",
+          "description": "R-10: time 7 years",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
@@ -3633,24 +3637,10 @@
         },
         {
           "id": "A-19",
-          "description": "R-8: p95 latency at 2,000, 1,000 <= 2 s s — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 2,000, 1,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
-        },
-        {
-          "id": "A-20",
-          "description": "R-15: size at 2 KB <= 256 kb kb",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-15"
-        },
-        {
-          "id": "A-21",
-          "description": "R-16: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
         }
       ],
       "notes": "family: infra"

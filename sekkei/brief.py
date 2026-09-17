@@ -10,6 +10,7 @@ import hashlib
 import json
 from typing import Optional
 
+from . import model as M
 from .model import Design, Interface
 from .render import interface_table
 from .state import State, report_template
@@ -44,7 +45,7 @@ def render_brief(design: Design, wp_id: str, state: Optional[State] = None) -> s
     if reqs:
         s.append("This package must satisfy the following requirements, quoted verbatim:\n")
         for r in reqs:
-            m = f" _(metric: {r.metric.name} {r.metric.target} {r.metric.unit})_".rstrip() if r.metric else ""
+            m = f" _(metric: {M.metric_text(r.metric)})_" if r.metric else ""
             s.append(f"- **{r.id}** ({r.kind}, {r.priority}): {r.statement}{m}")
         s.append("")
 

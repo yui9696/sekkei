@@ -34,17 +34,17 @@ _version 0.1.0 · schema sekkei/1_
 | R-5 | functional | must | Approved loans are exported nightly to the existing core banking system (system of record for the loan account) as a fixed-format file. | — |
 | R-6 | functional | must | Every decision is recorded with the model version, the inputs and who took it, for regulators. | — |
 | R-7 | functional | must | Applicants can download a copy of their data and request deletion after the retention period. | — |
-| R-8 | nonfunctional | should | 2,000 applications per day; 1,000 pending applications at any time; scoring returns within 2 s p95. | p95 latency at 2,000, 1,000 <= 2 s s |
+| R-8 | nonfunctional | must | 2,000 applications per day; 1,000 pending applications at any time; scoring returns within 2 s p95. | p95 latency at 2,000, 1,000 <= 2 s |
 | R-9 | nonfunctional | must | No application or decision is lost on a crash; a decision is never recorded twice. | records lost across a process crash = 0 records |
-| R-10 | nonfunctional | should | Personal and financial data are encrypted; access to documents is logged; decisions are retained for 7 years. | time 7 years years |
-| R-11 | nonfunctional | should | 99.9 % monthly availability for the applicant surface; metrics for Prometheus; structured logs. | ratio 99.9 % % |
+| R-10 | nonfunctional | should | Personal and financial data are encrypted; access to documents is logged; decisions are retained for 7 years. | time 7 years |
+| R-11 | nonfunctional | must | 99.9 % monthly availability for the applicant surface; metrics for Prometheus; structured logs. | ratio 99.9 % |
 | R-12 | constraint | must | Python 3.12, PostgreSQL and S3-compatible object storage available; containers behind an existing ingress; single region. Team of 5. | — |
 | R-13 | constraint | must | Applicants authenticate with the bank's OIDC identity provider; underwriters with the corporate SSO. | — |
 | R-14 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-15 | nonfunctional | should | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb kb |
-| R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-17 | nonfunctional | should | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % % |
-| R-18 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-15 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-17 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-18 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
 | R-19 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
 ## Components
@@ -244,7 +244,7 @@ graph LR
 - **responsibility**: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 - **provides**: I-18
 - **requires**: I-1, I-4
-- **satisfies**: R-7
+- **satisfies**: R-7, R-10
 
 ### C-19 — Public HTTP API
 
@@ -847,7 +847,7 @@ _Affects:_ C-18, C-1
   - − coupled to the legacy schema
   - − capture tooling to operate
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 1.73; API façade: 1.67; Change data capture from the legacy database: 1.23
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.73; API façade: 1.67; Change data capture from the legacy database: 1.23. stated in the constraints
 
 **Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
@@ -907,15 +907,17 @@ _Affects:_ C-1
 
 ### D-10 — Assumed answer: data (Q-migration) (proposed)
 
-**Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
+**Context.** The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.
 
-- ✔ **greenfield**
+- ✔ **integrate, no migration**
 - ✘ **one-shot import**
 - ✘ **gradual cut-over**
 
-**Rationale.** Nothing in the text names an existing system.
+**Rationale.** The text names an existing system and describes an exchange with it.
 
-**Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
+**Consequences.** If the real answer differs: State whether data moves; a migration package and risk are added.
+
+_Affects:_ C-17
 
 ### D-11 — Assumed answer: security (Q-authz) (proposed)
 
@@ -1041,7 +1043,7 @@ graph LR
 4. WP-11, WP-12
 5. WP-13, WP-14
 
-_Critical path (weight 6):_ WP-3 → WP-8 → WP-9 → WP-11 → WP-14
+_Critical path (13 person-days):_ WP-3 → WP-8 → WP-9 → WP-11 → WP-14
 
 ### WP-1 — Audit log (S)
 
@@ -1075,8 +1077,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **acceptance**:
   - A-3 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
   - A-4 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-5 (metric) R-11: ratio 99.9 % % — kill one instance under load; error rate stays within the target — metric R-11
-  - A-6 (metric) R-17: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload — metric R-17
+  - A-5 (metric) R-11: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-11
 - **notes**: family: infra
 
 ### WP-4 — Model server (S)
@@ -1087,7 +1088,7 @@ Implement Model server: Loads the model, serves predictions with batching and ti
 - **depends on**: — · **satisfies**: R-3
 - **write scope**: `app/model.py`, `tests/test_model.py`
 - **acceptance**:
-  - A-7 (test) unit tests of Model server pass — `python -m pytest -q tests/test_model.py`
+  - A-6 (test) unit tests of Model server pass — `python -m pytest -q tests/test_model.py`
 - **notes**: family: ml_inference
 
 ### WP-5 — Data protection (S)
@@ -1095,10 +1096,11 @@ Implement Model server: Loads the model, serves predictions with batching and ti
 Implement Data protection: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 
 - **components**: C-18 · **implements**: I-18
-- **depends on**: WP-1, WP-3 · **satisfies**: R-7
+- **depends on**: WP-1, WP-3 · **satisfies**: R-7, R-10
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
-  - A-8 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
+  - A-7 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
+  - A-8 (metric) R-10: time 7 years — metric R-10
 - **notes**: family: compliance_data
 
 ### WP-6 — Authentication + Scheduler (M)
@@ -1110,7 +1112,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
   - A-9 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
-  - A-10 (metric) R-10: time 7 years years — security test: unauthenticated and cross-tenant requests are rejected; outbound calls to private ranges are blocked — metric R-10
+  - A-10 (metric) R-10: time 7 years — metric R-10
 - **notes**: family: infra
 
 ### WP-7 — Identity and credit checks (S)
@@ -1199,9 +1201,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-19 (metric) R-8: p95 latency at 2,000, 1,000 <= 2 s s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-20 (metric) R-15: size at 2 KB <= 256 kb kb — metric R-15
-  - A-21 (metric) R-16: time at 4 h 24 h h — metric R-16
+  - A-19 (metric) R-8: p95 latency at 2,000, 1,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
 - **notes**: family: infra
 
 ## Traceability
@@ -1210,21 +1210,21 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 |---|---|---|---|---|
 | R-1 | must | C-3, C-7 | WP-2, WP-9 | A-2, A-13 |
 | R-2 | must | C-5, C-7, C-13 | WP-7, WP-9 | A-11, A-13 |
-| R-3 | must | C-5, C-7, C-8, C-11, C-13, C-14 | WP-4, WP-7, WP-8, WP-9, WP-10 | A-7, A-11, A-12, A-13, A-14 |
+| R-3 | must | C-5, C-7, C-8, C-11, C-13, C-14 | WP-4, WP-7, WP-8, WP-9, WP-10 | A-6, A-11, A-12, A-13, A-14 |
 | R-4 | must | C-8, C-14 | WP-8, WP-10 | A-12, A-14 |
 | R-5 | must | C-6, C-7, C-8, C-12, C-14, C-15, C-16, C-17 | WP-6, WP-8, WP-9, WP-10, WP-11, WP-12, WP-13 | A-9, A-10, A-12, A-13, A-14, A-15, A-16, A-17 |
 | R-6 | must | C-4 | WP-1 | A-1 |
-| R-7 | must | C-4, C-18 | WP-1, WP-5 | A-1, A-8 |
-| R-8 | should | C-19 | WP-14 | A-18, A-19, A-20, A-21 |
-| R-9 | must | C-1 | WP-3 | A-3, A-4, A-5, A-6 |
-| R-10 | should | C-10 | WP-6 | A-9, A-10 |
-| R-11 | should | C-9 | WP-3 | A-3, A-4, A-5, A-6 |
-| R-12 | must | C-1, C-7, C-19 | WP-3, WP-9, WP-14 | A-3, A-4, A-5, A-6, A-13, A-18, A-19, A-20, A-21 |
+| R-7 | must | C-4, C-18 | WP-1, WP-5 | A-1, A-7, A-8 |
+| R-8 | must | C-19 | WP-14 | A-18, A-19 |
+| R-9 | must | C-1 | WP-3 | A-3, A-4, A-5 |
+| R-10 | should | C-10, C-18 | WP-5, WP-6 | A-7, A-8, A-9, A-10 |
+| R-11 | must | C-9 | WP-3 | A-3, A-4, A-5 |
+| R-12 | must | C-1, C-7, C-19 | WP-3, WP-9, WP-14 | A-3, A-4, A-5, A-13, A-18, A-19 |
 | R-13 | must | C-10 | WP-6 | A-9, A-10 |
 | R-14 | could | C-10 | WP-6 | A-9, A-10 |
-| R-15 | should | C-19 | WP-14 | A-18, A-19, A-20, A-21 |
-| R-16 | should | C-19 | WP-14 | A-18, A-19, A-20, A-21 |
-| R-17 | should | C-9 | WP-3 | A-3, A-4, A-5, A-6 |
+| R-15 | must | C-19 | WP-14 | A-18, A-19 |
+| R-16 | should | C-19 | WP-14 | A-18, A-19 |
+| R-17 | must | C-9 | WP-3 | A-3, A-4, A-5 |
 | R-18 | must | C-7 | WP-9 | A-13 |
 | R-19 | must | C-7 | WP-9 | A-13 |
 

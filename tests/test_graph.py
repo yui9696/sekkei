@@ -23,12 +23,12 @@ def test_find_cycle_and_waves():
 
 
 def test_critical_path_uses_size_weights():
-    d = starter_design()  # WP-1 (S=1) -> WP-2 (M=2)
-    assert G.critical_path(d) == (3, ["WP-1", "WP-2"])
+    d = starter_design()  # WP-1 (S=2) -> WP-2 (M=5), person-days: one table with the notes
+    assert G.critical_path(d) == (7, ["WP-1", "WP-2"])
     d.work_packages[1].size = "L"
-    assert G.critical_path(d) == (5, ["WP-1", "WP-2"])
+    assert G.critical_path(d) == (12, ["WP-1", "WP-2"])
     d.work_packages.append(M.WorkPackage("WP-3", "x", size="L"))
-    assert G.critical_path(d) == (5, ["WP-1", "WP-2"])  # ties broken deterministically
+    assert G.critical_path(d) == (12, ["WP-1", "WP-2"])  # WP-3 alone is 10; ties broken deterministically
     assert G.critical_path(M.Design(name="empty")) == (0, [])
 
 

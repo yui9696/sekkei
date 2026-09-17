@@ -23,20 +23,21 @@ _version 0.1.0 · schema sekkei/1_
 | R-3 | functional | must | Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | — |
 | R-4 | functional | must | When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is notified by SMS. | — |
 | R-5 | functional | must | A nightly job aggregates readings into daily statistics per truck and exports them as CSV to an SFTP server. | — |
-| R-6 | nonfunctional | should | 5,000 trucks, 20,000 readings/s at peak; a reading is visible to managers within 10 s p95. | p95 latency at 5,000, 20,000 <= 10 s s |
+| R-6 | nonfunctional | must | 5,000 trucks, 20,000 readings/s at peak; a reading is visible to managers within 10 s p95. | p95 latency at 5,000, 20,000 <= 10 s |
 | R-7 | nonfunctional | must | Readings are never lost once acknowledged to the truck; duplicates never appear in charts. | records lost across a process crash = 0 records |
-| R-8 | nonfunctional | should | Raw readings are kept 90 days, daily statistics 5 years. | time at 5 years 90 days days |
+| R-8 | nonfunctional | should | Raw readings are kept 90 days, daily statistics 5 years. | time at 5 years 90 days |
 | R-9 | constraint | must | Java 21, PostgreSQL with TimescaleDB available, Kafka available. Team of 5. On-prem Kubernetes. | — |
 | R-10 | constraint | must | The MQTT broker already exists and is operated by another team. | — |
-| R-11 | functional | must | Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
+| R-11 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-12 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-13 | nonfunctional | should | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb kb |
-| R-14 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % % |
-| R-15 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-16 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s s |
-| R-17 | constraint | must | Authentication via an OIDC identity provider (assumed by the engine: internal users). | — |
-| R-18 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
-| R-19 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-13 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-14 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
+| R-15 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-16 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-17 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-18 | constraint | must | Authentication via an OIDC identity provider (assumed by the engine: internal users). | — |
+| R-19 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
+| R-20 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
 
 ## Components
 
@@ -93,7 +94,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-7, R-9, R-14, R-16
+- **satisfies**: R-7, R-9, R-16
 
 ### C-2 — Work queue
 
@@ -101,7 +102,7 @@ graph LR
 - **responsibility**: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.
 - **provides**: I-2
 - **requires**: —
-- **satisfies**: R-1, R-7, R-14, R-16
+- **satisfies**: R-1, R-7, R-14, R-16, R-17
 
 ### C-3 — Email provider
 
@@ -141,7 +142,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-7
 - **requires**: I-1, I-9, I-8, I-16
-- **satisfies**: R-3, R-1, R-5, R-9, R-10, R-18, R-19
+- **satisfies**: R-3, R-1, R-5, R-9, R-10, R-19, R-20
 
 ### C-8 — Notifier
 
@@ -157,7 +158,7 @@ graph LR
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
 - **provides**: I-9
 - **requires**: —
-- **satisfies**: R-14
+- **satisfies**: R-14, R-17
 
 ### C-10 — Authentication
 
@@ -165,7 +166,7 @@ graph LR
 - **responsibility**: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.
 - **provides**: I-10
 - **requires**: I-1
-- **satisfies**: R-12, R-17
+- **satisfies**: R-12, R-18
 
 ### C-11 — Import/export
 
@@ -181,7 +182,7 @@ graph LR
 - **responsibility**: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 - **provides**: I-12
 - **requires**: I-9, I-2
-- **satisfies**: R-1, R-5, R-11
+- **satisfies**: R-1, R-5, R-8, R-11
 
 ### C-13 — Batch job
 
@@ -189,7 +190,7 @@ graph LR
 - **responsibility**: Scheduled processing over stored records: extract, transform, aggregate, write results.
 - **provides**: I-13
 - **requires**: I-1, I-12, I-9, I-5, I-11, I-7
-- **satisfies**: R-1, R-5, R-11
+- **satisfies**: R-1, R-5, R-8, R-11
 
 ### C-14 — Public HTTP API
 
@@ -197,7 +198,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-14
 - **requires**: I-7, I-9, I-10, I-11
-- **satisfies**: R-3, R-6, R-8, R-9, R-13, R-15
+- **satisfies**: R-3, R-6, R-9, R-13, R-15
 
 ### C-15 — MQTT consumer
 
@@ -312,10 +313,12 @@ graph LR
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 | `export_sftp` | `sftp`: Sftp \| id | Sftp \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
-| | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-11); 1 year (R-11) |
-| | from R-11: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
+| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
+| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
+| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
+| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-8 — Notifier interface
 
@@ -379,7 +382,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `run` | `window`: DateRange | JobReport | JobError | stated values: 30 seconds (R-1); 90 days (R-11); 1 year (R-11) |
+| `run` | `window`: DateRange | JobReport | JobError | stated values: 30 seconds (R-1); 1 year (R-11) |
 
 ### I-14 — Public HTTP API interface
 
@@ -515,7 +518,7 @@ sequenceDiagram
   - + no secrets in headers
   - − certificate lifecycle for every customer
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.40; Mutual TLS: 0.80. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -544,7 +547,7 @@ _Affects:_ C-10
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.29; In-memory: 1.63; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.42; In-memory: 1.70; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
 
 **Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
 
@@ -568,9 +571,9 @@ _Affects:_ C-1
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.71; Separate services per concern: 1.51; Single process with background threads: 1.40
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.95; Single process with background threads: 1.51; Separate services per concern: 1.42
 
-**Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
+**Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
 _Affects:_ C-14, C-12
 
@@ -599,7 +602,7 @@ _Affects:_ C-14, C-12
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.09; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.07; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
 
 _Affects:_ C-2
 
@@ -621,7 +624,7 @@ _Affects:_ C-2
   - − a second database
   - − eventual consistency
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.29; Plain PostgreSQL tables partitioned by day: 2.23; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.42; Plain PostgreSQL tables partitioned by day: 2.19; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'Plain PostgreSQL tables partitioned by day' gives up: no extension.
 
@@ -645,7 +648,7 @@ _Affects:_ C-1
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.71; Single instance with health-based restart: 1.40; Active-active across two regions: 1.31
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.58; Single instance with health-based restart: 1.33; Active-active across two regions: 1.26
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.
 
@@ -683,13 +686,13 @@ _Affects:_ C-2, C-9
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
-- ✔ **90 days / 1 year**
+- ✔ **indefinite / 1 year**
+- ✘ **90 days / 1 year**
 - ✘ **30 days / 90 days**
-- ✘ **indefinite**
 
-**Rationale.** Bounded retention limits storage growth and satisfies most data-minimisation rules.
+**Rationale.** Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.
 
-**Consequences.** If the real answer differs: State the retention; the deletion job and capacity change.
+**Consequences.** If the real answer differs: State the retention per record class; the deletion job and capacity change.
 
 _Affects:_ C-13, C-1
 
@@ -773,6 +776,20 @@ _Affects:_ C-7, C-10
 
 _Affects:_ C-12, C-2
 
+### D-16 — Assumed answer: operations (Q-alerting) (proposed)
+
+**Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
+
+- ✔ **error rate + queue growth**
+- ✘ **none**
+- ✘ **per-endpoint SLO alerts**
+
+**Rationale.** Two alerts catch most incidents without paging on noise.
+
+**Consequences.** If the real answer differs: State the rules and the on-call; observability conventions change.
+
+_Affects:_ C-9
+
 ## Risks
 
 | id | risk | likelihood | impact | mitigation |
@@ -836,20 +853,19 @@ graph LR
 4. WP-6, WP-7
 5. WP-8, WP-9
 
-_Critical path (weight 6):_ WP-1 → WP-4 → WP-5 → WP-7 → WP-9
+_Critical path (13 person-days):_ WP-1 → WP-4 → WP-5 → WP-7 → WP-9
 
 ### WP-1 — Store + Work queue + Observability (M)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
 - **components**: C-1, C-2, C-9 · **implements**: I-1, I-2, I-9
-- **depends on**: — · **satisfies**: R-1, R-7, R-9, R-14, R-16
+- **depends on**: — · **satisfies**: R-1, R-7, R-9, R-14, R-16, R-17
 - **write scope**: `src/main/java/app/Store.java`, `src/test/java/app/StoreTest.java`, `src/main/java/app/Queue.java`, `src/test/java/app/QueueTest.java`, `src/main/java/app/Observability.java`, `src/test/java/app/ObservabilityTest.java`
 - **acceptance**:
   - A-1 (test) unit tests of Store, Work queue, Observability pass — `./gradlew test --tests app.StoreTest`
   - A-2 (metric) R-7: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-7
-  - A-3 (metric) R-14: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-14
-  - A-4 (metric) R-16: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-16
+  - A-3 (metric) R-14: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-14
 - **notes**: family: infra
 
 ### WP-2 — Authentication + Scheduler (M)
@@ -857,10 +873,11 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
 - **components**: C-10, C-12 · **implements**: I-10, I-12
-- **depends on**: WP-1 · **satisfies**: R-1, R-5, R-11, R-12, R-17
+- **depends on**: WP-1 · **satisfies**: R-1, R-5, R-8, R-11, R-12, R-18
 - **write scope**: `src/main/java/app/Auth.java`, `src/test/java/app/AuthTest.java`, `src/main/java/app/Scheduler.java`, `src/test/java/app/SchedulerTest.java`
 - **acceptance**:
-  - A-5 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
+  - A-4 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
+  - A-5 (metric) R-8: time at 5 years 90 days — metric R-8
 - **notes**: family: infra
 
 ### WP-3 — Notifier (S)
@@ -890,7 +907,7 @@ Implement Readings processor: Computes over readings on behalf of the core. Synt
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-7 · **implements**: I-7
-- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-9, R-10, R-18, R-19
+- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-9, R-10, R-19, R-20
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
   - A-8 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
@@ -923,10 +940,11 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-11
+- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-8, R-11
 - **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`
 - **acceptance**:
   - A-11 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
+  - A-12 (metric) R-8: time at 5 years 90 days — metric R-8
 - **notes**: family: batch_pipeline
 
 ### WP-9 — Public HTTP API (S)
@@ -934,39 +952,37 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-14 · **implements**: I-14
-- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-8, R-9, R-13, R-15
+- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-9, R-13, R-15
 - **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
 - **acceptance**:
-  - A-12 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
-  - A-13 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s s — load test at the stated rate; the stated percentile must meet the target — metric R-6
-  - A-14 (metric) R-8: time at 5 years 90 days days — metric R-8
-  - A-15 (metric) R-13: size at 2 KB <= 256 kb kb — metric R-13
-  - A-16 (metric) R-15: time at 4 h 24 h h — metric R-15
+  - A-13 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
+  - A-14 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
 - **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-11 |
+| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-11, A-12 |
 | R-2 | must | C-16 | WP-4 | A-7 |
-| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-12, A-13, A-14, A-15, A-16 |
+| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-13, A-14 |
 | R-4 | must | C-3, C-6, C-8 | WP-3 | A-6 |
-| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-5, A-8, A-10, A-11 |
-| R-6 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
-| R-7 | must | C-1, C-2 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-8 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
-| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-4, A-8, A-12, A-13, A-14, A-15, A-16 |
+| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-5, A-8, A-10, A-11, A-12 |
+| R-6 | must | C-14 | WP-9 | A-13, A-14 |
+| R-7 | must | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
+| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-11, A-12 |
+| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-8, A-13, A-14 |
 | R-10 | must | C-7 | WP-5 | A-8 |
-| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-5, A-11 |
-| R-12 | could | C-10 | WP-2 | A-5 |
-| R-13 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
-| R-14 | must | C-1, C-2, C-9 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-15 | should | C-14 | WP-9 | A-12, A-13, A-14, A-15, A-16 |
-| R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3, A-4 |
-| R-17 | must | C-10 | WP-2 | A-5 |
-| R-18 | must | C-7 | WP-5 | A-8 |
+| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-11, A-12 |
+| R-12 | could | C-10 | WP-2 | A-4, A-5 |
+| R-13 | must | C-14 | WP-9 | A-13, A-14 |
+| R-14 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
+| R-15 | should | C-14 | WP-9 | A-13, A-14 |
+| R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
+| R-17 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
+| R-18 | must | C-10 | WP-2 | A-4, A-5 |
 | R-19 | must | C-7 | WP-5 | A-8 |
+| R-20 | must | C-7 | WP-5 | A-8 |
 
 ## Conventions
 
@@ -974,6 +990,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **test**: `./gradlew test`
 - **lint**: `./gradlew check`
 - Constructor injection; no static state.
+- Every component logs one structured line per unit of work with the correlation id.
 - Prefer the boring option; a new piece of infrastructure needs a decision record.
 - Java 21 as stated in the constraints.
 - Stateless processes: configuration from the environment, no local files that a second instance would not see.

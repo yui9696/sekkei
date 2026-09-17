@@ -6,6 +6,7 @@ calendar. Nothing here is precise; everything here is reproducible and labelled.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from .. import graph as G
@@ -44,7 +45,7 @@ def implied_inputs(an: Analysis) -> tuple[float, float]:
 DEFAULT_PAYLOAD_BYTES = 2048
 DEFAULT_SERVICE_MS = 200          # mean time of one outbound/handler call
 DEFAULT_OUTAGE_HOURS = 1.0
-SIZE_DAYS = {"S": 2, "M": 5, "L": 10}   # person-days per package size (assumption)
+SIZE_DAYS = G.SIZE_WEIGHT   # person-days per package size (assumption); one table with graph.critical_path
 #: count nouns that denote a population worth dividing a rate by (not "5 attempts")
 POPULATION_NOUNS = {"endpoints", "users", "tenants", "customers", "items", "records", "devices", "sensors", "clients",
                     "subscribers", "orders", "products", "accounts", "files", "warehouses", "stores", "sites", "nodes",
@@ -93,6 +94,13 @@ def capacity(an: Analysis) -> Capacity:
     qs = [(u, q) for u in an.requirements for q in u.sentence.quantities]
     rates = [(u, q, _per_second(q)) for u, q in qs if q.kind == "rate"]
     rates = [(u, q, r) for u, q, r in rates if r]
+    # a peak/burst figure sizes concurrency, never storage or daily volume
+    def is_peak(u, q):
+        i = u.sentence.text.find(q.raw)
+        return bool(re.search(r"\bpeaks? (?:of|at)?\s*$|\bburst(?:s)? (?:of|at)?\s*$|\bat peak\b", u.sentence.text[max(0, i - 24):i].lower())) or \
+            bool(re.search(r"^\s*(?:at )?peak\b|^\s*\(peak", u.sentence.text[i + len(q.raw):i + len(q.raw) + 12].lower()))
+    peaks = [(u, q, r) for u, q, r in rates if is_peak(u, q)]
+    rates = [(u, q, r) for u, q, r in rates if not is_peak(u, q)]
     counts = [(u, q) for u, q in qs if q.kind == "count"]
     sizes = [(u, q) for u, q in qs if q.kind == "size"]
     latencies = [(u, q) for u, q in qs if q.kind == "latency"]
@@ -147,6 +155,11 @@ def capacity(an: Analysis) -> Capacity:
             cap.estimates.append(Estimate("in-flight items at the latency target", _fmt(r * secs),
                                           "rate × latency target (Little's law upper bound)", f"{q.raw} ({u.id}) × {lq.raw} ({lu.id})",
                                           "rate * latency_s", {**base, "latency_s": secs}, r * secs))
+    for u, q, r in peaks[:1]:
+        conc = r * DEFAULT_SERVICE_MS / 1000
+        cap.estimates.append(Estimate(f"concurrent handlers at the stated peak ({q.noun or 'requests'})", _fmt(conc),
+                                      "Little's law: peak rate × mean service time", f"{q.raw} ({u.id}); mean service time assumed {DEFAULT_SERVICE_MS} ms",
+                                      "rate * service_ms / 1000", {"rate": r, "service_ms": DEFAULT_SERVICE_MS}, conc))
     populations = [(u, q) for u, q in counts if q.value >= 100 or q.noun in POPULATION_NOUNS]
     for u, q in populations[:3]:
         cap.estimates.append(Estimate(f"number of {q.noun}", _fmt(q.value), "stated", f"{q.raw} {q.noun} ({u.id})", "count", {"count": q.value}, q.value))

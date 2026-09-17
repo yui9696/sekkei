@@ -13,4 +13,4 @@
 ## info
 
 - **RT01** [R-14] deleting this constraint changes nothing: it coincides with what the engine assumes by default (still worth stating)
-  - evidence: Patients authenticate existing patients OIDC.
+  - evidence: Patients authenticate existing patient portal OIDC.

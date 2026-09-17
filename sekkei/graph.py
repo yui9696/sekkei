@@ -10,7 +10,8 @@ from typing import Iterable, Optional
 
 from .model import Design, WorkPackage
 
-SIZE_WEIGHT = {"S": 1, "M": 2, "L": 4}
+#: person-days per package size; the single table used by plan, notes, roadmap and the effort estimate
+SIZE_WEIGHT = {"S": 2, "M": 5, "L": 10}
 
 Graph = dict[str, set[str]]
 
@@ -128,7 +129,7 @@ def topological_order(g: Graph) -> list[str]:
 
 
 def critical_path(design: Design) -> tuple[int, list[str]]:
-    """Longest path through the package DAG, weighted by size (S=1, M=2, L=4)."""
+    """Longest path through the package DAG, weighted by size in person-days (S=2, M=5, L=10)."""
     g = package_graph(design)
     weight = {w.id: SIZE_WEIGHT.get(w.size, 2) for w in design.work_packages}
     best: dict[str, tuple[int, list[str]]] = {}

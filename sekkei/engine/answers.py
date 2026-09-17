@@ -84,12 +84,12 @@ def answer(q: Question, an: Analysis) -> Answer | None:
             return A(q.id, q.topic, f"{rate:,} updates/s sustained (derived), 10x at peak.", [("nonfunctional", f"The system sustains {rate:,} updates/s with peaks of {rate * 10:,} updates/s (assumed by the engine: {imp[1]}).")],
                      [f"{rate:,} updates/s", f"{rate * 10:,} updates/s", f"{max(1, rate // 10):,} updates/s"], f"Derived from the text: {imp[1]}.", imp[1],
                      "State the measured rate; capacity estimates and the queue decision change.", ["queue", "surface_api"])
-        n = _max_count(an)
-        rate = max(10, int(n / 100)) if n else 100
-        return A(q.id, q.topic, f"{rate:,} requests/s sustained, 10x at peak.", [("nonfunctional", f"The system sustains {rate:,} requests/s with peaks of {rate * 10:,} requests/s (assumed by the engine).")],
+        # a stated count is a size, not a rate: never turn 200,000 items into requests per second
+        rate = 100
+        return A(q.id, q.topic, f"{rate:,} requests/s sustained, 10x at peak (engine default, not derived).", [("nonfunctional", f"The system sustains {rate:,} requests/s with peaks of {rate * 10:,} requests/s (assumed by the engine; default, not derived from the text).")],
                  [f"{rate:,} requests/s", f"{rate // 10 or 1:,} requests/s", f"{rate * 10:,} requests/s"],
-                 (f"Derived from the largest stated count ({int(n):,}) at 1 request per 100 items per second." if n else "No rate or count stated; 100 requests/s is a modest default for a first release."),
-                 f"count {int(n):,}" if n else "", "State the measured or expected rate; capacity estimates and the queue decision change.", ["queue", "surface_api"])
+                 "No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.",
+                 "", "State the measured or expected rate; capacity estimates and the queue decision change.", ["queue", "surface_api"])
     if q.id == "Q-volume":
         return A(q.id, q.topic, "10,000 primary records and 1,000 users in the first year.", [("nonfunctional", "The system holds 10,000 records and serves 1,000 users in the first year (assumed by the engine).")],
                  ["10,000 records / 1,000 users", "100,000 / 10,000", "1,000 / 100"], "No counts stated; the default keeps single-instance options viable and is easy to revise.", "",
@@ -108,13 +108,17 @@ def answer(q: Question, an: Analysis) -> Answer | None:
                  ["99.9 %", "99.5 %", "99.99 %"], "Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.", "",
                  "State the target and what may be lost; topology and queue durability change.", ["queue", "observability"])
     if q.id == "Q-retention":
-        return A(q.id, q.topic, "Records kept 90 days, audit history 1 year, then deleted by a nightly job.", [("functional", "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).")],
-                 ["90 days / 1 year", "30 days / 90 days", "indefinite"], "Bounded retention limits storage growth and satisfies most data-minimisation rules.", "",
-                 "State the retention; the deletion job and capacity change.", ["batch", "store"], ["batch_pipeline"])
+        return A(q.id, q.topic, "Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job.", [("functional", "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).")],
+                 ["indefinite / 1 year", "90 days / 1 year", "30 days / 90 days"], "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.", "",
+                 "State the retention per record class; the deletion job and capacity change.", ["batch", "store"], ["batch_pipeline"])
     if q.id == "Q-backup":
         return A(q.id, q.topic, "Daily backups; RPO 24 h, RTO 4 h.", [("nonfunctional", "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).")],
                  ["daily / 24 h / 4 h", "hourly / 1 h / 1 h", "none"], "The store's own daily backup is the cheapest credible baseline.", "", "State RPO/RTO; the store decision and a restore drill change.", ["store"])
     if q.id == "Q-migration":
+        if "legacy_integration" in an.patterns:
+            return A(q.id, q.topic, "An existing system stays the system of record; records are exchanged, nothing is migrated in one shot.", [("constraint", "The existing system named in the requirements stays in place; integration, not migration (assumed by the engine).")],
+                     ["integrate, no migration", "one-shot import", "gradual cut-over"], "The text names an existing system and describes an exchange with it.", "legacy_integration pattern",
+                     "State whether data moves; a migration package and risk are added.", ["legacy_adapter"])
         return A(q.id, q.topic, "Greenfield; no existing data to migrate.", [("constraint", "No existing data or system to migrate from (assumed by the engine).")],
                  ["greenfield", "one-shot import", "gradual cut-over"], "Nothing in the text names an existing system.", "", "Name the existing system; a migration package and risk are added.", [])
     if q.id == "Q-auth":
@@ -139,6 +143,10 @@ def answer(q: Question, an: Analysis) -> Answer | None:
                  ["10 s / 5 retries / queue", "fail fast, no retry", "30 s / unlimited retries"], "Bounded retries with a durable queue keep the system responsive during a one-hour outage.", "",
                  "State the policy; the outbound client and scheduler contracts change.", ["dispatcher", "scheduler", "queue"])
     if q.id == "Q-compliance":
+        if "compliance_data" in an.patterns:
+            return A(q.id, q.topic, "The regime named in the text applies; deletion on request and access logging are designed.", [("functional", "Personal data is deleted on request and access to it is logged, under the regime the requirements name (assumed by the engine: regime named).")],
+                     ["named regime + deletion + audit", "no regime", "HIPAA/PCI controls"], "The requirements name a data-protection regime or a deletion right.", "compliance_data pattern",
+                     "State the statutory deadline; the deletion job's deadline changes.", ["data_protection", "audit"], ["compliance_data"])
         return A(q.id, q.topic, "Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged.", [("functional", "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).")],
                  ["GDPR-style deletion + audit", "no regime", "HIPAA/PCI controls"], "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.", "personal data mentioned",
                  "State the regime; audit and deletion paths change.", ["audit", "store"], ["audit_log"])

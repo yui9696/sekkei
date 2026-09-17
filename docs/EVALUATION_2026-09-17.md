@@ -47,12 +47,12 @@ from appointments`).
 
 After: the per-day rate grammar (`3000 requests/day`, 20 requests/s peak as the second
 quantity); the legacy pattern accepts up to three words before `system`, so an *Existing
-system* + *Legacy system adapter* with the batch-file decision appear; multi-clause
+system* + *Legacy system adapter* appear (the batch-file exchange wins the integration decision because the text says 「夜間に」, which the engine reads as a nightly-batch constraint — at the first run the API façade had won by 0.04); multi-clause
 sentences are split at 「〜び、」「〜し、」 and the first clause's actor carries over
 (`Patients departments choose doctors. The system can register, change and cancel
 available slots from appointments.` — still rough, but each clause now has its own verb).
 Right from the start: PostgreSQL, OIDC, optimistic concurrency for the double-booking
-rule, field-level PII protection, SMS + email notifier, audit log, slot generation as a
+rule, platform encryption at rest with access audit for the patient data (field-level encryption scored lower on simplicity for a team of 3), SMS + email notifier, audit log, slot generation as a
 scheduled job, data-protection component for APPI deletion.
 
 Still wrong: `POST /slots` where a human would write `POST /appointments`; `GET
@@ -119,6 +119,27 @@ unrecognised sentences (RT07) — exactly the sentences listed above as still wr
 assumption load (RT06) on the hospital spec (9 decisions proposed against 8 taken from the
 text) — the notes list the nine questions. The reports are in
 `examples/eval2/*.REDTEAM.md`.
+
+## After the independent red team (same day)
+
+An independent reviewer (a separate session, given no conclusions) attacked the same four
+specs and found what the scores above had not: the language decision was lost when the
+engine re-read the augmented text (a Japanese spec with few bullets came back raw and
+「300ms 以内」 became a 300 s metric — fixed: the language is decided once on the original);
+the load question derived a rate from a catalogue *count* (200,000 items → 2,000 requests/s
+→ 10 TB/month — fixed: a count is a size, never a rate; the default is labelled a default);
+the retention default deleted domain records after 90 days (fixed: domain data indefinite,
+logs and history one year); runbooks and FMEA looked for the backup decision by title
+prefix and never found the engine's assumed one (fixed); two critical-path weight tables
+(fixed: one table, person-days); acceptance templates were chosen by component family, so a
+PII requirement was checked by the SSRF test (fixed: chosen by the metric's quality);
+SLO.md paged on assumptions and record sizes (fixed: stated latency/availability/rate/loss
+only); the FMEA propagated an email-provider outage into every must-have (fixed: side-effect
+components do not propagate); `redteam` was quadratic (capped); `--prices` accepted NaN,
+negatives and nested objects (rejected). The reviewer's own spec (smart-building access
+control) scored **5/20**: the decision hot path, device PKI, offline controller cache and
+regional topology were all missed — the catalogue has none of them. That number stands as
+the honest floor for a domain the catalogue does not know.
 
 ## The fixes this evaluation motivated
 

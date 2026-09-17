@@ -18,7 +18,7 @@
   ],
   "non_goals": [
     "Accounting invoices.",
-    "Bookings."
+    "Inpatient bookings."
   ],
   "conventions": {
     "language": "python",
@@ -77,7 +77,7 @@
     },
     {
       "id": "R-6",
-      "statement": "The system must change and record audit log bookings cancel rows.",
+      "statement": "The system must change and record audit log bookings cancel who when rows.",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 予約・変更・キャンセルの操作履歴を、誰がいつ行ったかとともに記録する。"
@@ -107,21 +107,21 @@
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "target to be agreed",
-        "target": "review",
-        "unit": ""
+        "name": "lost or duplicate updates under concurrent writes to one record",
+        "target": "= 0",
+        "unit": "updates"
       },
       "rationale": "source (ja): 同じ枠に二重に予約が入ってはならない。"
     },
     {
       "id": "R-10",
-      "statement": "The system must save patient records encrypted. The system can delete appi on request.",
+      "statement": "The system must save patient records encrypted. The system can delete appi in accordance with on request.",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "unauthenticated or cross-tenant requests accepted",
-        "target": "= 0",
-        "unit": "requests"
+        "name": "retention/deletion rules exercised",
+        "target": "= all",
+        "unit": ""
       },
       "rationale": "source (ja): 患者情報は暗号化して保存し、個人情報保護法に従って本人の求めに応じて削除できること。"
     },
@@ -129,7 +129,7 @@
       "id": "R-11",
       "statement": "Monthly availability at least 99.5 %.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio",
         "target": ">= 99.5 %",
@@ -141,7 +141,7 @@
       "id": "R-12",
       "statement": "3000 requests/day bookings 20 requests/s peak.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "sustained rate at 20",
         "target": "3000 requests /day",
@@ -158,14 +158,14 @@
     },
     {
       "id": "R-14",
-      "statement": "Patients authenticate existing patients OIDC.",
+      "statement": "Patients authenticate existing patient portal OIDC.",
       "kind": "constraint",
       "priority": "must",
       "rationale": "source (ja): 患者の認証は既存の患者ポータル(OIDC)を使う。"
     },
     {
       "id": "R-15",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -179,7 +179,7 @@
     },
     {
       "id": "R-17",
-      "statement": "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).",
+      "statement": "Personal data is deleted on request and access to it is logged, under the regime the requirements name (assumed by the engine: regime named).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -188,7 +188,7 @@
       "id": "R-18",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "size at 2 KB",
         "target": "<= 256 kb",
@@ -224,7 +224,7 @@
       "id": "R-21",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio at 5 minutes, 10 minutes",
         "target": "1 %",
@@ -234,7 +234,7 @@
     },
     {
       "id": "R-22",
-      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "statement": "The existing system named in the requirements stays in place; integration, not migration (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -257,6 +257,7 @@
       "requires": [],
       "satisfies": [
         "R-9",
+        "R-10",
         "R-13",
         "R-20"
       ],
@@ -304,6 +305,7 @@
       "requires": [],
       "satisfies": [
         "R-6",
+        "R-10",
         "R-17"
       ],
       "tags": [
@@ -397,7 +399,6 @@
         "I-1"
       ],
       "satisfies": [
-        "R-10",
         "R-14",
         "R-16"
       ],
@@ -434,6 +435,7 @@
         "I-8"
       ],
       "satisfies": [
+        "R-3",
         "R-4",
         "R-5",
         "R-7",
@@ -495,7 +497,8 @@
         "I-4"
       ],
       "satisfies": [
-        "R-13"
+        "R-10",
+        "R-17"
       ],
       "tags": [
         "layer:2",
@@ -1034,7 +1037,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel rows."
+          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
           "name": "record_audit",
@@ -1052,7 +1055,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel rows."
+          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
           "name": "log_bookings",
@@ -1070,7 +1073,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel rows."
+          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
           "name": "cancel_rows",
@@ -1088,7 +1091,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel rows."
+          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
           "name": "record_external",
@@ -1109,6 +1112,42 @@
           "description": "from R-7: The system must integrate confirmed bookings existing electronic health record system exte"
         },
         {
+          "name": "record_kept",
+          "inputs": [
+            {
+              "name": "kept",
+              "type": "Kept | id",
+              "description": ""
+            }
+          ],
+          "output": "Kept | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-15)",
+          "post": "",
+          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
+          "name": "log_history",
+          "inputs": [
+            {
+              "name": "history",
+              "type": "History | id",
+              "description": ""
+            }
+          ],
+          "output": "History | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-15)",
+          "post": "",
+          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
           "name": "delete_job",
           "inputs": [
             {
@@ -1122,9 +1161,9 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-15); 1 year (R-15)",
+          "pre": "stated values: 1 year (R-15)",
           "post": "",
-          "description": "from R-15: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1448,7 +1487,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 90 days (R-15); 1 year (R-15)",
+          "pre": "stated values: 1 year (R-15)",
           "post": "",
           "description": ""
         }
@@ -2355,9 +2394,9 @@
           ]
         }
       ],
-      "choice": "API façade (anti-corruption layer) calling the legacy system's interfaces, with a translation layer and retries",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). API façade: 1.63; Scheduled batch file exchange: 1.59; Change data capture from the legacy database: 1.41",
-      "consequences": "Not choosing 'Scheduled batch file exchange' gives up: works with any system, no live coupling. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
+      "choice": "Scheduled batch file exchange (CSV/fixed format) through a shared drop",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.59; API façade: 1.63; Change data capture from the legacy database: 1.41. stated in the constraints",
+      "consequences": "Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
       "affects": [
         "C-13"
       ],
@@ -2488,6 +2527,11 @@
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
         {
+          "name": "indefinite / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
           "name": "90 days / 1 year",
           "pros": [],
           "cons": []
@@ -2496,16 +2540,11 @@
           "name": "30 days / 90 days",
           "pros": [],
           "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
         }
       ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "choice": "indefinite / 1 year",
+      "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
         "C-12",
         "C-1"
@@ -2544,10 +2583,10 @@
     {
       "id": "D-12",
       "title": "Assumed answer: data (Q-migration)",
-      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "context": "The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.",
       "options": [
         {
-          "name": "greenfield",
+          "name": "integrate, no migration",
           "pros": [],
           "cons": []
         },
@@ -2562,10 +2601,12 @@
           "cons": []
         }
       ],
-      "choice": "greenfield",
-      "rationale": "Nothing in the text names an existing system.",
-      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
-      "affects": [],
+      "choice": "integrate, no migration",
+      "rationale": "The text names an existing system and describes an exchange with it.",
+      "consequences": "If the real answer differs: State whether data moves; a migration package and risk are added.",
+      "affects": [
+        "C-13"
+      ],
       "status": "proposed"
     },
     {
@@ -2630,10 +2671,10 @@
     {
       "id": "D-15",
       "title": "Assumed answer: compliance (Q-compliance)",
-      "context": "The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.",
+      "context": "The requirements do not say. Question: Q-compliance. Evidence: compliance_data pattern.",
       "options": [
         {
-          "name": "GDPR-style deletion + audit",
+          "name": "named regime + deletion + audit",
           "pros": [],
           "cons": []
         },
@@ -2648,12 +2689,12 @@
           "cons": []
         }
       ],
-      "choice": "GDPR-style deletion + audit",
-      "rationale": "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.",
-      "consequences": "If the real answer differs: State the regime; audit and deletion paths change.",
+      "choice": "named regime + deletion + audit",
+      "rationale": "The requirements name a data-protection regime or a deletion right.",
+      "consequences": "If the real answer differs: State the statutory deadline; the deletion job's deadline changes.",
       "affects": [
-        "C-4",
-        "C-1"
+        "C-14",
+        "C-4"
       ],
       "status": "proposed"
     },
@@ -2941,6 +2982,7 @@
       "depends_on": [],
       "satisfies": [
         "R-6",
+        "R-10",
         "R-17"
       ],
       "files": [
@@ -2955,6 +2997,13 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_audit.py",
           "metric": ""
+        },
+        {
+          "id": "A-2",
+          "description": "R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
         }
       ],
       "notes": "family: audit_log"
@@ -2974,6 +3023,7 @@
       "depends_on": [],
       "satisfies": [
         "R-9",
+        "R-10",
         "R-11",
         "R-13",
         "R-20",
@@ -2988,39 +3038,32 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-2",
+          "id": "A-3",
           "description": "unit tests of Store, Observability pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_store.py tests/test_observability.py",
           "metric": ""
         },
         {
-          "id": "A-3",
-          "description": "R-9: target to be agreed review — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-4",
+          "description": "R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-4",
-          "description": "R-11: ratio >= 99.5 % % — kill one instance under load; error rate stays within the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-11"
-        },
-        {
           "id": "A-5",
-          "description": "R-20: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end",
           "kind": "metric",
           "command": "",
-          "metric": "R-20"
+          "metric": "R-10"
         },
         {
           "id": "A-6",
-          "description": "R-21: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
+          "description": "R-11: ratio >= 99.5 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
-          "metric": "R-21"
+          "metric": "R-11"
         }
       ],
       "notes": "family: infra"
@@ -3039,7 +3082,10 @@
         "WP-1",
         "WP-2"
       ],
-      "satisfies": [],
+      "satisfies": [
+        "R-10",
+        "R-17"
+      ],
       "files": [
         "app/data_protection.py",
         "tests/test_data_protection.py"
@@ -3052,6 +3098,13 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_data_protection.py",
           "metric": ""
+        },
+        {
+          "id": "A-8",
+          "description": "R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
         }
       ],
       "notes": "family: compliance_data"
@@ -3072,10 +3125,10 @@
         "WP-2"
       ],
       "satisfies": [
+        "R-3",
         "R-4",
         "R-5",
         "R-7",
-        "R-10",
         "R-14",
         "R-15",
         "R-16"
@@ -3089,18 +3142,11 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-9",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
           "metric": ""
-        },
-        {
-          "id": "A-9",
-          "description": "R-10: unauthenticated or cross-tenant requests accepted = 0 requests — security test: unauthenticated and cross-tenant requests are rejected; outbound calls to private ranges are blocked",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-10"
         }
       ],
       "notes": "family: infra"
@@ -3169,14 +3215,14 @@
         },
         {
           "id": "A-12",
-          "description": "R-8: p95 latency <= 500 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-13",
-          "description": "R-12: sustained rate at 20 3000 requests /day requests /day — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-12"
@@ -3223,7 +3269,7 @@
         },
         {
           "id": "A-15",
-          "description": "R-9: target to be agreed review — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "description": "R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
@@ -3307,31 +3353,17 @@
         },
         {
           "id": "A-18",
-          "description": "R-8: p95 latency <= 500 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-19",
-          "description": "R-12: sustained rate at 20 3000 requests /day requests /day — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-12"
-        },
-        {
-          "id": "A-20",
-          "description": "R-18: size at 2 KB <= 256 kb kb",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-18"
-        },
-        {
-          "id": "A-21",
-          "description": "R-19: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-19"
         }
       ],
       "notes": "family: crud_api"
@@ -3359,7 +3391,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-22",
+          "id": "A-20",
           "description": "unit tests of Legacy system adapter pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_legacy_adapter.py",

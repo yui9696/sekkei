@@ -107,7 +107,7 @@ def analysis_markdown(an: Analysis) -> str:
          f"- Constraint tokens: {', '.join(sorted(an.constraints)) or '(none)'}; languages: {', '.join(an.languages) or '(none)'}; team: {an.team_size or 'unknown'}",
          "", "| id | kind | priority | patterns | qualities | metric |", "|---|---|---|---|---|---|"]
     for u in an.requirements:
-        m = f"{u.metric[0]} {u.metric[1]} {u.metric[2]}".strip() if u.metric else "—"
+        m = (f"{u.metric[0]} {u.metric[1]}" + ("" if not u.metric[2] or u.metric[2] in u.metric[1] else " " + u.metric[2])).strip() if u.metric else "—"
         s.append(f"| {u.id} | {u.kind} | {u.priority} | {', '.join(u.patterns) or ('—' if u.kind != 'functional' else '**none**')} | {', '.join(u.qualities) or '—'} | {m} |")
     return "\n".join(s) + "\n"
 

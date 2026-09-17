@@ -13,6 +13,7 @@ from typing import Any
 
 from .. import rules as R
 from ..model import Decision, Design, Option
+from . import ja
 from .analysis import Analysis, analyse
 from .answers import Answer, augment
 from .answers import answers as _answers
@@ -81,7 +82,13 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
     """Design from a requirements text. With ``assume`` the engine answers its own open questions first;
     ``overrides`` carries owners and options a human chose in the interview."""
     overrides = overrides or Overrides()
+    # the language is decided once, on the original text: the augmented text (original + English
+    # assumed bullets) may fall under the Japanese-detection threshold and must not be re-read raw
+    norm = ja.normalise(text) if ja.is_japanese(text) else None
+    if norm:
+        text = norm.text
     an = analyse(text)
+    an.normalisation = norm
     ans: list[Answer] = []
     full = text
     if not an.requirements:
@@ -99,6 +106,7 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
             ans += new
             full = augment(text, ans)
             an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets})
+            an.normalisation = norm
     syn = synthesise(an, overrides.decisions, overrides.owners)
     _assumed_decisions(syn.design, ans)
     for x in syn.design.decisions:

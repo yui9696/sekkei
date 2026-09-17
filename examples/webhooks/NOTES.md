@@ -11,7 +11,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 |---|---|---|---|---|---|
 | 1 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 2 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
-| 3 | data | Q-retention | Records kept 90 days, audit history 1 year, then deleted by a nightly job. | default — Bounded retention limits storage growth and satisfies most data-minimisation rules. | State the retention; the deletion job and capacity change. |
+| 3 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
 | 4 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
 | 5 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
 | 6 | security | Q-auth | API keys per customer, hashed at rest, sent as a bearer token. | evidence: customers/visitors mentioned — External callers without a stated identity provider are simplest to serve with per-customer keys. | State the scheme; the authentication decision is rescored. |
@@ -39,13 +39,13 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **32 person-days**; critical path **12 days**; with a team of 3: **about 12 working days** (3 weeks).
+- Total effort: **32 person-days**; critical path **12 days**; with a team of 3: **about 16 working days** (4 weeks).
 - Wave 1: WP-1, WP-2, WP-3
 - Wave 2: WP-4, WP-5, WP-6, WP-7
 - Wave 3: WP-8
 - Wave 4: WP-10, WP-11, WP-12, WP-13, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
-- Assumption: Team of 3; packages in one wave run in parallel up to the team size.
+- Assumption: Team of 3; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
 ## 4. Threat model (STRIDE-lite)
 
@@ -90,7 +90,7 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 - D-11 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-12 Assumed answer: load (Q-payload): **2 KB / 256 KB**
 - D-13 Assumed answer: quality (Q-availability): **99.9 %**
-- D-14 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-14 Assumed answer: data (Q-retention): **indefinite / 1 year**
 - D-15 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
 - D-16 Assumed answer: data (Q-migration): **greenfield**
 - D-17 Assumed answer: security (Q-auth): **API keys**
@@ -108,7 +108,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: crud_api, admin_api, event_ingest, async_delivery, signing, notification, health_policy, observability, batch_pipeline, auth, audit_log
 - Quality attributes (weight): durability 1.0, performance 0.82, isolation 0.82, availability 0.63, security 0.54, operability 0.82, scalability 0.63, simplicity 0.8, compliance 0.54
-- Constraint tokens: containers, multi_instance, postgres, redis, single_region; languages: python; team: 3
+- Constraint tokens: containers, multi_instance, nightly_batch, postgres, redis, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -119,18 +119,18 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-5 | functional | must | async_delivery, signing | security | — |
 | R-6 | functional | must | admin_api, async_delivery | — | — |
 | R-7 | functional | must | notification, health_policy | — | — |
-| R-8 | nonfunctional | should | event_ingest, async_delivery | performance, operability, scalability | p95 latency at 1,000, 5,000 < 5 s s |
+| R-8 | nonfunctional | must | event_ingest, async_delivery | performance, operability, scalability | p95 latency at 1,000, 5,000 < 5 s |
 | R-9 | nonfunctional | should | — | durability | records lost across a process crash = 0 records |
 | R-10 | nonfunctional | must | — | isolation | p95 latency of healthy targets while one target stalls within the stated latency target |
 | R-11 | nonfunctional | should | async_delivery, observability | performance, operability | required metrics exposed = all listed |
 | R-12 | constraint | must | — | simplicity | — |
 | R-13 | constraint | must | — | scalability | — |
-| R-14 | functional | must | batch_pipeline | compliance | — |
+| R-14 | functional | must | batch_pipeline | operability, compliance | — |
 | R-15 | functional | must | audit_log | performance, compliance | — |
-| R-16 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-17 | nonfunctional | must | — | durability, availability | ratio 99.9 % % |
-| R-18 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-19 | nonfunctional | should | — | operability | ratio at 5 minutes, 10 minutes 1 % % |
+| R-16 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-17 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
+| R-18 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-19 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-20 | constraint | must | — | — | — |
 | R-21 | constraint | must | auth | isolation, security | — |
 | R-22 | constraint | must | — | — | — |

@@ -13,7 +13,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | 2 | stack | Q-store | PostgreSQL. | default — A networked service with several actors favour a transactional server database; PostgreSQL is the engine's default when none is stated. | State the available database; the Primary store and Work queue decisions are rescored. |
 | 3 | stack | Q-deploy | Stateless containers behind an existing ingress, several instances. | default — The default for a networked service; keeps instances interchangeable. | State the deployment; topology, statelessness conventions and store options change. |
 | 4 | people | Q-team | A team of 2 for the first release. | default — No team stated; two people is the smallest team that can review each other's work. Simplicity is weighted accordingly. | State the team size; decision weights and the schedule change. |
-| 5 | load | Q-rate | 100 requests/s sustained, 10x at peak. | default — No rate or count stated; 100 requests/s is a modest default for a first release. | State the measured or expected rate; capacity estimates and the queue decision change. |
+| 5 | load | Q-rate | 100 requests/s sustained, 10x at peak (engine default, not derived). | default — No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption. | State the measured or expected rate; capacity estimates and the queue decision change. |
 | 6 | load | Q-volume | 10,000 primary records and 1,000 users in the first year. | default — No counts stated; the default keeps single-instance options viable and is easy to revise. | State the counts; isolation and capacity estimates change. |
 | 7 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 8 | quality | Q-latency | p95 under 300 ms for reads and under 1 s for writes. | default — Common interactive-API targets; measurable from day one. | State the target; the metric acceptance checks change. |
@@ -23,8 +23,9 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | 12 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
 | 13 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | evidence: personal data mentioned — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
 | 14 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
-| 15 | data | Q-retention | Records kept 90 days, audit history 1 year, then deleted by a nightly job. | default — Bounded retention limits storage growth and satisfies most data-minimisation rules. | State the retention; the deletion job and capacity change. |
+| 15 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
 | 16 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
+| 17 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 
 ## 2. Capacity estimates
 
@@ -36,12 +37,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-5); outage length assumed |
 | concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-5); mean service time assumed 200 ms |
 | in-flight items at the latency target | 30 | rate × latency target (Little's law upper bound) | 100 (R-5) × 300 ms (R-8) |
-| requests per day | 86.4 M | rate × 86,400 s | 1,000 (R-5) |
-| storage growth per day (requests) | 176.95 GB | rate × 86,400 × record size | 1,000 (R-5); 2 KB stated in R-7 |
-| storage after 30 days (requests) | 5.31 TB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 3.6 M requests | rate × outage seconds | 1,000 (R-5); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 200 | Little's law: rate × mean service time | 1,000 (R-5); mean service time assumed 200 ms |
-| in-flight items at the latency target | 300 | rate × latency target (Little's law upper bound) | 1,000 (R-5) × 300 ms (R-8) |
+| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-5); mean service time assumed 200 ms |
 | number of records | 10 k | stated | 10,000 records (R-6) |
 | average rate per record (if evenly spread) | 0.01/s | rate ÷ count | 100 ÷ 10,000 |
 | number of users | 1 k | stated | 1,000 users (R-6) |
@@ -52,14 +48,14 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **22 person-days**; critical path **13 days**; with a team of 2: **about 13 working days** (3 weeks).
+- Total effort: **22 person-days**; critical path **13 days**; with a team of 2: **about 16 working days** (4 weeks).
 - Wave 1: WP-1, WP-2
 - Wave 2: WP-3, WP-4
 - Wave 3: WP-5
 - Wave 4: WP-6
 - Wave 5: WP-7, WP-8
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
-- Assumption: Team of 2; packages in one wave run in parallel up to the team size.
+- Assumption: Team of 2; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
 ## 4. Threat model (STRIDE-lite)
 
@@ -99,8 +95,9 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 - D-16 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-17 Assumed answer: compliance (Q-compliance): **GDPR-style deletion + audit**
 - D-18 Assumed answer: cost (Q-budget): **existing only**
-- D-19 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-19 Assumed answer: data (Q-retention): **indefinite / 1 year**
 - D-20 Assumed answer: data (Q-migration): **greenfield**
+- D-21 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 
 ### Notes
 
@@ -111,26 +108,27 @@ Every requirement was recognised and every active quality has a tactic. Review t
 ## 6. How the text was read
 
 - Patterns recognised: notification, import_export, auth, audit_log, batch_pipeline
-- Quality attributes (weight): durability 1.0, performance 1.0, availability 1.0, scalability 0.88, simplicity 0.8, compliance 0.76
-- Constraint tokens: containers, multi_instance, postgres; languages: python; team: 2
+- Quality attributes (weight): durability 1.0, performance 1.0, availability 1.0, operability 0.88, scalability 0.88, simplicity 0.8, compliance 0.76
+- Constraint tokens: containers, multi_instance, nightly_batch, postgres; languages: python; team: 2
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
 | R-1 | functional | must | notification | — | — |
 | R-2 | functional | must | import_export | — | — |
 | R-3 | functional | must | audit_log | performance, compliance | — |
-| R-4 | functional | must | batch_pipeline | compliance | — |
-| R-5 | nonfunctional | should | — | performance | sustained rate at 1,000 100 requests /s requests /s |
-| R-6 | nonfunctional | should | — | scalability | number of records at 1,000 10000 records records |
-| R-7 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-8 | nonfunctional | should | — | performance, operability | p95 latency at 1 s <= 300 ms ms |
-| R-9 | nonfunctional | must | — | durability, availability | ratio 99.9 % % |
-| R-10 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-11 | nonfunctional | should | — | durability | time at 5 10 s s |
-| R-12 | constraint | must | — | — | — |
+| R-4 | functional | must | batch_pipeline | operability, compliance | — |
+| R-5 | nonfunctional | must | — | performance | sustained rate at 1,000 100 requests /s |
+| R-6 | nonfunctional | should | — | scalability | number of records at 1,000 10000 records |
+| R-7 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-8 | nonfunctional | must | — | performance, operability | p95 latency at 1 s <= 300 ms |
+| R-9 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
+| R-10 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-11 | nonfunctional | should | — | durability | time at 5 10 s |
+| R-12 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-13 | constraint | must | — | — | — |
-| R-14 | constraint | must | — | scalability | — |
-| R-15 | constraint | must | — | simplicity | — |
-| R-16 | constraint | must | auth | isolation, security | — |
-| R-17 | constraint | must | — | — | — |
+| R-14 | constraint | must | — | — | — |
+| R-15 | constraint | must | — | scalability | — |
+| R-16 | constraint | must | — | simplicity | — |
+| R-17 | constraint | must | auth | isolation, security | — |
 | R-18 | constraint | must | — | — | — |
+| R-19 | constraint | must | — | — | — |

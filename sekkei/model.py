@@ -73,6 +73,14 @@ class Metric:
     unit: str = ""
 
 
+def metric_text(m: "Metric") -> str:
+    """'p95 latency <= 300 ms' — the unit printed once even when the target already carries it."""
+    unit = (m.unit or "").strip()
+    target = (m.target or "").strip()
+    tail = "" if not unit or unit in target else " " + unit
+    return f"{m.name} {target}{tail}".strip()
+
+
 @dataclass
 class Requirement:
     id: str = ""

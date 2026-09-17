@@ -11,20 +11,21 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 |---|---|---|---|---|---|
 | 1 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 2 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
-| 3 | data | Q-retention | Records kept 90 days, audit history 1 year, then deleted by a nightly job. | default — Bounded retention limits storage growth and satisfies most data-minimisation rules. | State the retention; the deletion job and capacity change. |
+| 3 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
 | 4 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
 | 5 | security | Q-auth | Single sign-on with the company's identity provider (OIDC). | evidence: staff/employees mentioned — Internal staff systems normally sit behind the company's SSO. | State the scheme; the authentication decision is rescored. |
 | 6 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
 | 7 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
 | 8 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
 | 9 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
+| 10 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 
 ## 1b. Requirements placed without a catalogue pattern
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
 | R-2 | C-16 Readings processor | synthesised | new component Readings processor (processor) from verb 'validate' and object 'readings' |
-| R-3 | C-14 Public HTTP API, C-7 Domain core | surface+core | human actor 'fleet managers': a use case |
+| R-3 | C-14 Public HTTP API, C-7 Domain core | surface+core | human actor 'fleet manager': a use case |
 
 ## 2. Capacity estimates
 
@@ -90,19 +91,20 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-7 Assumed answer: load (Q-payload): **2 KB / 256 KB**
 - D-8 Assumed answer: quality (Q-availability): **99.9 %**
-- D-9 Assumed answer: data (Q-retention): **90 days / 1 year**
+- D-9 Assumed answer: data (Q-retention): **indefinite / 1 year**
 - D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
 - D-11 Assumed answer: security (Q-auth): **OIDC**
 - D-12 Assumed answer: cost (Q-budget): **existing only**
 - D-13 Assumed answer: data (Q-migration): **greenfield**
 - D-14 Assumed answer: security (Q-authz): **owner-scoped + admin role**
 - D-15 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-16 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 
 ## 6. How the text was read
 
 - Patterns recognised: notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
-- Quality attributes (weight): durability 1.0, performance 0.9, availability 0.9, simplicity 0.7
-- Constraint tokens: broker, containers, idp, on_prem, postgres, timeseries_db; languages: java; team: 5
+- Quality attributes (weight): durability 1.0, performance 0.9, availability 0.9, operability 0.8, simplicity 0.7
+- Constraint tokens: broker, containers, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -111,17 +113,18 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-3 | functional | must | **none** | — | — |
 | R-4 | functional | must | notification, sms_notification | — | — |
 | R-5 | functional | must | batch_pipeline, sftp_export, import_export | — | — |
-| R-6 | nonfunctional | should | — | performance | p95 latency at 5,000, 20,000 <= 10 s s |
+| R-6 | nonfunctional | must | — | performance | p95 latency at 5,000, 20,000 <= 10 s |
 | R-7 | nonfunctional | must | — | durability | records lost across a process crash = 0 records |
-| R-8 | nonfunctional | should | batch_pipeline | — | time at 5 years 90 days days |
+| R-8 | nonfunctional | should | batch_pipeline | — | time at 5 years 90 days |
 | R-9 | constraint | must | — | simplicity | — |
 | R-10 | constraint | must | mqtt_ingest | operability | — |
-| R-11 | functional | must | batch_pipeline | compliance | — |
+| R-11 | functional | must | batch_pipeline | operability, compliance | — |
 | R-12 | functional | could | auth | operability | — |
-| R-13 | nonfunctional | should | — | — | size at 2 KB <= 256 kb kb |
-| R-14 | nonfunctional | must | — | durability, availability | ratio 99.9 % % |
-| R-15 | nonfunctional | should | — | — | time at 4 h 24 h h |
-| R-16 | nonfunctional | should | — | durability | time at 5 10 s s |
-| R-17 | constraint | must | auth | security | — |
-| R-18 | constraint | must | — | — | — |
+| R-13 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-14 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
+| R-15 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-16 | nonfunctional | should | — | durability | time at 5 10 s |
+| R-17 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
+| R-18 | constraint | must | auth | security | — |
 | R-19 | constraint | must | — | — | — |
+| R-20 | constraint | must | — | — | — |

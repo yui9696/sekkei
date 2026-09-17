@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from . import graph as G
+from . import model as M
 from .model import Design, Interface
 
 
@@ -130,7 +131,7 @@ def render_markdown(design: Design) -> str:
     s.append("| id | kind | priority | statement | metric |")
     s.append("|---|---|---|---|---|")
     for r in d.requirements:
-        m = f"{r.metric.name} {r.metric.target} {r.metric.unit}".strip() if r.metric else "—"
+        m = M.metric_text(r.metric) if r.metric else "—"
         s.append(f"| {r.id} | {r.kind} | {r.priority} | {_esc(r.statement)} | {_esc(m)} |")
     s.append("")
 
@@ -219,7 +220,7 @@ def render_markdown(design: Design) -> str:
         s.append("**Waves** (packages in one wave may run in parallel):\n")
         s.extend(f"{n + 1}. {', '.join(w)}" for n, w in enumerate(ws))
         weight, path = G.critical_path(d)
-        s.append(f"\n_Critical path (weight {weight}):_ {' → '.join(path)}\n")
+        s.append(f"\n_Critical path ({weight} person-days):_ {' → '.join(path)}\n")
     except ValueError as exc:
         s.append(f"_Plan not computable: {exc}_\n")
     for w in d.work_packages:

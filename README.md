@@ -153,27 +153,27 @@ A solution architect's job, mechanised into five deterministic steps
 | step | what happens | where |
 |---|---|---|
 | analyse | sentences → requirement units with modality (must/should/could), kind (functional / non-functional / constraint), the numbers as metrics (`p95 latency < 5 s`, `>= 1000 events/s`), actors, verbs, objects | `engine/text.py`, `engine/analysis.py` |
-| recognise | 22 capability patterns (async delivery with retries, request signing, admin API, event ingest, audit log, batch pipeline, CLI tool, …) and 12 quality attributes matched by signals in the text | `engine/catalog.py` |
-| synthesise | patterns bring archetypes (31), which merge into components with interfaces and operations; entities, flows, requirement-to-component mapping; operations are derived from the verbs and objects of the input sentences | `engine/synthesis.py` |
-| decide | 12 decision points with 36 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
+| recognise | 40 capability patterns (async delivery with retries, request signing, admin API, event ingest, audit log, batch pipeline, CLI tool, …) and 12 quality attributes matched by signals in the text | `engine/catalog.py` |
+| synthesise | patterns bring archetypes (52), which merge into components with interfaces and operations; entities, flows, requirement-to-component mapping; operations are derived from the verbs and objects of the input sentences | `engine/synthesis.py` |
+| decide | 26 decision points with 76 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
 | package | components are layered, cut into ≤3-component work packages with unique write scopes, ordered by the interfaces they consume; acceptance checks derived from the metrics | `engine/synthesis.py` |
 
 Then the engine does the rest of the architect's job (`--review NOTES.md`): asks the
-questions the text left open (`engine/gaps.py`, 19 gap rules with the default taken
+questions the text left open (`engine/gaps.py`, 18 gap rules with the default taken
 meanwhile), sizes the system from the stated numbers (`engine/sizing.py`), estimates
 effort and calendar, builds a STRIDE-lite threat model whose threats become risks in the
-design (`engine/threats.py`, 29 threat rules over 15 archetypes), and **reviews its own
+design (`engine/threats.py`, 44 threat rules over 23 archetypes), and **reviews its own
 output**: requirements it did not recognise, quality attributes it has no tactic for,
 generic components from the fallback. It says what it does not know instead of hiding it.
 Every element carries a trace to the sentences and catalogue rules that produced it.
 
 What the engine produced for the webhook spec (`examples/webhooks/`): 16 components from
-the text (plus an audit log and a retention job from its own assumed answers), including a partitioned durable queue, worker, retry scheduler carrying the backoff
+the text (plus an audit log and a log-retention job from its own assumed answers), including a partitioned durable queue, worker, retry scheduler carrying the backoff
 schedule from the text as a precondition, HMAC signer with a rotation-window secret store,
 SSRF-safe outbound client, health policy with notifier, admin and ingest APIs with
 operations derived from the sentences (`POST /endpoints`, `DELETE /endpoints/{id}`,
-`POST /secrets/{id}/rotate`, `POST /events`), observability; 10 scored decisions; 7 work
-packages in 5 waves; zero lint diagnostics; nothing unrecognised. Time: 0.05–0.3 s.
+`POST /secrets/{id}/rotate`, `POST /events`), observability; 11 scored decisions; 13 work
+packages in 4 waves; zero lint diagnostics; nothing unrecognised. Time: 0.05–0.3 s.
 
 **Limits, stated plainly.** The engine has no understanding of prose. Its catalogue is
 finite; a domain outside it (the bundled greenhouse-controller fixture) gets a layered
@@ -207,13 +207,13 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 229 |
+| tests | 230 |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
 | catalogue | 40 patterns, 52 archetypes, 26 decision points / 76 options, 12 quality tactics, 25 risks, 9 language layouts, 44 threats |
-| `sekkei deliver` on the SaaS fixture | 31 files (18 ADRs) in about 0.5 s |
-| `sekkei redteam` on the SaaS fixture | 18 engine runs in about 0.8 s |
+| `sekkei deliver` on the SaaS fixture | 32 files (18 ADRs) in about 0.5 s |
+| `sekkei redteam` on the SaaS fixture | 18 engine runs in 1–3 s (one engine run per stated sentence, capped at 80) |
 
 ## How good is it, measured
 

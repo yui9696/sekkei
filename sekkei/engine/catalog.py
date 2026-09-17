@@ -678,7 +678,7 @@ DECISIONS: dict[str, DecisionPoint] = {d.key: d for d in [
                           {"simplicity": 2, "durability": 2, "operability": 3, "consistency": 2, "cost": 3}),
                    Option("Scheduled batch file exchange (CSV/fixed format) through a shared drop", ["works with any system", "no live coupling"],
                           ["latency of the schedule", "reconciliation of partial files"],
-                          {"simplicity": 3, "durability": 3, "operability": 2, "consistency": 1, "cost": 3}),
+                          {"simplicity": 3, "durability": 3, "operability": 2, "consistency": 1, "cost": 3}, bonus_when=["nightly_batch"]),
                    Option("Change data capture from the legacy database", ["near real time", "no legacy code changes"],
                           ["coupled to the legacy schema", "capture tooling to operate"],
                           {"simplicity": 1, "durability": 3, "operability": 1, "consistency": 3, "cost": 1})],
@@ -807,7 +807,7 @@ PATTERNS: list[Pattern] = [
             ["files", "core"], ["file"], [], [], ["unbounded_input"], "Files are uploaded, stored and served."),
     Pattern("batch_pipeline", "Batch processing", [(r"\bbatch", 2), (r"\bnightly\b|\bdaily\b|\bweekly\b|\bhourly\b", 2), (r"\betl\b", 3), (r"\bpipeline", 1), (r"\baggregat", 1), (r"\breport", 1)],
             ["batch", "scheduler", "store"], ["job_run"], ["batch_run"], ["store_tech", "topology"], ["schema_drift"], "Scheduled jobs process stored records in windows."),
-    Pattern("scheduler_jobs", "Scheduled jobs", [(r"\bcron\b", 3), (r"\bschedul", 2), (r"\bevery (?:day|hour|minute|night|week)\b", 2), (r"\bperiodic", 2)],
+    Pattern("scheduler_jobs", "Scheduled jobs", [(r"\bcron\b", 3), (r"\bschedul", 2), (r"\bevery (?:day|hour|minute|night|week)\b", 2), (r"\bperiodic", 2), (r"\b\d+ (?:days?|hours?|minutes?) before\b", 2), (r"\breminders?\b", 2), (r"\bdeadline\b", 1)],
             ["scheduler"], [], [], [], [], "Work runs on a schedule."),
     Pattern("cli_tool", "Command-line tool", [(r"command[- ]line", 3), (r"\bcli\b", 3), (r"\bterminal\b", 2), (r"\bcommand[- ]line flags?\b|\s--[a-z]|\bsubcommands?\b", 2), (r"\bstdin\b|\bstdout\b|\bstderr\b|\bexit(?:s)? (?:with )?code", 2), (r"\bthe tool\b|\bthe user runs\b", 1)],
             ["cli", "core", "config"], [], ["cli_run"], ["store_tech"], [], "A command-line front end over the core."),
@@ -850,7 +850,7 @@ PATTERNS: list[Pattern] = [
             ["data_protection", "store", "audit"], ["deletion_request"], [], ["pii_protection"], ["pii_spread"], "Personal data is held and must be protected, exportable and deletable."),
     Pattern("feature_flags", "Feature flags and gradual rollout", [(r"feature[- ]flags?\b|feature[- ]toggles?\b", 3), (r"\bgradual(?:ly)? (?:roll|releas|expos)", 3), (r"\bcanary\b", 2), (r"\ba/b test", 2), (r"\bkill switch\b", 2), (r"\bpercentage of users\b", 2)],
             ["flags", "config"], ["flag"], [], ["release_strategy"], ["flag_debt"], "Features reach users gradually and reversibly."),
-    Pattern("i18n", "Localisation", [(r"\bi18n\b|\bl10n\b|\blocali[sz]", 3), (r"\bmulti(?:ple)?[- ]?languages?\b|\bin (?:japanese|english|german|french|spanish|chinese) and\b", 3), (r"\blocales?\b", 2), (r"\btranslat", 2), (r"\btime ?zones?\b", 1), (r"\bcurrenc(?:y|ies)\b", 1)],
+    Pattern("i18n", "Localisation", [(r"\bi18n\b|\bl10n\b|\blocali[sz]", 3), (r"\bmulti(?:ple)?[- ]?languages?\b|\b(?:japanese|english|german|french|spanish|chinese|korean)\b.{0,20}\b(?:japanese|english|german|french|spanish|chinese|korean)\b", 3), (r"\blocales?\b", 2), (r"\btranslat", 2), (r"\btime ?zones?\b", 1), (r"\bcurrenc(?:y|ies)\b", 1)],
             ["i18n"], [], [], ["i18n_approach"], ["missing_translation"], "Users work in several languages and locales."),
     Pattern("mobile_offline", "Mobile app with offline use", [(r"\bmobile app\b|\bios\b|\bandroid\b|\bsmartphones?\b", 1), (r"\boffline\b", 3), (r"\bsync(?:s|ed|ing|hroni[sz]e)?\b", 2), (r"\bwhen (?:back )?online\b|\bwithout (?:a )?(?:network|connection|signal)\b", 3)],
             ["mobile", "sync", "surface_api", "core", "store"], [], ["sync_round"], ["sync_conflicts"], ["sync_conflict_loss"], "People use the app on phones, sometimes without a connection."),
@@ -906,11 +906,11 @@ CONSTRAINT_TOKENS: list[tuple[str, str]] = [
     (r"\bcontainers?\b|\bdocker\b|\bkubernetes\b|\bk8s\b|\becs\b", "containers"),
     (r"\bstateless\b|\bmultiple instances\b|\bbehind (?:a |our )?(?:load balancer|ingress)", "multi_instance"),
     (r"\blambda\b|\bserverless\b|\bcloud functions\b", "serverless"), (r"\bsingle region\b", "single_region"),
-    (r"\bon[- ]prem", "on_prem"), (r"\bno database\b|\bwithout a database\b", "no_database"), (r"\bno network\b|\boffline\b|\bair[- ]gapped\b", "no_network"), (r"\bwindows\b", "windows"), (r"\blinux\b", "linux"), (r"\bmacos\b", "macos"),
+    (r"\bon[- ]prem", "on_prem"), (r"\bnightly\b|\bevery night\b|\bnightly batch\b|\bonce a day\b", "nightly_batch"), (r"\bno database\b|\bwithout a database\b", "no_database"), (r"\bno network\b|\boffline\b|\bair[- ]gapped\b", "no_network"), (r"\bwindows\b", "windows"), (r"\blinux\b", "linux"), (r"\bmacos\b", "macos"),
 ]
 
 LANGUAGE_TOKENS: list[tuple[str, str]] = [
-    (r"\bpython\b", "python"), (r"\btypescript\b|\bnode(?:\.js)?\b", "typescript"), (r"\bgo(?:lang)?\b", "go"),
+    (r"\bpython\b", "python"), (r"\btypescript\b|\bnode(?:\.js)?\b", "typescript"), (r"\bgolang\b|\bgo 1\.\d+\b|\bin go\b|\bwritten in go\b|\bgo (?:service|binary|module)s?\b", "go"),
     (r"\brust\b", "rust"), (r"\bjava\b(?!script)", "java"), (r"\bkotlin\b", "kotlin"), (r"\bc#\b|\bdotnet\b|\.net\b", "csharp"),
     (r"\bruby\b", "ruby"), (r"\belixir\b", "elixir"),
 ]

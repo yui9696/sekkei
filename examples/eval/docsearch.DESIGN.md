@@ -29,20 +29,21 @@ _version 0.1.0 · schema sekkei/1_
 | R-5 | functional | must | For each result the system generates a three-sentence summary with an LLM and caches it. | — |
 | R-6 | functional | must | Team leads can delete documents; deleted documents disappear from search results within one minute. | — |
 | R-7 | functional | must | Every search query is logged with the employee id for usage reporting; a weekly report is emailed to the knowledge team. | — |
-| R-8 | nonfunctional | should | Search returns within 800 ms p95 for a corpus of 50,000 documents. | p95 latency at 50,000 <= 800 ms ms |
-| R-9 | nonfunctional | must | Embedding and summary generation must not block uploads; an upload is acknowledged within 1 s. | latency <= 1 s s |
+| R-8 | nonfunctional | must | Search returns within 800 ms p95 for a corpus of 50,000 documents. | p95 latency at 50,000 <= 800 ms |
+| R-9 | nonfunctional | must | Embedding and summary generation must not block uploads; an upload is acknowledged within 1 s. | latency <= 1 s |
 | R-10 | functional | must | Documents are visible only to members of the tagged team. | — |
 | R-11 | constraint | must | Python 3.12, PostgreSQL with pgvector available, S3-compatible object storage available. Team of 3. | — |
 | R-12 | constraint | must | Embeddings and summaries come from an external API with a rate limit of 60 requests per minute. | — |
 | R-13 | constraint | must | Employees authenticate through the company SSO (OIDC). | — |
-| R-14 | functional | must | Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
+| R-14 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-15 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-16 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % % |
-| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s s |
-| R-19 | constraint | must | Deployed as stateless containers behind an ingress (assumed by the engine). | — |
-| R-20 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
-| R-21 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-16 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
+| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-19 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-20 | constraint | must | Deployed as stateless containers behind an ingress (assumed by the engine). | — |
+| R-21 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
+| R-22 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
 
 ## Components
 
@@ -92,7 +93,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-9, R-11, R-16, R-18
+- **satisfies**: R-11, R-18
 
 ### C-2 — Email provider
 
@@ -108,7 +109,7 @@ graph LR
 - **responsibility**: Stores and serves uploaded files/blobs with content-type and size limits.
 - **provides**: I-3
 - **requires**: —
-- **satisfies**: R-2
+- **satisfies**: R-2, R-9
 
 ### C-4 — Domain core
 
@@ -116,7 +117,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
 - **requires**: I-1, I-6, I-9, I-3, I-11, I-5
-- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-20, R-21
+- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-21, R-22
 
 ### C-5 — Notifier
 
@@ -132,7 +133,7 @@ graph LR
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
 - **provides**: I-6
 - **requires**: —
-- **satisfies**: R-16
+- **satisfies**: R-16, R-19
 
 ### C-7 — Authentication
 
@@ -172,7 +173,7 @@ graph LR
 - **responsibility**: Loads the model, serves predictions with batching and timeouts, versions the model.
 - **provides**: I-11
 - **requires**: —
-- **satisfies**: R-3, R-5
+- **satisfies**: R-3, R-5, R-9
 
 ### C-12 — Scheduler
 
@@ -204,7 +205,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
 - **requires**: I-4, I-6, I-7, I-8, I-10
-- **satisfies**: R-1, R-10, R-8, R-9, R-17, R-19
+- **satisfies**: R-1, R-10, R-8, R-9, R-17, R-20
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -287,10 +288,12 @@ graph LR
 | | from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is | | | |
 | `query_employee` | `employee`: Employee \| id | Employee \| None | ValidationError, NotFound | — |
 | | from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
-| | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-14); 1 year (R-14) |
-| | from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
+| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
+| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
+| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
+| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-5 — Notifier interface
 
@@ -382,7 +385,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `run` | `window`: DateRange | JobReport | JobError | stated values: 90 days (R-14); 1 year (R-14) |
+| `run` | `window`: DateRange | JobReport | JobError | stated values: 1 year (R-14) |
 
 ### I-14 — Reporting interface
 
@@ -532,7 +535,7 @@ sequenceDiagram
   - + flexible queries
   - − complexity budget for a small team
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.49; gRPC: 1.33; GraphQL: 1.16
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.42; gRPC: 1.28; GraphQL: 1.14
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
@@ -561,7 +564,7 @@ _Affects:_ C-15
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.18; In-memory: 1.31; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.30; In-memory: 1.40; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints
 
 **Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
 
@@ -584,7 +587,7 @@ _Affects:_ C-1
   - + no secrets in headers
   - − certificate lifecycle for every customer
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.28; Mutual TLS: 0.86. stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -601,7 +604,7 @@ _Affects:_ C-7
   - + no staleness
   - − hot rows become the bottleneck
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.49; No cache: 1.33
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.56; No cache: 1.56
 
 **Consequences.** Not choosing 'No cache; rely on database indexes' gives up: no staleness.
 
@@ -625,7 +628,7 @@ _Affects:_ C-9
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.96; Separate services per concern: 1.94; Single process with background threads: 1.33
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 2.10; Separate services per concern: 1.81; Single process with background threads: 1.42
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
@@ -649,7 +652,7 @@ _Affects:_ C-15, C-12
   - − memory bound
   - − rebuild on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.49; In-process index: 1.49; Dedicated vector database: 1.33. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.70; In-process index: 1.56; Dedicated vector database: 1.28. stated in the constraints
 
 **Consequences.** Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.
 
@@ -675,7 +678,7 @@ _Affects:_ C-10, C-1
   - − a second store and a pipeline
   - − eventual consistency
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.63; Read replica queried directly: 1.47; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.82; Read replica queried directly: 1.54; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)
 
 **Consequences.** Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.
 
@@ -699,7 +702,7 @@ _Affects:_ C-14, C-1
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.82; Active-active across two regions: 1.49; Single instance with health-based restart: 1.33
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.70; Active-active across two regions: 1.42; Single instance with health-based restart: 1.28
 
 **Consequences.** Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
@@ -737,13 +740,13 @@ _Affects:_ C-6
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
-- ✔ **90 days / 1 year**
+- ✔ **indefinite / 1 year**
+- ✘ **90 days / 1 year**
 - ✘ **30 days / 90 days**
-- ✘ **indefinite**
 
-**Rationale.** Bounded retention limits storage growth and satisfies most data-minimisation rules.
+**Rationale.** Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.
 
-**Consequences.** If the real answer differs: State the retention; the deletion job and capacity change.
+**Consequences.** If the real answer differs: State the retention per record class; the deletion job and capacity change.
 
 _Affects:_ C-13, C-1
 
@@ -813,6 +816,20 @@ _Affects:_ C-12
 
 **Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
 
+### D-17 — Assumed answer: operations (Q-alerting) (proposed)
+
+**Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
+
+- ✔ **error rate + queue growth**
+- ✘ **none**
+- ✘ **per-endpoint SLO alerts**
+
+**Rationale.** Two alerts catch most incidents without paging on noise.
+
+**Consequences.** If the real answer differs: State the rules and the on-call; observability conventions change.
+
+_Affects:_ C-6
+
 ## Risks
 
 | id | risk | likelihood | impact | mitigation |
@@ -877,17 +894,18 @@ graph LR
 3. WP-9
 4. WP-10, WP-11
 
-_Critical path (weight 5):_ WP-2 → WP-6 → WP-9 → WP-11
+_Critical path (12 person-days):_ WP-2 → WP-5 → WP-11
 
 ### WP-1 — File storage (S)
 
 Implement File storage: Stores and serves uploaded files/blobs with content-type and size limits.
 
 - **components**: C-3 · **implements**: I-3
-- **depends on**: — · **satisfies**: R-2
+- **depends on**: — · **satisfies**: R-2, R-9
 - **write scope**: `app/files.py`, `tests/test_files.py`
 - **acceptance**:
   - A-1 (test) unit tests of File storage pass — `python -m pytest -q tests/test_files.py`
+  - A-2 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: file_storage
 
 ### WP-2 — Store + Observability + Rate limiter (M)
@@ -895,13 +913,11 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Rate limiter: Per-principal or per-key request budgets with a sliding window.
 
 - **components**: C-1, C-6, C-8 · **implements**: I-1, I-6, I-8
-- **depends on**: — · **satisfies**: R-9, R-11, R-16, R-18
+- **depends on**: — · **satisfies**: R-11, R-16, R-18, R-19
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`, `app/ratelimit.py`, `tests/test_ratelimit.py`
 - **acceptance**:
-  - A-2 (test) unit tests of Store, Observability, Rate limiter pass — `python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py`
-  - A-3 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-4 (metric) R-16: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-16
-  - A-5 (metric) R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-18
+  - A-3 (test) unit tests of Store, Observability, Rate limiter pass — `python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py`
+  - A-4 (metric) R-16: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-16
 - **notes**: family: infra
 
 ### WP-3 — Cache (S)
@@ -912,9 +928,9 @@ Implement Cache: Read-through cache with TTL and explicit invalidation.
 - **depends on**: — · **satisfies**: R-5, R-8, R-9
 - **write scope**: `app/cache.py`, `tests/test_cache.py`
 - **acceptance**:
-  - A-6 (test) unit tests of Cache pass — `python -m pytest -q tests/test_cache.py`
-  - A-7 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-8 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-5 (test) unit tests of Cache pass — `python -m pytest -q tests/test_cache.py`
+  - A-6 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-7 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: infra
 
 ### WP-4 — Model server (S)
@@ -922,10 +938,11 @@ Implement Cache: Read-through cache with TTL and explicit invalidation.
 Implement Model server: Loads the model, serves predictions with batching and timeouts, versions the model.
 
 - **components**: C-11 · **implements**: I-11
-- **depends on**: — · **satisfies**: R-3, R-5
+- **depends on**: — · **satisfies**: R-3, R-5, R-9
 - **write scope**: `app/model.py`, `tests/test_model.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Model server pass — `python -m pytest -q tests/test_model.py`
+  - A-8 (test) unit tests of Model server pass — `python -m pytest -q tests/test_model.py`
+  - A-9 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: ml_inference
 
 ### WP-5 — Authentication + Scheduler (M)
@@ -970,8 +987,8 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
   - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-14 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-15 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-14 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-15 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: search
 
 ### WP-9 — Domain core (S)
@@ -979,7 +996,7 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-20, R-21
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
@@ -1001,40 +1018,40 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-19
+- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-20
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-19 (metric) R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-20 (metric) R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-21 (metric) R-17: time at 4 h 24 h h — metric R-17
+  - A-19 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-20 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20, A-21 |
-| R-2 | must | C-3, C-4 | WP-1, WP-9 | A-1, A-16 |
-| R-3 | must | C-4, C-10, C-11 | WP-4, WP-8, WP-9 | A-9, A-13, A-14, A-15, A-16 |
+| R-1 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20 |
+| R-2 | must | C-3, C-4 | WP-1, WP-9 | A-1, A-2, A-16 |
+| R-3 | must | C-4, C-10, C-11 | WP-4, WP-8, WP-9 | A-8, A-9, A-13, A-14, A-15, A-16 |
 | R-4 | must | C-10 | WP-8 | A-13, A-14, A-15 |
-| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-9 | A-6, A-7, A-8, A-9, A-16 |
+| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-9 | A-5, A-6, A-7, A-8, A-9, A-16 |
 | R-6 | must | C-10 | WP-8 | A-13, A-14, A-15 |
 | R-7 | must | C-2, C-5, C-10, C-12, C-13, C-14 | WP-5, WP-6, WP-7, WP-8, WP-10 | A-10, A-11, A-12, A-13, A-14, A-15, A-17 |
-| R-8 | should | C-9, C-10, C-15 | WP-3, WP-8, WP-11 | A-6, A-7, A-8, A-13, A-14, A-15, A-18, A-19, A-20, A-21 |
-| R-9 | must | C-1, C-9, C-10, C-15 | WP-2, WP-3, WP-8, WP-11 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-13, A-14, A-15, A-18, A-19, A-20, A-21 |
-| R-10 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20, A-21 |
-| R-11 | must | C-1, C-4, C-8 | WP-2, WP-9 | A-2, A-3, A-4, A-5, A-16 |
+| R-8 | must | C-9, C-10, C-15 | WP-3, WP-8, WP-11 | A-5, A-6, A-7, A-13, A-14, A-15, A-18, A-19, A-20 |
+| R-9 | must | C-3, C-9, C-10, C-11, C-15 | WP-1, WP-3, WP-4, WP-8, WP-11 | A-1, A-2, A-5, A-6, A-7, A-8, A-9, A-13, A-14, A-15, A-18, A-19, A-20 |
+| R-10 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20 |
+| R-11 | must | C-1, C-4, C-8 | WP-2, WP-9 | A-3, A-4, A-16 |
 | R-12 | must | C-4 | WP-9 | A-16 |
 | R-13 | must | C-7 | WP-5 | A-10 |
 | R-14 | must | C-12, C-13 | WP-5, WP-10 | A-10, A-17 |
 | R-15 | could | C-7 | WP-5 | A-10 |
-| R-16 | must | C-1, C-6 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-17 | should | C-15 | WP-11 | A-18, A-19, A-20, A-21 |
-| R-18 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-19 | must | C-15 | WP-11 | A-18, A-19, A-20, A-21 |
-| R-20 | must | C-4 | WP-9 | A-16 |
+| R-16 | must | C-6 | WP-2 | A-3, A-4 |
+| R-17 | should | C-15 | WP-11 | A-18, A-19, A-20 |
+| R-18 | should | C-1 | WP-2 | A-3, A-4 |
+| R-19 | must | C-6 | WP-2 | A-3, A-4 |
+| R-20 | must | C-15 | WP-11 | A-18, A-19, A-20 |
 | R-21 | must | C-4 | WP-9 | A-16 |
+| R-22 | must | C-4 | WP-9 | A-16 |
 
 ## Conventions
 
@@ -1043,6 +1060,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **lint**: `ruff check .`
 - Type hints on every public function; dataclasses or pydantic for records.
 - No business logic in the HTTP layer.
+- Every component logs one structured line per unit of work with the correlation id.
 - No in-process state that a second instance would not see; instances are interchangeable.
 - Prefer the boring option; a new piece of infrastructure needs a decision record.
 - Python 3.12 as stated in the constraints.

@@ -27,17 +27,17 @@ _version 0.1.0 · schema sekkei/1_
 | R-4 | functional | must | The system computes the fare from distance and time at the end of the trip and charges the rider's card through Stripe. | — |
 | R-5 | functional | must | Riders can rate a trip and see their trip history; operators can view all active trips on a dashboard. | — |
 | R-6 | functional | must | Operators receive an alert when no driver accepts a request within 2 minutes. | — |
-| R-7 | nonfunctional | must | 300 concurrent trips and 2,000 online drivers at peak; position updates must be visible to the rider within 2 s p95. | p95 latency at 300, 2,000 <= 2 s s |
+| R-7 | nonfunctional | must | 300 concurrent trips and 2,000 online drivers at peak; position updates must be visible to the rider within 2 s p95. | p95 latency at 300, 2,000 <= 2 s |
 | R-8 | nonfunctional | should | No accepted ride request or completed trip is lost on a crash. | records lost across a process crash = 0 records |
-| R-9 | nonfunctional | should | A driver's position history is kept 30 days for dispute handling, then deleted. | time 30 days days |
+| R-9 | nonfunctional | should | A driver's position history is kept 30 days for dispute handling, then deleted. | time 30 days |
 | R-10 | constraint | must | Go 1.22, PostgreSQL with PostGIS available, Redis available. Team of 4. Kubernetes cluster in a single region. | — |
 | R-11 | constraint | must | Riders and drivers authenticate with the company's OIDC provider; operators use the same provider with an operator role. | — |
-| R-12 | functional | must | Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
-| R-13 | nonfunctional | should | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)). | sustained rate at 2,000, 5 s 4000 updates /s updates /s |
-| R-14 | nonfunctional | should | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb kb |
-| R-15 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % % |
-| R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h h |
-| R-17 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s s |
+| R-12 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
+| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)). | sustained rate at 2,000, 5 s 4000 updates /s |
+| R-14 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-15 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
+| R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-17 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
 | R-18 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 | R-19 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
 
@@ -87,7 +87,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-7, R-8, R-10, R-15, R-17
+- **satisfies**: R-8, R-10, R-17
 
 ### C-2 — Payment provider
 
@@ -103,7 +103,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-3
 - **requires**: I-1, I-4, I-6, I-8, I-7
-- **satisfies**: R-5, R-6, R-1, R-3, R-7, R-10, R-18, R-19
+- **satisfies**: R-5, R-6, R-1, R-3, R-10, R-18, R-19
 
 ### C-4 — Observability
 
@@ -248,10 +248,12 @@ graph LR
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 | `request_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
-| | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 90 days (R-12); 1 year (R-12) |
-| | from R-12: Records are retained for 90 days and audit history for 1 year, after which a nightly job d | | | |
+| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
+| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
+| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
+| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-4 — Observability interface
 
@@ -325,7 +327,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `run` | `window`: DateRange | JobReport | JobError | stated values: 15 seconds (R-2); 90 days (R-12); 1 year (R-12) |
+| `run` | `window`: DateRange | JobReport | JobError | stated values: 15 seconds (R-2); 1 year (R-12) |
 
 ### I-11 — Public HTTP API interface
 
@@ -478,7 +480,7 @@ _Affects:_ C-5
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; In-memory: 1.63; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.26; In-memory: 1.64; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
 
 **Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
 
@@ -502,7 +504,7 @@ _Affects:_ C-1
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.83; Single process with background threads: 1.49; Separate services per concern: 1.35
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.85; Single process with background threads: 1.50; Separate services per concern: 1.34
 
 **Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
@@ -525,7 +527,7 @@ _Affects:_ C-11, C-9
   - + nothing to implement
   - − lost updates
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.75; Last write wins: 1.56
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.74; Row locks inside a short transaction: 1.74; Last write wins: 1.55
 
 **Consequences.** Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.
 
@@ -549,7 +551,7 @@ _Affects:_ C-1, C-3
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.52; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
@@ -601,13 +603,13 @@ _Affects:_ C-4
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
-- ✔ **90 days / 1 year**
+- ✔ **indefinite / 1 year**
+- ✘ **90 days / 1 year**
 - ✘ **30 days / 90 days**
-- ✘ **indefinite**
 
-**Rationale.** Bounded retention limits storage growth and satisfies most data-minimisation rules.
+**Rationale.** Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.
 
-**Consequences.** If the real answer differs: State the retention; the deletion job and capacity change.
+**Consequences.** If the real answer differs: State the retention per record class; the deletion job and capacity change.
 
 _Affects:_ C-10, C-1
 
@@ -721,21 +723,19 @@ graph LR
 3. WP-6
 4. WP-7, WP-8, WP-9
 
-_Critical path (weight 5):_ WP-1 → WP-5 → WP-6 → WP-9
+_Critical path (12 person-days):_ WP-1 → WP-4 → WP-9
 
 ### WP-1 — Store + Observability (M)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
 - **components**: C-1, C-4 · **implements**: I-1, I-4
-- **depends on**: — · **satisfies**: R-7, R-8, R-10, R-15, R-17
+- **depends on**: — · **satisfies**: R-8, R-10, R-15, R-17
 - **write scope**: `internal/store/store.go`, `internal/store/store_test.go`, `internal/observability/observability.go`, `internal/observability/observability_test.go`
 - **acceptance**:
   - A-1 (test) unit tests of Store, Observability pass — `go test ./internal/store/`
-  - A-2 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
-  - A-3 (metric) R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-8
-  - A-4 (metric) R-15: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-15
-  - A-5 (metric) R-17: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-17
+  - A-2 (metric) R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-8
+  - A-3 (metric) R-15: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-15
 - **notes**: family: infra
 
 ### WP-2 — Event bus (S)
@@ -746,7 +746,7 @@ Implement Event bus: Publishes domain events to subscribers inside the system.
 - **depends on**: — · **satisfies**: R-3
 - **write scope**: `internal/bus/bus.go`, `internal/bus/bus_test.go`
 - **acceptance**:
-  - A-6 (test) unit tests of Event bus pass — `go test ./internal/bus/`
+  - A-4 (test) unit tests of Event bus pass — `go test ./internal/bus/`
 - **notes**: family: realtime
 
 ### WP-3 — Geospatial index (S)
@@ -757,7 +757,7 @@ Implement Geospatial index: Keeps current positions and answers nearest-neighbou
 - **depends on**: WP-1 · **satisfies**: R-1
 - **write scope**: `internal/geo/geo.go`, `internal/geo/geo_test.go`
 - **acceptance**:
-  - A-7 (test) unit tests of Geospatial index pass — `go test ./internal/geo/`
+  - A-5 (test) unit tests of Geospatial index pass — `go test ./internal/geo/`
 - **notes**: family: geo
 
 ### WP-4 — Authentication + Scheduler (M)
@@ -768,7 +768,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-1 · **satisfies**: R-2, R-11, R-12
 - **write scope**: `internal/auth/auth.go`, `internal/auth/auth_test.go`, `internal/scheduler/scheduler.go`, `internal/scheduler/scheduler_test.go`
 - **acceptance**:
-  - A-8 (test) unit tests of Authentication, Scheduler pass — `go test ./internal/auth/`
+  - A-6 (test) unit tests of Authentication, Scheduler pass — `go test ./internal/auth/`
 - **notes**: family: infra
 
 ### WP-5 — Payments (S)
@@ -779,7 +779,7 @@ Implement Payments: Creates charges/invoices through the payment provider and re
 - **depends on**: WP-1 · **satisfies**: R-4
 - **write scope**: `internal/payments/payments.go`, `internal/payments/payments_test.go`
 - **acceptance**:
-  - A-9 (test) unit tests of Payments pass — `go test ./internal/payments/`
+  - A-7 (test) unit tests of Payments pass — `go test ./internal/payments/`
 - **notes**: family: payments
 
 ### WP-6 — Domain core (S)
@@ -787,11 +787,10 @@ Implement Payments: Creates charges/invoices through the payment provider and re
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-3 · **implements**: I-3
-- **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-5, R-6, R-7, R-10, R-18, R-19
+- **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-5, R-6, R-10, R-18, R-19
 - **write scope**: `internal/core/core.go`, `internal/core/core_test.go`
 - **acceptance**:
-  - A-10 (test) unit tests of Domain core pass — `go test ./internal/core/`
-  - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+  - A-8 (test) unit tests of Domain core pass — `go test ./internal/core/`
 - **notes**: family: geo
 
 ### WP-7 — Batch job (S)
@@ -802,7 +801,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-2, R-12
 - **write scope**: `internal/batch/batch.go`, `internal/batch/batch_test.go`
 - **acceptance**:
-  - A-12 (test) unit tests of Batch job pass — `go test ./internal/batch/`
+  - A-9 (test) unit tests of Batch job pass — `go test ./internal/batch/`
 - **notes**: family: batch_pipeline
 
 ### WP-8 — Public HTTP API (S)
@@ -813,12 +812,9 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-5, R-6, R-7, R-9, R-10, R-13, R-14, R-16
 - **write scope**: `internal/surface_api/surface_api.go`, `internal/surface_api/surface_api_test.go`
 - **acceptance**:
-  - A-13 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
-  - A-14 (metric) R-7: p95 latency at 300, 2,000 <= 2 s s — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
-  - A-15 (metric) R-9: time 30 days days — metric R-9
-  - A-16 (metric) R-13: sustained rate at 2,000, 5 s 4000 updates /s updates /s — load test at the stated rate; the stated percentile must meet the target — metric R-13
-  - A-17 (metric) R-14: size at 2 KB <= 256 kb kb — metric R-14
-  - A-18 (metric) R-16: time at 4 h 24 h h — metric R-16
+  - A-10 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
+  - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-7
+  - A-12 (metric) R-9: time 30 days — metric R-9
 - **notes**: family: infra
 
 ### WP-9 — Push gateway (S)
@@ -829,32 +825,32 @@ Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out even
 - **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-10
 - **write scope**: `internal/push/push.go`, `internal/push/push_test.go`
 - **acceptance**:
-  - A-19 (test) unit tests of Push gateway pass — `go test ./internal/push/`
+  - A-13 (test) unit tests of Push gateway pass — `go test ./internal/push/`
 - **notes**: family: realtime
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-6 | WP-3, WP-6 | A-7, A-10, A-11 |
-| R-2 | must | C-9, C-10 | WP-4, WP-7 | A-8, A-12 |
-| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-6, A-10, A-11, A-19 |
-| R-4 | must | C-2, C-7 | WP-5 | A-9 |
-| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-7 | must | C-1, C-3, C-11 | WP-1, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-8 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-9 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-4, A-5, A-10, A-11, A-13, A-14, A-15, A-16, A-17, A-18, A-19 |
-| R-11 | must | C-5 | WP-4 | A-8 |
-| R-12 | must | C-9, C-10 | WP-4, WP-7 | A-8, A-12 |
-| R-13 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-14 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-15 | must | C-1, C-4 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-16 | should | C-11 | WP-8 | A-13, A-14, A-15, A-16, A-17, A-18 |
-| R-17 | should | C-1 | WP-1 | A-1, A-2, A-3, A-4, A-5 |
-| R-18 | must | C-3 | WP-6 | A-10, A-11 |
-| R-19 | must | C-3 | WP-6 | A-10, A-11 |
+| R-1 | must | C-3, C-6 | WP-3, WP-6 | A-5, A-8 |
+| R-2 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
+| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-4, A-8, A-13 |
+| R-4 | must | C-2, C-7 | WP-5 | A-7 |
+| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11, A-12 |
+| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11, A-12 |
+| R-7 | must | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-8 | should | C-1 | WP-1 | A-1, A-2, A-3 |
+| R-9 | should | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-8, A-10, A-11, A-12, A-13 |
+| R-11 | must | C-5 | WP-4 | A-6 |
+| R-12 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
+| R-13 | must | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-14 | must | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-15 | must | C-4 | WP-1 | A-1, A-2, A-3 |
+| R-16 | should | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-17 | should | C-1 | WP-1 | A-1, A-2, A-3 |
+| R-18 | must | C-3 | WP-6 | A-8 |
+| R-19 | must | C-3 | WP-6 | A-8 |
 
 ## Conventions
 

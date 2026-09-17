@@ -10,13 +10,14 @@
     "Callers are authenticated and authorized.",
     "Users search and filter records.",
     "Files are uploaded, stored and served.",
+    "Work runs on a schedule.",
     "Changes are recorded append-only with the actor.",
     "Records move in and out as files.",
     "Large media files are stored once and played by many.",
     "Users work in several languages and locales."
   ],
   "non_goals": [
-    "Videos existing service.",
+    "Videos transcoding existing service delegated to.",
     "Outside learners external."
   ],
   "conventions": {
@@ -50,7 +51,7 @@
       "id": "R-2",
       "statement": "Employees can search and take courses. Employees can save and resume playback position videos later.",
       "kind": "functional",
-      "priority": "could",
+      "priority": "must",
       "rationale": "source (ja): 社員は講座を検索して受講し、動画の視聴位置を保存して後で再開できる。"
     },
     {
@@ -83,7 +84,7 @@
     },
     {
       "id": "R-7",
-      "statement": "The system must view pages email employees locale items.",
+      "statement": "The system must view pages email employees locale Japanese English.",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 画面とメールは社員のロケール(日本語・英語)で表示する。"
@@ -130,9 +131,9 @@
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "records lost across a process crash",
+        "name": "lost or duplicate updates under concurrent writes to one record",
         "target": "= 0",
-        "unit": "records"
+        "unit": "updates"
       },
       "rationale": "source (ja): 成績は失われてはならず、二重に記録されてはならない。"
     },
@@ -171,12 +172,12 @@
     },
     {
       "id": "R-16",
-      "statement": "The system sustains 20 requests/s with peaks of 200 requests/s (assumed by the engine).",
+      "statement": "The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
-        "name": "sustained rate",
-        "target": "20 requests /s",
+        "name": "sustained rate at 1,000",
+        "target": "100 requests /s",
         "unit": "requests /s"
       },
       "rationale": "assumed by the engine; confirm or override"
@@ -209,7 +210,7 @@
       "id": "R-19",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "ratio at 5 minutes, 10 minutes",
         "target": "1 %",
@@ -276,7 +277,9 @@
       "requires": [],
       "satisfies": [
         "R-1",
-        "R-2"
+        "R-2",
+        "R-8",
+        "R-9"
       ],
       "tags": [
         "layer:0",
@@ -307,7 +310,9 @@
       "requires": [],
       "satisfies": [
         "R-1",
-        "R-2"
+        "R-2",
+        "R-8",
+        "R-9"
       ],
       "tags": [
         "layer:0",
@@ -424,7 +429,8 @@
         "I-6"
       ],
       "satisfies": [
-        "R-4"
+        "R-4",
+        "R-12"
       ],
       "tags": [
         "layer:1",
@@ -448,6 +454,23 @@
     },
     {
       "id": "C-13",
+      "name": "Scheduler",
+      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "kind": "job",
+      "path": "src/scheduler.ts",
+      "requires": [
+        "I-8"
+      ],
+      "satisfies": [
+        "R-5"
+      ],
+      "tags": [
+        "layer:2",
+        "archetype:scheduler"
+      ]
+    },
+    {
+      "id": "C-14",
       "name": "Public HTTP API",
       "responsibility": "Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "kind": "service",
@@ -907,7 +930,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-7: The system must view pages email employees locale items."
+          "description": "from R-7: The system must view pages email employees locale Japanese English."
         }
       ],
       "stability": "draft",
@@ -1289,8 +1312,53 @@
     },
     {
       "id": "I-13",
-      "name": "Public HTTP API interface",
+      "name": "Scheduler interface",
       "owner": "C-13",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "next_attempt",
+          "inputs": [
+            {
+              "name": "attempt",
+              "type": "int",
+              "description": ""
+            },
+            {
+              "name": "retry_after",
+              "type": "timedelta | None",
+              "description": ""
+            }
+          ],
+          "output": "datetime | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": "None when attempts are exhausted"
+        },
+        {
+          "name": "promote_due",
+          "inputs": [
+            {
+              "name": "now",
+              "type": "datetime",
+              "description": ""
+            }
+          ],
+          "output": "int moved",
+          "errors": [],
+          "pre": "stated values: 3 days (R-5)",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Scheduler. "
+    },
+    {
+      "id": "I-14",
+      "name": "Public HTTP API interface",
+      "owner": "C-14",
       "kind": "http",
       "operations": [
         {
@@ -1631,7 +1699,7 @@
       "trigger": "client calls the API",
       "steps": [
         {
-          "from": "C-13",
+          "from": "C-14",
           "to": "C-6",
           "via": "I-6",
           "description": "validate and apply"
@@ -1685,7 +1753,7 @@
       "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). REST/JSON over HTTP: 1.37; gRPC: 1.25; GraphQL: 1.13",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
-        "C-13"
+        "C-14"
       ],
       "status": "accepted"
     },
@@ -1956,7 +2024,7 @@
       "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). Two or more interchangeable instances per role b: 1.55; Active-active across two regions: 1.31; Single instance with health-based restart: 1.25",
       "consequences": "Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
-        "C-13"
+        "C-14"
       ],
       "status": "accepted"
     },
@@ -2001,6 +2069,7 @@
       "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.86; Separate services per concern: 1.43; Single process with background threads: 1.40",
       "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
       "affects": [
+        "C-14",
         "C-13"
       ],
       "status": "accepted"
@@ -2008,29 +2077,29 @@
     {
       "id": "D-9",
       "title": "Assumed answer: load (Q-rate)",
-      "context": "The requirements do not say. Question: Q-rate. Evidence: count 2,000.",
+      "context": "The requirements do not say. Question: Q-rate. No evidence in the text; engine default.",
       "options": [
         {
-          "name": "20 requests/s",
+          "name": "100 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "2 requests/s",
+          "name": "10 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "200 requests/s",
+          "name": "1,000 requests/s",
           "pros": [],
           "cons": []
         }
       ],
-      "choice": "20 requests/s",
-      "rationale": "Derived from the largest stated count (2,000) at 1 request per 100 items per second.",
+      "choice": "100 requests/s",
+      "rationale": "No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.",
       "consequences": "If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.",
       "affects": [
-        "C-13"
+        "C-14"
       ],
       "status": "proposed"
     },
@@ -2144,7 +2213,9 @@
       "choice": "10 s / 5 retries / queue",
       "rationale": "Bounded retries with a durable queue keep the system responsive during a one-hour outage.",
       "consequences": "If the real answer differs: State the policy; the outbound client and scheduler contracts change.",
-      "affects": [],
+      "affects": [
+        "C-13"
+      ],
       "status": "proposed"
     },
     {
@@ -2212,7 +2283,7 @@
       "impact": "medium",
       "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
       "affects": [
-        "C-13",
+        "C-14",
         "C-3"
       ]
     },
@@ -2364,7 +2435,7 @@
       "impact": "medium",
       "mitigation": "Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials",
       "affects": [
-        "C-13"
+        "C-14"
       ]
     },
     {
@@ -2374,7 +2445,7 @@
       "impact": "medium",
       "mitigation": "Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413",
       "affects": [
-        "C-13"
+        "C-14"
       ]
     },
     {
@@ -2384,7 +2455,7 @@
       "impact": "medium",
       "mitigation": "Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected",
       "affects": [
-        "C-13"
+        "C-14"
       ]
     },
     {
@@ -2394,7 +2465,7 @@
       "impact": "high",
       "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
       "affects": [
-        "C-13"
+        "C-14"
       ]
     }
   ],
@@ -2442,7 +2513,9 @@
       "depends_on": [],
       "satisfies": [
         "R-1",
-        "R-2"
+        "R-2",
+        "R-8",
+        "R-9"
       ],
       "files": [
         "src/files.ts",
@@ -2456,6 +2529,20 @@
           "kind": "test",
           "command": "npx vitest run tests/files.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-3",
+          "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        },
+        {
+          "id": "A-4",
+          "description": "R-9: number of users 2000 users",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
         }
       ],
       "notes": "family: file_storage"
@@ -2481,7 +2568,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-3",
+          "id": "A-5",
           "description": "unit tests of Localisation pass",
           "kind": "test",
           "command": "npx vitest run tests/i18n.test.ts",
@@ -2520,78 +2607,69 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-4",
+          "id": "A-6",
           "description": "unit tests of Store, Observability pass",
           "kind": "test",
           "command": "npx vitest run tests/store.test.ts tests/observability.test.ts",
           "metric": ""
         },
         {
-          "id": "A-5",
-          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-7",
+          "description": "R-9: number of users 2000 users",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-6",
-          "description": "R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-8",
+          "description": "R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
         },
         {
-          "id": "A-7",
-          "description": "R-12: ratio >= 99.9 % % — kill one instance under load; error rate stays within the target",
+          "id": "A-9",
+          "description": "R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-12"
-        },
-        {
-          "id": "A-8",
-          "description": "R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-18"
-        },
-        {
-          "id": "A-9",
-          "description": "R-19: ratio at 5 minutes, 10 minutes 1 % % — the listed metrics are exposed and change under a smoke workload",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-19"
         }
       ],
       "notes": "family: infra"
     },
     {
       "id": "WP-5",
-      "title": "Authentication",
-      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
+      "title": "Authentication + Scheduler",
+      "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
-        "C-9"
+        "C-9",
+        "C-13"
       ],
       "implements": [
-        "I-9"
+        "I-9",
+        "I-13"
       ],
       "depends_on": [
         "WP-4"
       ],
       "satisfies": [
+        "R-5",
         "R-14",
         "R-15"
       ],
       "files": [
         "src/auth.ts",
-        "tests/auth.test.ts"
+        "tests/auth.test.ts",
+        "src/scheduler.ts",
+        "tests/scheduler.test.ts"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-10",
-          "description": "unit tests of Authentication pass",
+          "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
-          "command": "npx vitest run tests/auth.test.ts",
+          "command": "npx vitest run tests/auth.test.ts tests/scheduler.test.ts",
           "metric": ""
         }
       ],
@@ -2664,24 +2742,17 @@
         },
         {
           "id": "A-13",
-          "description": "R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-14",
-          "description": "R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
-        },
-        {
-          "id": "A-15",
-          "description": "R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
         }
       ],
       "notes": "family: search"
@@ -2718,22 +2789,22 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-15",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "npx vitest run tests/core.test.ts",
           "metric": ""
         },
         {
-          "id": "A-17",
-          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-16",
+          "description": "R-9: number of users 2000 users",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-18",
-          "description": "R-11: records lost across a process crash = 0 records — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-17",
+          "description": "R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-11"
@@ -2755,7 +2826,8 @@
         "WP-8"
       ],
       "satisfies": [
-        "R-4"
+        "R-4",
+        "R-12"
       ],
       "files": [
         "src/exporter.ts",
@@ -2764,11 +2836,18 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-18",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "npx vitest run tests/exporter.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-19",
+          "description": "R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-12"
         }
       ],
       "notes": "family: import_export"
@@ -2778,10 +2857,10 @@
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
-        "C-13"
+        "C-14"
       ],
       "implements": [
-        "I-13"
+        "I-14"
       ],
       "depends_on": [
         "WP-4",
@@ -2814,38 +2893,24 @@
         },
         {
           "id": "A-21",
-          "description": "R-8: latency at 2 GB <= 10 min min — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-22",
-          "description": "R-9: number of users 2000 users users — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "description": "R-9: number of users 2000 users",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
           "id": "A-23",
-          "description": "R-10: p95 latency <= 300 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
-        },
-        {
-          "id": "A-24",
-          "description": "R-16: sustained rate 20 requests /s requests /s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-16"
-        },
-        {
-          "id": "A-25",
-          "description": "R-17: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-17"
         }
       ],
       "notes": "family: crud_api"

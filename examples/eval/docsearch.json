@@ -24,6 +24,7 @@
     "rules": [
       "Type hints on every public function; dataclasses or pydantic for records.",
       "No business logic in the HTTP layer.",
+      "Every component logs one structured line per unit of work with the correlation id.",
       "No in-process state that a second instance would not see; instances are interchangeable.",
       "Prefer the boring option; a new piece of infrastructure needs a decision record.",
       "Python 3.12 as stated in the constraints.",
@@ -89,7 +90,7 @@
       "id": "R-8",
       "statement": "Search returns within 800 ms p95 for a corpus of 50,000 documents.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
         "name": "p95 latency at 50,000",
         "target": "<= 800 ms",
@@ -139,7 +140,7 @@
     },
     {
       "id": "R-14",
-      "statement": "Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).",
+      "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -189,20 +190,32 @@
     },
     {
       "id": "R-19",
+      "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "ratio at 5 minutes, 10 minutes",
+        "target": "1 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-20",
       "statement": "Deployed as stateless containers behind an ingress (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-20",
+      "id": "R-21",
       "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-21",
+      "id": "R-22",
       "statement": "No existing data or system to migrate from (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
@@ -218,9 +231,7 @@
       "path": "app/store.py",
       "requires": [],
       "satisfies": [
-        "R-9",
         "R-11",
-        "R-16",
         "R-18"
       ],
       "tags": [
@@ -251,7 +262,8 @@
       "path": "app/files.py",
       "requires": [],
       "satisfies": [
-        "R-2"
+        "R-2",
+        "R-9"
       ],
       "tags": [
         "layer:0",
@@ -280,8 +292,8 @@
         "R-5",
         "R-11",
         "R-12",
-        "R-20",
-        "R-21"
+        "R-21",
+        "R-22"
       ],
       "tags": [
         "layer:1",
@@ -314,7 +326,8 @@
       "path": "app/observability.py",
       "requires": [],
       "satisfies": [
-        "R-16"
+        "R-16",
+        "R-19"
       ],
       "tags": [
         "layer:1",
@@ -402,7 +415,8 @@
       "requires": [],
       "satisfies": [
         "R-3",
-        "R-5"
+        "R-5",
+        "R-9"
       ],
       "tags": [
         "layer:1",
@@ -484,7 +498,7 @@
         "R-8",
         "R-9",
         "R-17",
-        "R-19"
+        "R-20"
       ],
       "tags": [
         "layer:3",
@@ -988,22 +1002,40 @@
           "description": "from R-7: Every search query is logged with the employee id for usage reporting; a weekly report is"
         },
         {
-          "name": "record_audit",
+          "name": "record_kept",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "kept",
+              "type": "Kept | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Kept | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+        },
+        {
+          "name": "log_history",
+          "inputs": [
+            {
+              "name": "history",
+              "type": "History | id",
+              "description": ""
+            }
+          ],
+          "output": "History | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "stated values: 1 year (R-14)",
+          "post": "",
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         },
         {
           "name": "delete_job",
@@ -1019,9 +1051,9 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
-          "description": "from R-14: Records are retained for 90 days and audit history for 1 year, after which a nightly job d"
+          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1457,7 +1489,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 90 days (R-14); 1 year (R-14)",
+          "pre": "stated values: 1 year (R-14)",
           "post": "",
           "description": ""
         }
@@ -1955,7 +1987,7 @@
         }
       ],
       "choice": "REST/JSON over HTTP",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.49; gRPC: 1.33; GraphQL: 1.16",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.42; gRPC: 1.28; GraphQL: 1.14",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
         "C-15"
@@ -2011,7 +2043,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.18; In-memory: 1.31; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.30; In-memory: 1.40; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
       "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
       "affects": [
         "C-1"
@@ -2055,7 +2087,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.28; Mutual TLS: 0.86. stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-7"
@@ -2087,7 +2119,7 @@
         }
       ],
       "choice": "Read-through cache with TTL and explicit invalidation on write",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.49; No cache: 1.33",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.56; No cache: 1.56",
       "consequences": "Not choosing 'No cache; rely on database indexes' gives up: no staleness.",
       "affects": [
         "C-9"
@@ -2132,7 +2164,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.96; Separate services per concern: 1.94; Single process with background threads: 1.33",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 2.10; Separate services per concern: 1.81; Single process with background threads: 1.42",
       "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
       "affects": [
         "C-15",
@@ -2178,7 +2210,7 @@
         }
       ],
       "choice": "pgvector in PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.49; In-process index: 1.49; Dedicated vector database: 1.33. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.70; In-process index: 1.56; Dedicated vector database: 1.28. stated in the constraints",
       "consequences": "Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.",
       "affects": [
         "C-10",
@@ -2226,7 +2258,7 @@
         }
       ],
       "choice": "Materialised aggregates built by a scheduled job into report tables in the primary database",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.63; Read replica queried directly: 1.47; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.82; Read replica queried directly: 1.54; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)",
       "consequences": "Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.",
       "affects": [
         "C-14",
@@ -2272,7 +2304,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.82; Active-active across two regions: 1.49; Single instance with health-based restart: 1.33",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.70; Active-active across two regions: 1.42; Single instance with health-based restart: 1.28",
       "consequences": "Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-15"
@@ -2343,6 +2375,11 @@
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
         {
+          "name": "indefinite / 1 year",
+          "pros": [],
+          "cons": []
+        },
+        {
           "name": "90 days / 1 year",
           "pros": [],
           "cons": []
@@ -2351,16 +2388,11 @@
           "name": "30 days / 90 days",
           "pros": [],
           "cons": []
-        },
-        {
-          "name": "indefinite",
-          "pros": [],
-          "cons": []
         }
       ],
-      "choice": "90 days / 1 year",
-      "rationale": "Bounded retention limits storage growth and satisfies most data-minimisation rules.",
-      "consequences": "If the real answer differs: State the retention; the deletion job and capacity change.",
+      "choice": "indefinite / 1 year",
+      "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
+      "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
         "C-13",
         "C-1"
@@ -2507,6 +2539,35 @@
       "rationale": "Nothing in the text names an existing system.",
       "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
       "affects": [],
+      "status": "proposed"
+    },
+    {
+      "id": "D-17",
+      "title": "Assumed answer: operations (Q-alerting)",
+      "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "error rate + queue growth",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "per-endpoint SLO alerts",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "error rate + queue growth",
+      "rationale": "Two alerts catch most incidents without paging on noise.",
+      "consequences": "If the real answer differs: State the rules and the on-call; observability conventions change.",
+      "affects": [
+        "C-6"
+      ],
       "status": "proposed"
     }
   ],
@@ -2716,7 +2777,8 @@
       ],
       "depends_on": [],
       "satisfies": [
-        "R-2"
+        "R-2",
+        "R-9"
       ],
       "files": [
         "app/files.py",
@@ -2730,6 +2792,13 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_files.py",
           "metric": ""
+        },
+        {
+          "id": "A-2",
+          "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
         }
       ],
       "notes": "family: file_storage"
@@ -2750,10 +2819,10 @@
       ],
       "depends_on": [],
       "satisfies": [
-        "R-9",
         "R-11",
         "R-16",
-        "R-18"
+        "R-18",
+        "R-19"
       ],
       "files": [
         "app/store.py",
@@ -2766,32 +2835,18 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-2",
+          "id": "A-3",
           "description": "unit tests of Store, Observability, Rate limiter pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py",
           "metric": ""
         },
         {
-          "id": "A-3",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-9"
-        },
-        {
           "id": "A-4",
-          "description": "R-16: ratio 99.9 % % — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-16: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
           "metric": "R-16"
-        },
-        {
-          "id": "A-5",
-          "description": "R-18: time at 5 10 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-18"
         }
       ],
       "notes": "family: infra"
@@ -2819,22 +2874,22 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-6",
+          "id": "A-5",
           "description": "unit tests of Cache pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_cache.py",
           "metric": ""
         },
         {
-          "id": "A-7",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "id": "A-6",
+          "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-8",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-7",
+          "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
@@ -2855,7 +2910,8 @@
       "depends_on": [],
       "satisfies": [
         "R-3",
-        "R-5"
+        "R-5",
+        "R-9"
       ],
       "files": [
         "app/model.py",
@@ -2864,11 +2920,18 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-8",
           "description": "unit tests of Model server pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_model.py",
           "metric": ""
+        },
+        {
+          "id": "A-9",
+          "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-9"
         }
       ],
       "notes": "family: ml_inference"
@@ -3012,14 +3075,14 @@
         },
         {
           "id": "A-14",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-15",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
@@ -3052,8 +3115,8 @@
         "R-10",
         "R-11",
         "R-12",
-        "R-20",
-        "R-21"
+        "R-21",
+        "R-22"
       ],
       "files": [
         "app/core.py",
@@ -3128,7 +3191,7 @@
         "R-9",
         "R-10",
         "R-17",
-        "R-19"
+        "R-20"
       ],
       "files": [
         "app/surface_api.py",
@@ -3145,24 +3208,17 @@
         },
         {
           "id": "A-19",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms ms — load test at the stated rate; the stated percentile must meet the target",
+          "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
           "id": "A-20",
-          "description": "R-9: latency <= 1 s s — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
-        },
-        {
-          "id": "A-21",
-          "description": "R-17: time at 4 h 24 h h",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-17"
         }
       ],
       "notes": "family: crud_api"

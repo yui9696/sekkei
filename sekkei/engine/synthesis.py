@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from .. import graph as G
 from ..model import (
     Acceptance, Component, Conventions, Decision, Design, Entity, FieldDef, Flow, Interface, Metric,
-    Operation, Option, Param, Requirement, Risk, Step, WorkPackage,
+    Operation, Option, Param, Requirement, Risk, Step, WorkPackage, metric_text,
 )
 from . import catalog as K
 from . import text as T
@@ -67,11 +67,11 @@ QUALITY_CARRIERS = {
     "consistency": ["store", "core"],
     "performance": ["surface_api", "admin_api", "ingest_api", "worker", "search", "cache", "cli"],
     "isolation": ["queue", "worker"],
-    "security": ["auth", "signer", "secrets", "dispatcher", "admin_api"],
+    "security": ["data_protection", "auth", "signer", "secrets", "dispatcher", "admin_api"],
     "operability": ["observability"],
     "scalability": ["surface_api", "ingest_api", "worker", "queue"],
     "availability": ["observability", "queue"],
-    "compliance": ["audit", "store"],
+    "compliance": ["data_protection", "audit", "store"],
     "simplicity": ["core"],
     "cost": ["store"],
     "usability": ["surface_api", "cli"],
@@ -347,6 +347,20 @@ def _metric_of(u: ReqUnit) -> Metric | None:
     return Metric(name, target, unit)
 
 
+_METRIC_QUALITY = (("latency", "performance"), ("sustained rate", "performance"), ("duplicate", "consistency"), ("concurrent", "consistency"),
+                   ("lost", "durability"), ("availability", "availability"), ("ratio", "availability"), ("unauthenticated", "security"),
+                   ("cross-tenant", "security"), ("metrics exposed", "operability"), ("retention", "compliance"), ("deletion", "compliance"),
+                   ("instances", "scalability"))
+
+
+def _metric_quality(u: ReqUnit) -> list[str]:
+    """The quality a metric measures, read from the metric's name — the acceptance template must match the metric, not the component family."""
+    if not u.metric:
+        return []
+    name = u.metric[0].lower()
+    return [q for k, q in _METRIC_QUALITY if k in name][:1]
+
+
 def _satisfiers(u: ReqUnit, active: list[str], surfaces: list[str]) -> list[str]:
     """Archetype keys that satisfy a requirement unit."""
     out: list[str] = []
@@ -359,7 +373,13 @@ def _satisfiers(u: ReqUnit, active: list[str], surfaces: list[str]) -> list[str]
         if not out:
             out = [a for a in ("core",) if a in active] + surfaces[:1]
     elif u.kind == "nonfunctional":
-        for q in u.qualities:
+        # the sentence's own patterns first (「個人情報は暗号化して保存」 belongs to data protection, not to auth)
+        for pid in u.patterns:
+            pat = next(p for p in K.PATTERNS if p.id == pid)
+            for a in pat.archetypes:
+                if a in active and a not in ("store", "core") and a not in out:
+                    out.append(a)
+        for q in _metric_quality(u) or u.qualities:
             for a in QUALITY_CARRIERS.get(q, []):
                 if a in active and a not in out:
                     out.append(a)
@@ -678,11 +698,14 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                               "test", layout.test_command.format(test=" ".join(tests), key=keys[0], Key=keys[0].capitalize())))
         for r in satisfies:
             req = d.requirement(r)
-            if req is not None and req.kind == "nonfunctional":
-                acc_n += 1
+            if req is not None and req.kind == "nonfunctional" and req.metric and req.metric.target != "review":
                 unit = next((u for u in an.requirements if u.id == r), None)
-                tmpl = next((t.acceptance for t in K.TACTICS if unit and t.quality in unit.qualities and t.acceptance), "")
-                acc.append(Acceptance(f"A-{acc_n}", f"{r}: {req.metric.name} {req.metric.target} {req.metric.unit}".strip()
+                mq = _metric_quality(unit) if unit else []
+                if req.rationale.startswith("assumed") and not (mq and mq[0] in ("performance", "availability") and ("latency" in req.metric.name or re.search(r"\b9\d(?:\.\d+)? ?%", req.metric.target))):
+                    continue          # engine assumptions become acceptance checks only for the latency and availability targets
+                acc_n += 1
+                tmpl = next((t.acceptance for t in K.TACTICS if mq and t.quality == mq[0] and t.acceptance), "")
+                acc.append(Acceptance(f"A-{acc_n}", f"{r}: {metric_text(req.metric)}"
                                       + (f" — {tmpl}" if tmpl else ""), "metric", metric=r))
         title = " + ".join(c.name for c in comps)
         goal = "Implement " + "; ".join(f"{c.name}: {c.responsibility.rstrip('.')}" for c in comps) + "."

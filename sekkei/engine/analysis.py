@@ -28,6 +28,7 @@ class ReqUnit:
 
 DEFAULT_METRICS = {
     "durability": ("records lost across a process crash", "= 0", "records"),
+    "consistency": ("lost or duplicate updates under concurrent writes to one record", "= 0", "updates"),
     "isolation": ("p95 latency of healthy targets while one target stalls", "within the stated latency target", ""),
     "security": ("unauthenticated or cross-tenant requests accepted", "= 0", "requests"),
     "operability": ("required metrics exposed", "= all listed", ""),
@@ -87,7 +88,9 @@ def _kind(sentence: T.Sentence, qualities: list[str]) -> str:
             return "functional"
         return sentence.section
     low = sentence.lower
-    if re.search(r"\b(python|typescript|go|rust|java|postgres|redis|team of|must run|available|region|containers?)\b", low) and not sentence.verbs:
+    if _TEAM_RE.search(sentence.text) and len(sentence.words) <= 6:
+        return "constraint"       # "Team of 3." under any heading is a constraint, not a quality target
+    if re.search(r"\b(python|typescript|golang|rust|java|postgres|redis|team of|must run|available|region|containers?)\b", low) and not sentence.verbs:
         return "constraint"
     if qualities and (sentence.quantities or not sentence.verbs):
         return "nonfunctional"
@@ -164,15 +167,18 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
         kind = _kind(s, sq)
         if kind == "constraint" and s.section != "constraint" and (s.verbs and s.modality != "must"):
             kind = "functional"
-        prio = s.modality or ("should" if kind == "nonfunctional" else "must")
+        prio = s.modality or ("should" if kind == "nonfunctional" and not any(q.comparator or q.kind in ("latency", "percent", "rate") for q in s.quantities) else "must")
         if kind == "constraint":
             prio = "must"
         n += 1
         pats = hints.get(s.text, []) if s.assumed else _sentence_patterns(s, active)
-        unit = ReqUnit(f"R-{n}", s, kind, prio, pats, sq, _metric(s) if kind == "nonfunctional" else None)
+        # a latency/percentage target keeps its metric even when the author filed the sentence under "functional"
+        has_target = any(q.kind in ("latency", "percent") and (q.comparator or q.percentile) for q in s.quantities)
+        unit = ReqUnit(f"R-{n}", s, kind, prio, pats, sq, _metric(s) if kind == "nonfunctional" or (kind == "functional" and has_target) else None)
         if kind == "nonfunctional" and unit.metric is None:
             # a quality statement without a number: a default metric for the quality, else a review-visible target
-            unit.metric = next((DEFAULT_METRICS[q] for q in sq if q in DEFAULT_METRICS), ("target to be agreed", "review", ""))
+            order = (["compliance"] if "compliance_data" in pats else []) + sq
+            unit.metric = next((DEFAULT_METRICS[q] for q in order if q in DEFAULT_METRICS), ("target to be agreed", "review", ""))
         if kind == "functional" and not unit.patterns:
             unit.recognised = False
             unrec.append(unit)

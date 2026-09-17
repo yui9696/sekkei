@@ -32,7 +32,7 @@ Constraints
 - Must run as a set of stateless containers behind our existing ingress.
 
 ## Functional (Assumed by the engine)
-- Records are retained for 90 days and audit history for 1 year, after which a nightly job deletes them (assumed by the engine).
+- Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).
 - Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).
 
 ## Non-functional (Assumed by the engine)
