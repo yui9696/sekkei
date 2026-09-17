@@ -173,6 +173,27 @@
       "kind": "functional",
       "priority": "must",
       "rationale": ""
+    },
+    {
+      "id": "R-20",
+      "statement": "Requirements may be written in Japanese: a glossary, a number grammar and a particle-driven reorder rewrite each sentence into the engine's canonical English; every rewrite is reported next to its source and words the glossary does not know are listed, never guessed.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-21",
+      "statement": "The whole hand-over package is derived from the design: executive summary, ADRs, C4 diagrams, risk register, FMEA, roadmap, RACI, SLOs, a cost model whose unit prices are never guessed, and runbooks.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
+    },
+    {
+      "id": "R-22",
+      "statement": "The design is attacked with the requirements as the oracle: inert sentences, lost numbers, contradictions, fragile decisions, assumption load, non-determinism and deliverable drift are reported with a severity.",
+      "kind": "functional",
+      "priority": "must",
+      "rationale": ""
     }
   ],
   "components": [
@@ -329,7 +350,9 @@
         "I-12",
         "I-19",
         "I-20",
-        "I-26"
+        "I-26",
+        "I-28",
+        "I-29"
       ],
       "satisfies": [
         "R-11",
@@ -397,6 +420,7 @@
       "kind": "module",
       "path": "sekkei/engine/analysis.py",
       "requires": [
+        "I-27",
         "I-13",
         "I-14"
       ],
@@ -606,9 +630,253 @@
         "R-16"
       ],
       "tags": []
+    },
+    {
+      "id": "C-27",
+      "name": "Japanese input",
+      "responsibility": "Glossary, number/unit grammar, modality lexicon and particle-driven reorder that rewrite Japanese requirements into canonical English, with an audit table of every rewrite.",
+      "kind": "module",
+      "path": "sekkei/engine/ja.py",
+      "requires": [],
+      "satisfies": [
+        "R-20"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-28",
+      "name": "Deliverables",
+      "responsibility": "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
+      "kind": "module",
+      "path": "sekkei/deliverables.py",
+      "requires": [
+        "I-1",
+        "I-3",
+        "I-4"
+      ],
+      "satisfies": [
+        "R-21"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-29",
+      "name": "Red team",
+      "responsibility": "Adversarial self-audit: re-runs the engine on perturbed requirements and compares design shapes; contradictions, lost numbers, assumption load, determinism.",
+      "kind": "module",
+      "path": "sekkei/redteam.py",
+      "requires": [
+        "I-1",
+        "I-13",
+        "I-19"
+      ],
+      "satisfies": [
+        "R-22"
+      ],
+      "tags": []
     }
   ],
   "interfaces": [
+    {
+      "id": "I-27",
+      "name": "Japanese input API",
+      "owner": "C-27",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "is_japanese",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "bool",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "normalise",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Normalised: text, rewrites, untranslated, title, sources",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "rewrite_sentence",
+          "inputs": [
+            {
+              "name": "src",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "Rewrite (source, english, untranslated)",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "numbers",
+          "inputs": [
+            {
+              "name": "s",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "str with Japanese quantities rewritten",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-28",
+      "name": "Deliverables API",
+      "owner": "C-28",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "package",
+          "inputs": [
+            {
+              "name": "result",
+              "type": "EngineResult",
+              "description": ""
+            },
+            {
+              "name": "prices",
+              "type": "dict | None",
+              "description": ""
+            }
+          ],
+          "output": "Package: files (name -> text); write(out) -> paths",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "cost_lines",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "notes",
+              "type": "Notes",
+              "description": ""
+            },
+            {
+              "name": "prices",
+              "type": "dict | None",
+              "description": ""
+            }
+          ],
+          "output": "list[CostLine]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "fmea",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "Markdown",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "slos",
+          "inputs": [
+            {
+              "name": "design",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "Markdown",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-29",
+      "name": "Red team API",
+      "owner": "C-29",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "run",
+          "inputs": [
+            {
+              "name": "text",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "base",
+              "type": "EngineResult | None",
+              "description": ""
+            }
+          ],
+          "output": "RedTeam: findings (rule, severity, subject, message, evidence), runs",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "shape",
+          "inputs": [
+            {
+              "name": "d",
+              "type": "Design",
+              "description": ""
+            }
+          ],
+          "output": "dict: the design minus requirement ids",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
     {
       "id": "I-1",
       "name": "Model API",
@@ -3735,7 +4003,8 @@
         "I-17"
       ],
       "depends_on": [
-        "WP-12"
+        "WP-12",
+        "WP-18"
       ],
       "satisfies": [
         "R-13",
@@ -3956,6 +4225,82 @@
       "notes": ""
     },
     {
+      "id": "WP-18",
+      "title": "Japanese input",
+      "goal": "Rewrite Japanese requirements into canonical English deterministically with an audit table; design a Japanese spec lint-clean.",
+      "components": [
+        "C-27"
+      ],
+      "implements": [
+        "I-27"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-20"
+      ],
+      "files": [
+        "sekkei/engine/ja.py",
+        "tests/test_ja.py",
+        "examples/ja/zaiko.md"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-27",
+          "description": "Japanese tests pass (sentences, numbers, document, design, determinism)",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_ja.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-19",
+      "title": "Deliverables and red team",
+      "goal": "Derive the hand-over package from the design and attack the design with the requirements as oracle.",
+      "components": [
+        "C-28",
+        "C-29"
+      ],
+      "implements": [
+        "I-28",
+        "I-29"
+      ],
+      "depends_on": [
+        "WP-14",
+        "WP-17"
+      ],
+      "satisfies": [
+        "R-21",
+        "R-22"
+      ],
+      "files": [
+        "sekkei/deliverables.py",
+        "sekkei/redteam.py",
+        "tests/test_deliverables.py",
+        "tests/test_redteam.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-28",
+          "description": "deliverables tests pass (every document, determinism, no guessed prices, one calendar formula)",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_deliverables.py",
+          "metric": ""
+        },
+        {
+          "id": "A-29",
+          "description": "red-team tests pass (inert sentence found on the document-search spec, contradiction, lost number)",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_redteam.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
       "id": "WP-10",
       "title": "CLI",
       "goal": "Expose every operation on the command line with exit codes and JSON output, and prove the whole loop end to end.",
@@ -3972,7 +4317,8 @@
         "WP-9",
         "WP-11",
         "WP-14",
-        "WP-17"
+        "WP-17",
+        "WP-19"
       ],
       "satisfies": [
         "R-11",
