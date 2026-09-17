@@ -138,6 +138,8 @@ class Effort:
     team: int
     waves: list[list[str]]
     assumptions: list[str]
+    #: calendar length of each wave: max(longest package, ceil(person-days / team)); their sum is calendar_days
+    phase_days: list[int] = field(default_factory=list)
 
 
 def effort(design: Design, an: Analysis) -> Effort:
@@ -155,10 +157,12 @@ def effort(design: Design, an: Analysis) -> Effort:
             best[w] = days[w] + max((best.get(d, 0) for d in g[w]), default=0)
     critical = max(best.values(), default=0)
     team = an.team_size or 2
-    calendar = max(critical, -(-total // team))
+    phase = [max(max((days[w] for w in wave), default=0), -(-sum(days[w] for w in wave) // team)) for wave in waves]
+    calendar = sum(phase)
     return Effort(total, critical, calendar, team, waves,
                   [f"Package sizes S/M/L = {SIZE_DAYS['S']}/{SIZE_DAYS['M']}/{SIZE_DAYS['L']} person-days (assumption).",
-                   f"Team of {team}" + ("" if an.team_size else " (assumed; no team size stated)") + "; packages in one wave run in parallel up to the team size."])
+                   f"Team of {team}" + ("" if an.team_size else " (assumed; no team size stated)") + "; packages in one wave run in parallel up to the team size; "
+                   "a wave lasts max(longest package, person-days ÷ team) and waves run one after another."], phase)
 
 
 def capacity_markdown(cap: Capacity) -> str:

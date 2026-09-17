@@ -375,6 +375,37 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_deliver(args: argparse.Namespace) -> int:
+    """requirements text -> the whole hand-over package: design, notes, ADRs, C4, risks, FMEA, roadmap, RACI, SLOs, cost model, runbooks."""
+    from pathlib import Path
+
+    from . import deliverables as DV
+    from .engine import design as run_engine
+
+    text = _read(args.input)
+    prices = None
+    if args.prices:
+        try:
+            prices = {k: float(v) for k, v in json.loads(_read(args.prices)).items()}
+        except (ValueError, AttributeError) as exc:
+            print(f"error: --prices must be a JSON object of unit prices: {exc}", file=sys.stderr)
+            return 2
+    result = run_engine(text, assume=not args.no_assume)
+    if not result.ok and not result.design.requirements:
+        sys.stdout.write(R.format_text(result.diagnostics))
+        return 1
+    pk = DV.package(result, prices)
+    out = Path(args.output)
+    written = pk.write(out)
+    print(f"wrote {len(written)} files to {out}/ ({len(result.design.components)} components, {len(result.design.decisions)} decisions, "
+          f"{sum(1 for n in pk.files if n.startswith('adr/'))} ADRs, {len(result.design.risks)} risks)")
+    if not result.ok:
+        sys.stdout.write(R.format_text(result.diagnostics, hints=False))
+    if result.review.needs_human:
+        print("needs a human: see NOTES.md §5")
+    return 0 if result.ok else 1
+
+
 def cmd_template(args: argparse.Namespace) -> int:
     from .engine import REQUIREMENTS_TEMPLATE
 
@@ -518,6 +549,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("ask", cmd_ask, "print the questions an architect would ask about a requirements text", design=False)
     sp.add_argument("input", help="requirements text file")
     sp.add_argument("--json", action="store_true")
+
+    sp = add("deliver", cmd_deliver, "write the whole hand-over package (design, notes, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model, runbooks)", design=False)
+    sp.add_argument("input", help="requirements text file (Markdown or plain text; English or Japanese)")
+    sp.add_argument("-o", "--output", default="deliverables", help="output directory (default: deliverables/)")
+    sp.add_argument("--prices", metavar="PRICES.json", help="unit prices for the cost model (keys listed in COST_MODEL.md); never guessed")
+    sp.add_argument("--no-assume", action="store_true", help="do not answer open questions; leave them in the notes")
 
     sp = add("template", cmd_template, "print a requirements template that makes the engine's job easiest", design=False)
     sp.add_argument("-o", "--output", help="write to a file, e.g. requirements.md")
