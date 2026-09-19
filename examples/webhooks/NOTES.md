@@ -75,6 +75,10 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 
 ## 5. What the engine could not decide
 
+### Assumptions made
+
+- 1 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 API style: **REST/JSON over HTTP**
@@ -108,7 +112,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: crud_api, admin_api, event_ingest, async_delivery, webhook_delivery, signing, notification, health_policy, observability, batch_pipeline, auth, audit_log
 - Quality attributes (weight): durability 1.0, performance 0.82, isolation 0.82, availability 0.63, security 0.54, operability 0.77, scalability 0.63, simplicity 0.8, compliance 0.54
-- Constraint tokens: containers, multi_instance, nightly_batch, postgres, redis, single_region; languages: python; team: 3
+- Constraint tokens: containers, durable_required, multi_instance, nightly_batch, postgres, redis, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -137,4 +141,5 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 6b. What the structure pass found
 
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “We run a SaaS.” (introduction before the first heading)
 - **Structure folded by the engine**: speaker label dropped: Ops

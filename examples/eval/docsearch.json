@@ -154,18 +154,6 @@
     },
     {
       "id": "R-16",
-      "statement": "The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text).",
-      "kind": "nonfunctional",
-      "priority": "must",
-      "metric": {
-        "name": "sustained rate at 1,000",
-        "target": "100 requests /s",
-        "unit": "requests /s"
-      },
-      "rationale": "assumed by the engine; confirm or override"
-    },
-    {
-      "id": "R-17",
       "statement": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -177,7 +165,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-18",
+      "id": "R-17",
       "statement": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -189,7 +177,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-19",
+      "id": "R-18",
       "statement": "External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -201,7 +189,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-20",
+      "id": "R-19",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -213,21 +201,21 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-21",
+      "id": "R-20",
       "statement": "Deployed as stateless containers behind an ingress (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-22",
+      "id": "R-21",
       "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-23",
+      "id": "R-22",
       "statement": "No existing data or system to migrate from (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
@@ -244,7 +232,7 @@
       "requires": [],
       "satisfies": [
         "R-11",
-        "R-19"
+        "R-18"
       ],
       "tags": [
         "layer:0",
@@ -304,8 +292,8 @@
         "R-5",
         "R-11",
         "R-12",
-        "R-22",
-        "R-23"
+        "R-21",
+        "R-22"
       ],
       "tags": [
         "layer:1",
@@ -338,8 +326,8 @@
       "path": "app/observability.py",
       "requires": [],
       "satisfies": [
-        "R-17",
-        "R-20"
+        "R-16",
+        "R-19"
       ],
       "tags": [
         "layer:1",
@@ -389,8 +377,7 @@
       "satisfies": [
         "R-5",
         "R-8",
-        "R-9",
-        "R-16"
+        "R-9"
       ],
       "tags": [
         "layer:1",
@@ -412,8 +399,7 @@
         "R-6",
         "R-7",
         "R-8",
-        "R-9",
-        "R-16"
+        "R-9"
       ],
       "tags": [
         "layer:1",
@@ -511,9 +497,8 @@
         "R-10",
         "R-8",
         "R-9",
-        "R-16",
-        "R-18",
-        "R-21"
+        "R-17",
+        "R-20"
       ],
       "tags": [
         "layer:3",
@@ -729,24 +714,6 @@
           "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
         },
         {
-          "name": "open_summary",
-          "inputs": [
-            {
-              "name": "summary",
-              "type": "Summary | id",
-              "description": ""
-            }
-          ],
-          "output": "Summary | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
-        },
-        {
           "name": "upload_pdf",
           "inputs": [
             {
@@ -801,61 +768,7 @@
           "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
         },
         {
-          "name": "split_chunks",
-          "inputs": [
-            {
-              "name": "chunks",
-              "type": "Chunks | id",
-              "description": ""
-            }
-          ],
-          "output": "Chunks | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
-        },
-        {
-          "name": "compute_embeddings",
-          "inputs": [
-            {
-              "name": "embeddings",
-              "type": "Embeddings | id",
-              "description": ""
-            }
-          ],
-          "output": "Embeddings | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
-        },
-        {
           "name": "index_semantic",
-          "inputs": [
-            {
-              "name": "semantic",
-              "type": "Semantic | id",
-              "description": ""
-            }
-          ],
-          "output": "Semantic | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them"
-        },
-        {
-          "name": "search_semantic",
           "inputs": [
             {
               "name": "semantic",
@@ -954,24 +867,6 @@
             }
           ],
           "output": "Documents | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
-        },
-        {
-          "name": "search_results",
-          "inputs": [
-            {
-              "name": "results",
-              "type": "Results | id",
-              "description": ""
-            }
-          ],
-          "output": "Results | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1595,28 +1490,6 @@
           "pre": "",
           "post": "",
           "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
-        },
-        {
-          "name": "GET /results",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [results], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Team leads can delete documents; deleted documents disappear from search results within on"
         }
       ],
       "stability": "draft",
@@ -1894,7 +1767,7 @@
         }
       ],
       "choice": "REST/JSON over HTTP",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). REST/JSON over HTTP: 1.44; gRPC: 1.34; GraphQL: 1.17",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.42; gRPC: 1.28; GraphQL: 1.14",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
         "C-15"
@@ -1971,8 +1844,8 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 3.32; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints",
-      "consequences": "",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.30; SQLite: 1.61; Files: 1.16; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); In-memory: unavailable (ruled out by postgres). stated in the constraints",
+      "consequences": "Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'Files' gives up: no dependencies, human readable.",
       "affects": [
         "C-1"
       ],
@@ -2026,7 +1899,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.27; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.28; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-7"
@@ -2058,7 +1931,7 @@
         }
       ],
       "choice": "Read-through cache with TTL and explicit invalidation on write",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Read-through cache with TTL and explicit invalid: 1.61; No cache: 1.54",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.56; No cache: 1.56",
       "consequences": "Not choosing 'No cache; rely on database indexes' gives up: no staleness.",
       "affects": [
         "C-9"
@@ -2103,7 +1976,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). One image, role by flag: `api` and `worker` proc: 2.07; Separate services per concern: 1.78; Single process with background threads: 1.41",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 2.10; Separate services per concern: 1.81; Single process with background threads: 1.42",
       "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
       "affects": [
         "C-15",
@@ -2149,7 +2022,7 @@
         }
       ],
       "choice": "pgvector in PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). pgvector in PostgreSQL: 2.71; In-process index: 1.61; Dedicated vector database: 1.34. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.70; In-process index: 1.56; Dedicated vector database: 1.28. stated in the constraints",
       "consequences": "Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.",
       "affects": [
         "C-10",
@@ -2197,7 +2070,7 @@
         }
       ],
       "choice": "Materialised aggregates built by a scheduled job into report tables in the primary database",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Materialised aggregates built by a scheduled job: 1.83; Read replica queried directly: 1.56; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.82; Read replica queried directly: 1.54; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)",
       "consequences": "Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.",
       "affects": [
         "C-14",
@@ -2243,7 +2116,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Two or more interchangeable instances per role b: 1.68; Active-active across two regions: 1.41; Single instance with health-based restart: 1.27",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.70; Active-active across two regions: 1.42; Single instance with health-based restart: 1.28",
       "consequences": "Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-15"
@@ -2281,35 +2154,6 @@
     },
     {
       "id": "D-10",
-      "title": "Assumed answer: load (Q-rate)",
-      "context": "The requirements do not say. Question: Q-rate. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "100 requests/s",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "10 requests/s",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "1,000 requests/s",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "100 requests/s",
-      "rationale": "No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.",
-      "consequences": "If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.",
-      "affects": [
-        "C-15"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-11",
       "title": "Assumed answer: quality (Q-availability)",
       "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
       "options": [
@@ -2338,7 +2182,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-12",
+      "id": "D-11",
       "title": "Assumed answer: data (Q-retention)",
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
@@ -2368,7 +2212,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-13",
+      "id": "D-12",
       "title": "Assumed answer: data (Q-backup)",
       "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
       "options": [
@@ -2397,7 +2241,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-14",
+      "id": "D-13",
       "title": "Assumed answer: security (Q-authz)",
       "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
       "options": [
@@ -2427,7 +2271,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-15",
+      "id": "D-14",
       "title": "Assumed answer: resilience (Q-external)",
       "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
       "options": [
@@ -2456,7 +2300,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-16",
+      "id": "D-15",
       "title": "Assumed answer: cost (Q-budget)",
       "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
       "options": [
@@ -2483,7 +2327,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-17",
+      "id": "D-16",
       "title": "Assumed answer: data (Q-migration)",
       "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
       "options": [
@@ -2510,7 +2354,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-18",
+      "id": "D-17",
       "title": "Assumed answer: operations (Q-alerting)",
       "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
       "options": [
@@ -2788,9 +2632,9 @@
       "depends_on": [],
       "satisfies": [
         "R-11",
-        "R-17",
-        "R-19",
-        "R-20"
+        "R-16",
+        "R-18",
+        "R-19"
       ],
       "files": [
         "app/store.py",
@@ -2811,10 +2655,10 @@
         },
         {
           "id": "A-4",
-          "description": "R-17: ratio 99.9 % — kill one instance under load; error rate stays within the target",
+          "description": "R-16: ratio 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
-          "metric": "R-17"
+          "metric": "R-16"
         }
       ],
       "notes": "family: infra"
@@ -2833,8 +2677,7 @@
       "satisfies": [
         "R-5",
         "R-8",
-        "R-9",
-        "R-16"
+        "R-9"
       ],
       "files": [
         "app/cache.py",
@@ -3027,8 +2870,7 @@
         "R-6",
         "R-7",
         "R-8",
-        "R-9",
-        "R-16"
+        "R-9"
       ],
       "files": [
         "app/search.py",
@@ -3085,8 +2927,8 @@
         "R-10",
         "R-11",
         "R-12",
-        "R-22",
-        "R-23"
+        "R-21",
+        "R-22"
       ],
       "files": [
         "app/core.py",
@@ -3160,9 +3002,8 @@
         "R-8",
         "R-9",
         "R-10",
-        "R-16",
-        "R-18",
-        "R-21"
+        "R-17",
+        "R-20"
       ],
       "files": [
         "app/surface_api.py",

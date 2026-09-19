@@ -667,7 +667,9 @@
       "responsibility": "Reads real-world document structure (tables, numbered headings, stories, labels, front matter) into the canonical Markdown shape the engine reads, reporting every fold.",
       "kind": "module",
       "path": "sekkei/engine/structure.py",
-      "requires": [],
+      "requires": [
+        "I-13"
+      ],
       "satisfies": [
         "R-23"
       ],
@@ -4432,7 +4434,8 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-2"
+        "WP-2",
+        "WP-12"
       ],
       "satisfies": [
         "R-23",

@@ -56,9 +56,12 @@ class Analysis:
     assumptions: list[str]
     normalisation: ja.Normalised | None = None   # set when the input was Japanese
     structure: ST.Canonical | None = None        # what the structure pass folded (tables, stories, labels, TODOs, deadline)
+    dropped: list[tuple[str, str]] = field(default_factory=list)   # (sentence, why) read but not taken as a requirement
+    stated_constraints: set[str] = field(default_factory=set)      # constraint tokens from the author's text only (no assumed bullets)
 
 
-_TEAM_RE = re.compile(r"team of (\d+)|(\d+)[- ]person team|(\d+) (?:engineers|developers)", re.I)
+_TEAM_RE = re.compile(r"team of (\d+)|(\d+)[- ]person team|(\d+) (?:platform |backend |frontend |data |software )?(?:engineers|developers)|team (?:is|=|:)\s*(\d+)\b", re.I)
+_TEAM_NAMES_RE = re.compile(r"\bteam (?:is|=|:)\s*(?:me|myself|I)(?:\s*(?:\+|,|and|&)\s*[A-Z][a-z]+)+", re.I)
 
 
 def _score(patterns_signals: list[tuple[str, int]], text: str) -> int:
@@ -122,6 +125,22 @@ def _metric(sentence: T.Sentence) -> tuple[str, str, str] | None:
     return (" ".join(name_bits), q.target(), q.unit if q.kind != "count" else q.noun)
 
 
+def _looks_like_requirement(s: T.Sentence) -> bool:
+    """Prose that reads as a use case or a target: 'Traders submit orders …', 'Fills are booked within 500 ms'."""
+    if any(q.comparator or q.percentile for q in s.quantities if q.kind in ("latency", "duration", "rate", "percent", "count", "size")):
+        return True
+    if s.actors and s.verbs:
+        words = s.words
+        first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))
+        actor_toks = {t.rstrip("s") for a in s.actors for t in a.split()}
+        for a in sorted(s.actors, key=len, reverse=True):
+            toks = a.split()
+            for i in range(min(first_verb, len(words))):
+                if [w.rstrip("s") for w in words[i: i + len(toks)]] == [t.rstrip("s") for t in toks]:
+                    return not any(T.verb_of(w) for w in words[:i] if w.rstrip("s") not in actor_toks)
+    return False
+
+
 def _summary(sentences: list[T.Sentence]) -> str:
     prose = [s for s in sentences if not s.is_bullet and not s.modality and not s.section]
     return prose[0].text if prose else (sentences[0].text if sentences else "")
@@ -154,13 +173,26 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
             qw[t.quality] = s
     top = max(qw.values(), default=1)
     qualities = {q: round(min(1.0, 0.4 + 0.6 * w / top), 2) for q, w in qw.items()}
-    constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low)}
+    h1 = next((l.lstrip("# ").strip() for l in text.splitlines() if l.startswith("# ")), "")
+    constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low + " " + h1.lower())}
+    low_stated = (h1 + " " + " ".join(s.text for s in sentences if s.section != "nongoal" and not s.assumed)).lower()
+    stated_constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low_stated)}
+    if "cli_tool" in active:
+        stated_constraints.add("cli_tool")
+    # derived tokens: a stated durability/consistency need or an availability target rules out volatile options
+    if "durability" in qualities or "consistency" in qualities or re.search(r"\b99\.\d+\s*%", low) or re.search(r"never (?:be )?lost|must never|double[- ]pay|exactly once|at[- ]least[- ]once", low):
+        constraints.add("durable_required")
     languages = [tok for rx, tok in K.LANGUAGE_TOKENS if re.search(rx, low)]
-    if "go" not in languages and re.search(r"(?<![A-Za-z])Go(?=[,./)]|\s+(?:\d|backend|service|binary|module|\+|and\b|for the\b|on\b|$))", text, re.M) \
-            and not re.search(r"\bGo (?:to|for|through|live|back|ahead|down|up|into|out|over|with|the|a|an)\b", text):
+    if "go" not in languages and re.search(r"(?<![A-Za-z])Go(?=[,./)]|\s+(?:\d|backend|service|services|binary|module|\+|and\b|for (?:services|the backend|apis|microservices)\b|on\b|$))", text, re.M) \
+            and not re.search(r"\bGo (?:to|through|live|back|ahead|down|up|into|out|over|with|the|a|an)\b", text) \
+            and not re.search(r"\bGo for (?:it|the|a|an)\b", text) or re.search(r"\bGo for (?:services|the backend|apis|microservices|the api|everything)\b", text):
         languages.append("go")
     m = _TEAM_RE.search(text)
     team = int(next(g for g in m.groups() if g)) if m else None
+    if team is None:
+        mn = _TEAM_NAMES_RE.search(text)
+        if mn:
+            team = 1 + len(re.findall(r"(?:\+|,|\band\b|&)\s*[A-Z][a-z]+", mn.group(0)))
     team_bad = None
     if team is not None and not (1 <= team <= 500):
         team_bad, team = team, None
@@ -172,15 +204,26 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
     unrec: list[ReqUnit] = []
     non_goals = [s.text for s in sentences if s.section == "nongoal"]
     candidates = [s for s in sentences if s.section != "nongoal" and not s.assumed]
-    structured = any(s.is_bullet or s.modality or s.section in ("functional", "nonfunctional", "constraint") for s in candidates)
+    structured = any(s.is_bullet or s.section in ("functional", "nonfunctional", "constraint") for s in candidates)
     # a one-liner or a paragraph with no bullets and no modal words: every sentence is a requirement
     prose_only = not structured and bool(candidates)
     n = 0
+    dropped: list[tuple[str, str]] = []
     for s in sentences:
         if s.section == "nongoal":
             continue
-        is_req = s.is_bullet or bool(s.modality) or s.section in ("functional", "nonfunctional", "constraint") or (prose_only and not s.assumed) or s.assumed
+        strong_modal = bool(s.modality) and not (s.intro and s.modality == "should")   # "needs" in an introduction is scene-setting
+        is_req = s.is_bullet or strong_modal or s.section in ("functional", "nonfunctional", "constraint") or (prose_only and not s.assumed) or s.assumed
+        if not is_req and s.section != "background" and not s.intro:
+            # prose in a structured document: a use case (actor as subject + verb) or a stated target (bounded number) is a requirement
+            if len(s.words) >= 5 and _looks_like_requirement(s):
+                is_req = True
+        if is_req and not s.is_bullet and not s.assumed and len(s.words) < 5 and not s.quantities:
+            is_req = False          # "Today we agree scope." — too short to be a requirement
         if not is_req:
+            why = "background/summary prose" if s.section == "background" else "introduction before the first heading" if s.intro else "prose without an actor-verb shape, a number target or a modal word"
+            if len(s.words) >= 3:
+                dropped.append((s.text, why))
             continue
         sq = _sentence_qualities(s)
         kind = _kind(s, sq)
@@ -218,8 +261,13 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
         assumptions.append("Japanese words the glossary does not know were dropped: " + ", ".join(f"「{w}」" for w in sorted(set(norm.untranslated))) + ".")
     if prose_only:
         assumptions.append("No bullets, headings or modal words: every sentence of the text was taken as a requirement.")
+    if dropped:
+        assumptions.append(f"{len(dropped)} sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.")
     for n in structure.notes:
         if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without")):
             assumptions.append("Structure: " + n + ".")
-    return Analysis(T.title_of(text), _summary(sentences), non_goals, sentences, reqs, active, qualities, constraints,
-                    languages, team, actors, unrec, assumptions, norm, structure)
+    an = Analysis(T.title_of(text), _summary(sentences), non_goals, sentences, reqs, active, qualities, constraints,
+                  languages, team, actors, unrec, assumptions, norm, structure)
+    an.dropped = dropped
+    an.stated_constraints = stated_constraints | {c for c in constraints if c == "durable_required"}
+    return an

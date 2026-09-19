@@ -81,9 +81,13 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - **R-2**: The service validates readings, drops duplicates, and stores them.
 - **R-3**: Fleet managers view the latest reading per truck and a 24-hour chart per sensor.
 
+### Assumptions made
+
+- 1 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
-- D-1 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
+- D-1 Caller authentication: **API keys per customer, hashed at rest, sent as a bearer token**
 - D-2 Primary store: **PostgreSQL**
 - D-3 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-4 Work queue technology: **Managed broker (SQS/RabbitMQ/Kafka)**
@@ -105,7 +109,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
 - Quality attributes (weight): consistency 0.6, durability 1.0, performance 0.9, availability 0.9, operability 0.8, simplicity 0.7
-- Constraint tokens: broker, containers, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
+- Constraint tokens: broker, containers, durable_required, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -129,3 +133,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-18 | constraint | must | auth | security | — |
 | R-19 | constraint | must | — | — | — |
 | R-20 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Trucks send sensor readings to a central service that keeps the fleet manager in” (introduction before the first heading)

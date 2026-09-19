@@ -37,14 +37,13 @@ _version 0.1.0 · schema sekkei/1_
 | R-13 | constraint | must | Employees authenticate through the company SSO (OIDC). | — |
 | R-14 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-15 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-16 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
-| R-17 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
-| R-18 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
-| R-19 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
-| R-20 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
-| R-21 | constraint | must | Deployed as stateless containers behind an ingress (assumed by the engine). | — |
-| R-22 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
-| R-23 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
+| R-16 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
+| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-19 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-20 | constraint | must | Deployed as stateless containers behind an ingress (assumed by the engine). | — |
+| R-21 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
+| R-22 | constraint | must | No existing data or system to migrate from (assumed by the engine). | — |
 
 ## Components
 
@@ -94,7 +93,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-11, R-19
+- **satisfies**: R-11, R-18
 
 ### C-2 — Email provider
 
@@ -118,7 +117,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
 - **requires**: I-1, I-6, I-9, I-3, I-11, I-5
-- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-22, R-23
+- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-21, R-22
 
 ### C-5 — Notifier
 
@@ -134,7 +133,7 @@ graph LR
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
 - **provides**: I-6
 - **requires**: —
-- **satisfies**: R-17, R-20
+- **satisfies**: R-16, R-19
 
 ### C-7 — Authentication
 
@@ -158,7 +157,7 @@ graph LR
 - **responsibility**: Read-through cache with TTL and explicit invalidation.
 - **provides**: I-9
 - **requires**: —
-- **satisfies**: R-5, R-8, R-9, R-16
+- **satisfies**: R-5, R-8, R-9
 
 ### C-10 — Search index
 
@@ -166,7 +165,7 @@ graph LR
 - **responsibility**: Full-text and filtered queries over the indexed entities.
 - **provides**: I-10
 - **requires**: I-1
-- **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9, R-16
+- **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
 
 ### C-11 — Model server
 
@@ -206,7 +205,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
 - **requires**: I-4, I-6, I-7, I-8, I-10
-- **satisfies**: R-1, R-10, R-8, R-9, R-16, R-18, R-21
+- **satisfies**: R-1, R-10, R-8, R-9, R-17, R-20
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -257,21 +256,13 @@ graph LR
 |---|---|---|---|---|
 | `get_summary` | `summary`: Summary \| id | Summary \| None | ValidationError, NotFound | — |
 | | from R-1: Employees must find internal documents quickly and get a short summary without opening the | | | |
-| `open_summary` | `summary`: Summary \| id | Summary \| None | ValidationError, NotFound | — |
-| | from R-1: Employees must find internal documents quickly and get a short summary without opening the | | | |
 | `upload_pdf` | `pdf`: Pdf \| id | Pdf \| None | ValidationError, NotFound | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
 | `tag_team` | `team`: Team \| id | Team \| None | ValidationError, NotFound | stated values: 20 MB (R-2) |
 | | from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team. | | | |
 | `extract_text` | `text`: Text \| id | Text \| None | ValidationError, NotFound | — |
 | | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
-| `split_chunks` | `chunks`: Chunks \| id | Chunks \| None | ValidationError, NotFound | — |
-| | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
-| `compute_embeddings` | `embeddings`: Embeddings \| id | Embeddings \| None | ValidationError, NotFound | — |
-| | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
 | `index_semantic` | `semantic`: Semantic \| id | Semantic \| None | ValidationError, NotFound | — |
-| | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
-| `search_semantic` | `semantic`: Semantic \| id | Semantic \| None | ValidationError, NotFound | — |
 | | from R-3: The system extracts the text, splits it into chunks, computes embeddings and indexes them | | | |
 | `search_natural-language` | `natural-language`: Natural-language \| id | Natural-language \| None | ValidationError, NotFound | — |
 | | from R-4: Employees search with a natural-language query and get the ten best passages with links to | | | |
@@ -282,8 +273,6 @@ graph LR
 | `generate_summary` | `summary`: Summary \| id | Summary \| None | ValidationError, NotFound | — |
 | | from R-5: For each result the system generates a three-sentence summary with an LLM and caches it. | | | |
 | `delete_documents` | `documents`: Documents \| id | Documents \| None | ValidationError, NotFound | — |
-| | from R-6: Team leads can delete documents; deleted documents disappear from search results within on | | | |
-| `search_results` | `results`: Results \| id | Results \| None | ValidationError, NotFound | — |
 | | from R-6: Team leads can delete documents; deleted documents disappear from search results within on | | | |
 
 ### I-5 — Notifier interface
@@ -408,8 +397,6 @@ graph LR
 | | from R-4: Employees search with a natural-language query and get the ten best passages with links to | | | |
 | `DELETE /documents/{id}` | `id`: str | 204 | 401 unauthenticated, 404 unknown id | — |
 | | from R-6: Team leads can delete documents; deleted documents disappear from search results within on | | | |
-| `GET /results` | `filter`: query, `page`: cursor | 200 [results], next cursor | 401 unauthenticated | — |
-| | from R-6: Team leads can delete documents; deleted documents disappear from search results within on | | | |
 
 ## Entities
 
@@ -524,7 +511,7 @@ sequenceDiagram
   - + flexible queries
   - − complexity budget for a small team
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). REST/JSON over HTTP: 1.44; gRPC: 1.34; GraphQL: 1.17
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). REST/JSON over HTTP: 1.42; gRPC: 1.28; GraphQL: 1.14
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
@@ -562,7 +549,9 @@ _Affects:_ C-15
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 3.32; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). PostgreSQL: 3.30; SQLite: 1.61; Files: 1.16; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); In-memory: unavailable (ruled out by postgres). stated in the constraints
+
+**Consequences.** Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'Files' gives up: no dependencies, human readable.
 
 _Affects:_ C-1
 
@@ -588,7 +577,7 @@ _Affects:_ C-1
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.27; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.28; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -605,7 +594,7 @@ _Affects:_ C-7
   - + no staleness
   - − hot rows become the bottleneck
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Read-through cache with TTL and explicit invalid: 1.61; No cache: 1.54
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Read-through cache with TTL and explicit invalid: 1.56; No cache: 1.56
 
 **Consequences.** Not choosing 'No cache; rely on database indexes' gives up: no staleness.
 
@@ -629,7 +618,7 @@ _Affects:_ C-9
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). One image, role by flag: `api` and `worker` proc: 2.07; Separate services per concern: 1.78; Single process with background threads: 1.41
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). One image, role by flag: `api` and `worker` proc: 2.10; Separate services per concern: 1.81; Single process with background threads: 1.42
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
@@ -653,7 +642,7 @@ _Affects:_ C-15, C-12
   - − memory bound
   - − rebuild on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). pgvector in PostgreSQL: 2.71; In-process index: 1.61; Dedicated vector database: 1.34. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). pgvector in PostgreSQL: 2.70; In-process index: 1.56; Dedicated vector database: 1.28. stated in the constraints
 
 **Consequences.** Not choosing 'In-process index' gives up: fast, no service. Not choosing 'Dedicated vector database' gives up: scales to hundreds of millions of vectors.
 
@@ -679,7 +668,7 @@ _Affects:_ C-10, C-1
   - − a second store and a pipeline
   - − eventual consistency
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Materialised aggregates built by a scheduled job: 1.83; Read replica queried directly: 1.56; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Materialised aggregates built by a scheduled job: 1.82; Read replica queried directly: 1.54; Columnar analytics store: unavailable (needs clickhouse, not in the constraints)
 
 **Consequences.** Not choosing 'Read replica queried directly' gives up: fresh, no aggregate design.
 
@@ -703,7 +692,7 @@ _Affects:_ C-14, C-1
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). Two or more interchangeable instances per role b: 1.68; Active-active across two regions: 1.41; Single instance with health-based restart: 1.27
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), availability (weight 0.9). Two or more interchangeable instances per role b: 1.70; Active-active across two regions: 1.42; Single instance with health-based restart: 1.28
 
 **Consequences.** Not choosing 'Active-active across two regions' gives up: survives a regional outage. Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
@@ -723,21 +712,7 @@ _Affects:_ C-15
 
 _Affects:_ C-15
 
-### D-10 — Assumed answer: load (Q-rate) (proposed)
-
-**Context.** The requirements do not say. Question: Q-rate. No evidence in the text; engine default.
-
-- ✔ **100 requests/s**
-- ✘ **10 requests/s**
-- ✘ **1,000 requests/s**
-
-**Rationale.** No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.
-
-**Consequences.** If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.
-
-_Affects:_ C-15
-
-### D-11 — Assumed answer: quality (Q-availability) (proposed)
+### D-10 — Assumed answer: quality (Q-availability) (proposed)
 
 **Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
 
@@ -751,7 +726,7 @@ _Affects:_ C-15
 
 _Affects:_ C-6
 
-### D-12 — Assumed answer: data (Q-retention) (proposed)
+### D-11 — Assumed answer: data (Q-retention) (proposed)
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
@@ -765,7 +740,7 @@ _Affects:_ C-6
 
 _Affects:_ C-13, C-1
 
-### D-13 — Assumed answer: data (Q-backup) (proposed)
+### D-12 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -779,7 +754,7 @@ _Affects:_ C-13, C-1
 
 _Affects:_ C-1
 
-### D-14 — Assumed answer: security (Q-authz) (proposed)
+### D-13 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -793,7 +768,7 @@ _Affects:_ C-1
 
 _Affects:_ C-4, C-7
 
-### D-15 — Assumed answer: resilience (Q-external) (proposed)
+### D-14 — Assumed answer: resilience (Q-external) (proposed)
 
 **Context.** The requirements do not say. Question: Q-external. No evidence in the text; engine default.
 
@@ -807,7 +782,7 @@ _Affects:_ C-4, C-7
 
 _Affects:_ C-12
 
-### D-16 — Assumed answer: cost (Q-budget) (proposed)
+### D-15 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -819,7 +794,7 @@ _Affects:_ C-12
 
 **Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
-### D-17 — Assumed answer: data (Q-migration) (proposed)
+### D-16 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
 
@@ -831,7 +806,7 @@ _Affects:_ C-12
 
 **Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
 
-### D-18 — Assumed answer: operations (Q-alerting) (proposed)
+### D-17 — Assumed answer: operations (Q-alerting) (proposed)
 
 **Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
 
@@ -928,11 +903,11 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Rate limiter: Per-principal or per-key request budgets with a sliding window.
 
 - **components**: C-1, C-6, C-8 · **implements**: I-1, I-6, I-8
-- **depends on**: — · **satisfies**: R-11, R-17, R-19, R-20
+- **depends on**: — · **satisfies**: R-11, R-16, R-18, R-19
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`, `app/ratelimit.py`, `tests/test_ratelimit.py`
 - **acceptance**:
   - A-3 (test) unit tests of Store, Observability, Rate limiter pass — `python -m pytest -q tests/test_store.py tests/test_observability.py tests/test_ratelimit.py`
-  - A-4 (metric) R-17: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-17
+  - A-4 (metric) R-16: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-16
 - **notes**: family: infra
 
 ### WP-3 — Cache (S)
@@ -940,7 +915,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 Implement Cache: Read-through cache with TTL and explicit invalidation.
 
 - **components**: C-9 · **implements**: I-9
-- **depends on**: — · **satisfies**: R-5, R-8, R-9, R-16
+- **depends on**: — · **satisfies**: R-5, R-8, R-9
 - **write scope**: `app/cache.py`, `tests/test_cache.py`
 - **acceptance**:
   - A-5 (test) unit tests of Cache pass — `python -m pytest -q tests/test_cache.py`
@@ -998,7 +973,7 @@ Implement Reporting: Builds read models and aggregates (daily/weekly figures, KP
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
 - **components**: C-10 · **implements**: I-10
-- **depends on**: WP-2 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9, R-16
+- **depends on**: WP-2 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
   - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
@@ -1011,7 +986,7 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-22, R-23
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
@@ -1033,7 +1008,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-16, R-18, R-21
+- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-20
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
@@ -1060,14 +1035,13 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 | R-13 | must | C-7 | WP-5 | A-10 |
 | R-14 | must | C-12, C-13 | WP-5, WP-10 | A-10, A-17 |
 | R-15 | could | C-7 | WP-5 | A-10 |
-| R-16 | must | C-9, C-10, C-15 | WP-3, WP-8, WP-11 | A-5, A-6, A-7, A-13, A-14, A-15, A-18, A-19, A-20 |
-| R-17 | must | C-6 | WP-2 | A-3, A-4 |
-| R-18 | should | C-15 | WP-11 | A-18, A-19, A-20 |
-| R-19 | should | C-1 | WP-2 | A-3, A-4 |
-| R-20 | must | C-6 | WP-2 | A-3, A-4 |
-| R-21 | must | C-15 | WP-11 | A-18, A-19, A-20 |
+| R-16 | must | C-6 | WP-2 | A-3, A-4 |
+| R-17 | should | C-15 | WP-11 | A-18, A-19, A-20 |
+| R-18 | should | C-1 | WP-2 | A-3, A-4 |
+| R-19 | must | C-6 | WP-2 | A-3, A-4 |
+| R-20 | must | C-15 | WP-11 | A-18, A-19, A-20 |
+| R-21 | must | C-4 | WP-9 | A-16 |
 | R-22 | must | C-4 | WP-9 | A-16 |
-| R-23 | must | C-4 | WP-9 | A-16 |
 
 ## Conventions
 

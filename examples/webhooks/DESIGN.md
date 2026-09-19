@@ -825,9 +825,9 @@ _Affects:_ C-18
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.13; Redis Streams with consumer groups: 1.81; In-memory queue: 1.36; Managed broker: unavailable (needs broker, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 3.13; Redis Streams with consumer groups: 1.81; Managed broker: unavailable (needs broker, not in the constraints); In-memory queue: unavailable (ruled out by durable_required, containers, multi_instance). stated in the constraints
 
-**Consequences.** Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.
+**Consequences.** Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists.
 
 _Affects:_ C-2, C-18, C-13
 
@@ -846,9 +846,9 @@ _Affects:_ C-2, C-18, C-13
   - + no store
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.91; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.91; Redis sorted set keyed by due time: 1.49; In-process timers: unavailable (ruled out by durable_required, containers, multi_instance)
 
-**Consequences.** Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.
+**Consequences.** Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries.
 
 _Affects:_ C-14, C-2
 

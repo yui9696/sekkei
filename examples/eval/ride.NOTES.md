@@ -32,10 +32,19 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | implied update rate | 400/s | count ÷ interval | 2,000 online (R-7) ÷ every 5 s (R-3) |
 | implied updates per day | 34.56 M | implied rate × 86,400 s | 2,000 online (R-7) ÷ every 5 s (R-3) |
 | storage growth per day (updates) | 70.78 GB | implied rate × 86,400 × record size | 2,000 online (R-7) ÷ every 5 s (R-3); 2 KB stated in R-14 |
+| updates per day | 34.56 M | rate × 86,400 s | 400 (R-13) |
+| storage growth per day (updates) | 70.78 GB | rate × 86,400 × record size | 400 (R-13); 2 KB stated in R-14 |
+| storage after 30 days (updates) | 2.12 TB | daily growth × 30 | same inputs |
+| backlog after a 1 h downstream outage | 1.44 M updates | rate × outage seconds | 400 (R-13); outage length assumed |
+| concurrent handlers to sustain the rate (updates) | 80 | Little's law: rate × mean service time | 400 (R-13); mean service time assumed 200 ms |
+| in-flight items at the latency target | 800 | rate × latency target (Little's law upper bound) | 400 (R-13) × 2 s (R-7) |
 | concurrent handlers at the stated peak (updates) | 800 | Little's law: peak rate × mean service time | 4,000 (R-13); mean service time assumed 200 ms |
 | number of concurrent | 300 | stated | 300 concurrent (R-7) |
+| average rate per concurrent (if evenly spread) | 1.33/s | rate ÷ count | 400 ÷ 300 |
 | number of online | 2 k | stated | 2,000 online (R-7) |
+| average rate per online (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
 | number of online | 2 k | stated | 2,000 online (R-13) |
+| average rate per online (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
 
 - Assumption: Record size: 2 KB stated in R-14.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -76,6 +85,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - **R-5**: Riders can rate a trip and see their trip history; operators can view all active trips on a dashboard.
 - **R-6**: Operators receive an alert when no driver accepts a request within 2 minutes.
 
+### Assumptions made
+
+- 1 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
@@ -96,7 +109,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: observability, auth, batch_pipeline, geo, realtime, payments
 - Quality attributes (weight): consistency 0.57, durability 1.0, performance 0.83, availability 0.83, operability 0.74, simplicity 0.8
-- Constraint tokens: containers, idp, nightly_batch, postgres, redis, single_region; languages: go; team: 4
+- Constraint tokens: containers, durable_required, idp, nightly_batch, postgres, redis, single_region; languages: go; team: 4
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -112,10 +125,14 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-10 | constraint | must | geo | simplicity | — |
 | R-11 | constraint | must | auth | security | — |
 | R-12 | functional | must | batch_pipeline | operability, compliance | — |
-| R-13 | nonfunctional | must | — | performance | sustained rate at 2,000, 5 s 4000 updates /s |
+| R-13 | nonfunctional | must | — | performance | sustained rate at 4,000, 2,000, 5 s 400 updates /s |
 | R-14 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
 | R-15 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
 | R-16 | nonfunctional | should | — | — | time at 4 h 24 h |
 | R-17 | nonfunctional | should | — | durability | time at 5 10 s |
 | R-18 | constraint | must | — | — | — |
 | R-19 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “A city taxi cooperative needs a backend that matches ride requests to nearby dri” (introduction before the first heading)

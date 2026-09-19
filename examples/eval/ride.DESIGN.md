@@ -33,7 +33,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-10 | constraint | must | Go 1.22, PostgreSQL with PostGIS available, Redis available. Team of 4. Kubernetes cluster in a single region. | — |
 | R-11 | constraint | must | Riders and drivers authenticate with the company's OIDC provider; operators use the same provider with an operator role. | — |
 | R-12 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
-| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)). | sustained rate at 2,000, 5 s 4000 updates /s |
+| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)). | sustained rate at 4,000, 2,000, 5 s 400 updates /s |
 | R-14 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
 | R-15 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
 | R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
@@ -216,20 +216,14 @@ graph LR
 |---|---|---|---|---|
 | `request_ride` | `ride`: Ride \| id | Ride \| None | ValidationError, NotFound | — |
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
-| `offer_location` | `location`: Location \| id | Location \| None | ValidationError, NotFound | — |
-| | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
 | `accept_offer` | `offer`: Offer \| id | Offer \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
 | `decline_offer` | `offer`: Offer \| id | Offer \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
-| | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `offer_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
 | `send_position` | `position`: Position \| id | Position \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `get_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `compute_fare` | `fare`: Fare \| id | Fare \| None | ValidationError, NotFound | — |
-| | from R-4: The system computes the fare from distance and time at the end of the trip and charges the | | | |
 | `charge_rider` | `rider`: Rider \| id | Rider \| None | ValidationError, NotFound | — |
 | | from R-4: The system computes the fare from distance and time at the end of the trip and charges the | | | |
 | `rate_trip` | `trip`: Trip \| id | Trip \| None | ValidationError, NotFound | — |
@@ -383,15 +377,6 @@ Domain entity named in the requirements ('trip'); confirm the fields.
 ### E-4 — Ride (owner C-1)
 
 Domain entity named in the requirements ('ride'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-5 — Location (owner C-1)
-
-Domain entity named in the requirements ('location'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|

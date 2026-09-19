@@ -40,8 +40,8 @@ def _max_count(an: Analysis) -> float:
 
 def answer(q: Question, an: Analysis) -> Answer | None:
     cli = "cli_tool" in an.patterns or "no_network" in an.constraints
-    internal_users = _has(an, r"\bstaff\b|\bemployees?\b|\bmanagers?\b|\binternal\b|\bcompany\b")
-    external_users = _has(an, r"\bcustomers?\b|\bvisitors?\b|\bsubscribers?\b|\bclients?\b|\bpublic\b")
+    internal_users = _has(an, r"\bstaff\b|\bemployees?\b|\bmanagers?\b|\binternal\b|\bcompany\b|\btraders?\b|\brisk officers?\b|\bcompliance\b|\banalysts?\b|\beditors?\b|\bnurses?\b|\bdoctors?\b|\bphysicians?\b|\binspectors?\b|\boperators?\b|\bdesk\b|\bthe bank\b|\bour (?:team|engineers|analysts)\b")
+    external_users = _has(an, r"\bcustomers?\b|\bvisitors?\b|\bsubscribers?\b|\bpublic (?:api|users?|site|website|internet|portal)\b|\bthe public\b")
     big = _max_count(an) >= 10000
     durable = "durability" in an.qualities or "consistency" in an.qualities
     A = Answer

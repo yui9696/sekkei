@@ -937,7 +937,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 24-hour (R-3)",
           "post": "",
           "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
         },
@@ -955,7 +955,7 @@
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 24-hour (R-3)",
           "post": "",
           "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
         },
@@ -996,15 +996,15 @@
           "description": "from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV"
         },
         {
-          "name": "export_sftp",
+          "name": "export_server",
           "inputs": [
             {
-              "name": "sftp",
-              "type": "Sftp | id",
+              "name": "server",
+              "type": "Server | id",
               "description": ""
             }
           ],
-          "output": "Sftp | None",
+          "output": "Server | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1368,7 +1368,7 @@
             "401 unauthenticated",
             "404 unknown id"
           ],
-          "pre": "",
+          "pre": "stated values: 24-hour (R-3)",
           "post": "",
           "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
         }
@@ -1762,9 +1762,9 @@
           ]
         }
       ],
-      "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.29; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
-      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "choice": "API keys per customer, hashed at rest, sent as a bearer token",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)",
+      "consequences": "Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
       ],
@@ -1944,7 +1944,7 @@
         }
       ],
       "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 1.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s). stated in the constraints",
       "consequences": "",
       "affects": [
         "C-2"
@@ -2723,7 +2723,7 @@
           "id": "A-7",
           "description": "unit tests of Readings processor pass",
           "kind": "test",
-          "command": "./gradlew test --tests app.Readings_processorTest",
+          "command": "./gradlew test --tests app.ReadingsProcessorTest",
           "metric": ""
         }
       ],
@@ -2804,7 +2804,7 @@
           "id": "A-10",
           "description": "unit tests of MQTT consumer pass",
           "kind": "test",
-          "command": "./gradlew test --tests app.Mqtt_consumerTest",
+          "command": "./gradlew test --tests app.MqttConsumerTest",
           "metric": ""
         }
       ],
@@ -2920,7 +2920,7 @@
           "id": "A-14",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
-          "command": "./gradlew test --tests app.Surface_apiTest",
+          "command": "./gradlew test --tests app.SurfaceApiTest",
           "metric": ""
         },
         {

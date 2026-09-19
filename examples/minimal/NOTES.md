@@ -119,7 +119,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: async_delivery, notification, import_export, auth, audit_log, batch_pipeline
 - Quality attributes (weight): durability 1.0, performance 1.0, availability 1.0, operability 0.88, scalability 0.88, simplicity 0.8, compliance 0.76
-- Constraint tokens: containers, multi_instance, nightly_batch, postgres; languages: python; team: 2
+- Constraint tokens: containers, durable_required, multi_instance, nightly_batch, postgres; languages: python; team: 2
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|

@@ -48,6 +48,7 @@ class Notes:
     analysis_md: str = ""
     normalisation_md: str = ""
     structure_md: str = ""
+    text_questions: list[str] = field(default_factory=list)   # TODOs / open questions lifted from the text
     sections: list[str] = field(default_factory=list)
     answers: list[Answer] = field(default_factory=list)
     placements_md: str = ""
@@ -119,6 +120,8 @@ def structure_markdown(an: Analysis, eff: Effort) -> str:
         s.append("- **Tentative sentences** (kept at priority *could*): " + "; ".join(t[:70] for t in st.tentative))
     if st.alternatives:
         s.append("- **Alternatives the text already rejected** (recorded as rejected decisions): " + "; ".join(a[:70] for a in st.alternatives))
+    if an.dropped:
+        s.append("- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): " + "; ".join(f"“{t[:80]}” ({w})" for t, w in an.dropped[:12]) + (f"; … {len(an.dropped) - 12} more" if len(an.dropped) > 12 else ""))
     folded = [n for n in st.notes if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without", "front matter", "metadata", "list intro", "speaker", "checked", "nested"))]
     if folded:
         s.append("- **Structure folded by the engine**: " + "; ".join(folded))
@@ -152,5 +155,5 @@ def notes(design: Design, an: Analysis, review: Review, answers: list[Answer] | 
     eff = effort(design, an)
     return Notes(review, questions(an), capacity(an), eff, threats_markdown(design), analysis_markdown(an),
                  normalisation_md=an.normalisation.to_markdown() if an.normalisation else "",
-                 structure_md=structure_markdown(an, eff),
+                 structure_md=structure_markdown(an, eff), text_questions=list(an.structure.todos) if an.structure else [],
                  answers=list(answers or []), placements_md=placements_markdown(placements, design) if placements else "")

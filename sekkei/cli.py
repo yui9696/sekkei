@@ -406,11 +406,16 @@ def cmd_deliver(args: argparse.Namespace) -> int:
         return 1
     pk = DV.package(result, prices)
     out = Path(args.output)
+    foreign = [p.name for p in out.iterdir() if p.is_file() and p.name != DV.MANIFEST] if out.is_dir() and not (out / DV.MANIFEST).exists() else []
     try:
         written = pk.write(out)
     except OSError as exc:
         print(f"error: cannot write to {out}: {exc}", file=sys.stderr)
         return 1
+    if foreign:
+        print(f"note: {out} already held {len(foreign)} file(s) not written by sekkei; they were left alone (e.g. {foreign[0]})")
+    if getattr(pk, "removed_stale", []):
+        print(f"note: removed {len(pk.removed_stale)} stale file(s) from the previous deliver (e.g. {pk.removed_stale[0]})")
     print(f"wrote {len(written)} files to {out}/ ({len(result.design.components)} components, {len(result.design.decisions)} decisions, "
           f"{sum(1 for n in pk.files if n.startswith('adr/'))} ADRs, {len(result.design.risks)} risks)")
     if not result.ok:

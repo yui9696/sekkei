@@ -77,6 +77,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - **R-3**: Employees can take tests. Employees can view explanations grades immediately.
 
+### Assumptions made
+
+- 2 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 API style: **REST/JSON over HTTP**
@@ -99,7 +103,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: crud_api, notification, observability, auth, search, file_storage, scheduler_jobs, audit_log, import_export, media, i18n
 - Quality attributes (weight): consistency 0.83, durability 1.0, performance 0.83, availability 0.83, operability 1.0, scalability 0.57, simplicity 0.8, compliance 0.66
-- Constraint tokens: containers, idp, object_storage, postgres; languages: typescript; team: 4
+- Constraint tokens: containers, durable_required, idp, object_storage, postgres; languages: typescript; team: 4
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -124,6 +128,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-19 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-20 | constraint | must | — | — | — |
 | R-21 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Employees can take video courses.” (introduction before the first heading); “Managers can track tests and progress system. Japanese English.” (introduction before the first heading)
 
 ## 7. Input normalisation (Japanese → canonical English)
 

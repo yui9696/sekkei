@@ -486,9 +486,7 @@ sequenceDiagram
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.15; In-memory queue: 1.41; Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); Managed broker: unavailable (needs broker, not in the constraints)
-
-**Consequences.** Not choosing 'In-memory queue' gives up: simplest possible.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.15; Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); Managed broker: unavailable (needs broker, not in the constraints); In-memory queue: unavailable (ruled out by durable_required)
 
 _Affects:_ C-2, C-11
 
@@ -507,9 +505,7 @@ _Affects:_ C-2, C-11
   - + no store
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). not_before column on the work item: 2.01; In-process timers: 1.41; Redis sorted set keyed by due time: unavailable (needs redis, not in the constraints)
-
-**Consequences.** Not choosing 'In-process timers' gives up: no store.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). not_before column on the work item: 2.01; Redis sorted set keyed by due time: unavailable (needs redis, not in the constraints); In-process timers: unavailable (ruled out by durable_required)
 
 _Affects:_ C-12, C-2
 
@@ -587,7 +583,9 @@ _Affects:_ C-6
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 3.56; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 2.56; SQLite: 1.69; In-memory: 1.29; Files: 1.11; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints)
+
+**Consequences.** Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'In-memory' gives up: fastest, trivial.
 
 _Affects:_ C-1
 

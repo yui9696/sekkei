@@ -84,6 +84,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - **R-1**: Patients departments choose doctors. The system can register, change and cancel available slots from appointments.
 - **R-2**: Staff can accept and register bookings patients. Staff can view bookings list the same day departments each.
 
+### Assumptions made
+
+- 1 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 API style: **REST/JSON over HTTP**
@@ -107,7 +111,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: crud_api, notification, observability, auth, search, batch_pipeline, scheduler_jobs, sms_notification, audit_log, compliance_data, legacy_integration
 - Quality attributes (weight): consistency 0.76, durability 0.64, performance 1.0, availability 1.0, security 0.76, operability 1.0, simplicity 0.88, compliance 0.88
-- Constraint tokens: containers, idp, nightly_batch, postgres, single_region; languages: python; team: 3
+- Constraint tokens: containers, durable_required, idp, nightly_batch, postgres, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -133,6 +137,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-20 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
 | R-21 | constraint | must | — | — | — |
 | R-22 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Patients during outside mobile app from so that bookings. Accept.” (introduction before the first heading)
 
 ## 7. Input normalisation (Japanese → canonical English)
 

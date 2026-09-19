@@ -7,7 +7,7 @@ acceptance checks — **without calling a model**, then holds the line while age
 it lints the design, hands each agent a self-contained brief, refuses stale briefs, and
 checks the code against the design afterwards.
 
-Pure Python standard library, 3.11+. Deterministic: same text, same design, byte for byte.
+Pure Python standard library, 3.11+ (the optional `draft` command imports the `anthropic` SDK only when you choose that backend). Deterministic: same text, same design, byte for byte.
 
 ```
 requirements.md ──sekkei design──▶ design.json ──lint/plan──▶ brief WP-n ──(agent)──▶ accept ──▶ check
@@ -138,12 +138,21 @@ reporting every fold in the notes:
 | an RFC with Motivation / Goals / Non-goals / Requirements / Alternatives considered | background is not a requirement; a generic *Requirements* heading lets content decide functional vs non-functional; rejected alternatives become rejected decisions |
 | checkboxes, nested bullets, `3.1 性能: …` labels, front matter (author, date, version), one sentence with no structure at all | stripped / kept as their own requirement / label dropped / skipped / every sentence taken as a requirement |
 | a stated deadline (`MVP in 6 weeks`, `2027 年 3 月リリース`) | compared with the engine's own calendar estimate in the notes |
+| `Systems affected: checkout-api, ledger-service`, `Team: 5 engineers, 1 SRE`, `team is me + Lena`, an `Open questions` / `Actions` section, a `\| Field \| Value \|` header table, a glossary table | a constraint naming the existing systems; the team counted (6, 2); questions and actions lifted into the notes and counted in the summary; metadata and glossary tables skipped, not designed |
+| text pasted from a PDF (page headers repeated, lines hard-wrapped, `auto-` / `approved`) | headers and page markers dropped, wrapped lines re-joined |
 
 Eleven such specifications (Japanese RFP, Jira export, Slack notes, RFC, a monolith split,
 an ETL pipeline, a field app, IoT cold chain, an engineer's TODO list, a one-liner) live in
-[`examples/real/`](examples/real/); each must design lint-clean and deterministically, and a
-fuzz test mutates them (deleted, duplicated, truncated, nested and junk lines) and requires
-the same. The battery is what found most of what the structure pass now handles.
+[`examples/real/`](examples/real/), and thirteen more written by an independent reviewer
+posing as an adopting team (a Confluence design doc with a metadata table, a Jira epic whose
+stories are prose lines with Given/When/Then underneath, meeting notes with speakers, a
+Japanese 要件定義書 with a glossary table, a Slack paragraph, a brownfield change request
+naming five existing services, a PDF paste with page headers and hard wraps, a two-line
+table header, …) in [`examples/real2/`](examples/real2/). Each must design lint-clean and
+deterministically, a fuzz test mutates them (deleted, duplicated, truncated, nested and junk
+lines) and requires the same, and every finding of that review is a test
+([`tests/test_real2.py`](tests/test_real2.py)). The notes list every sentence the engine read
+but did not take as a requirement, and every Japanese rewrite that may have lost a negation.
 
 ## Into the tools the team already uses
 
@@ -236,11 +245,11 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 253 (incl. 11 real-world specs and a mutation fuzz) |
+| tests | 279 (incl. 11 real-world specs, 13 specs written by an independent red team, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 43 patterns, 56 archetypes, 28 decision points / 84 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
+| catalogue | 43 patterns (one more: webhook delivery split from asynchronous delivery), 56 archetypes, 28 decision points / 84 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
 | `sekkei deliver` on the SaaS fixture | 32 files (18 ADRs) in about 0.5 s |
 | `sekkei redteam` on the SaaS fixture | 18 engine runs in 1–3 s (one engine run per stated sentence, capped at 80) |
 

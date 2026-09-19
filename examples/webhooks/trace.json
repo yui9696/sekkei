@@ -26,6 +26,7 @@
   },
   "constraints": [
     "containers",
+    "durable_required",
     "multi_instance",
     "nightly_batch",
     "postgres",

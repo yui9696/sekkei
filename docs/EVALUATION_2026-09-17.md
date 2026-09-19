@@ -153,3 +153,43 @@ the honest floor for a domain the catalogue does not know.
 - The three earlier evaluation specs were re-run: ride and telemetry unchanged except one
   operation name on the engine-assumed retention bullet; document search gains a Reporting
   component for its weekly report.
+
+## Second independent red team (2026-09-19): specifications as teams write them
+
+A second reviewer, again given no conclusions, wrote six specifications the way engineering
+teams actually hand them over — a Confluence design doc with a `| Field | Value |` header
+table and a requirements table, a Jira epic export whose stories are prose lines
+(`VOD-2211 As a viewer, I want …`) with Given/When/Then beneath, meeting notes with speaker
+labels and TODOs, a Japanese 要件定義書 with a glossary table, a one-paragraph Slack message,
+and a change request against five named existing services — plus eight robustness inputs
+(PDF paste, BOM+CRLF, smart quotes, tabs, a 300-line spec, mixed Japanese/English, a
+table-only spec, a two-line table header). Its scores on the engine as it stood that
+morning were **5 / 3 / 4 / 9 / 8 / 4 out of 20**, median 5, and its verdict was that the
+team would not adopt the generator, only the checking side. The findings (five blockers):
+
+- every prose user story was silently dropped, because a document with bullets discarded
+  prose without a modal word; the pattern matcher still read the dropped text, so the design
+  had a geospatial index for a requirement it did not have;
+- `500 clip requests per second`, `400 orders per second`, `200 verifications/minute` were
+  discarded as HTTP status codes;
+- `<20ms` became 20 seconds (the `m` read as a multiplier) and `over EDI … within 15 minutes`
+  took the earlier comparator (`> 15 minutes`);
+- 「改ざん不可」 (tamper-proof) was rewritten as "allowed";
+- a change request was designed as a greenfield system and its "5. Rollout" section landed
+  in the preceding "Out of scope" section as non-goals.
+
+All of these, and the majors (metadata tables becoming components and tickets, team sizes
+read from names instead of counts, an in-memory queue for a bank OMS, "no public cloud"
+read as public users, SQLite from "offline training reads", the kill switch read as a
+feature flag, SLOs on retention periods with doubled units and a full-month window for a
+trading-hours target, a hyphen-wrapped PDF line becoming the requirement "00.", stale ADRs
+surviving a re-run, open questions dropped and reported as zero) are now regression tests
+in `tests/test_real2.py` over the reviewer's own files in `examples/real2/`. What the engine
+does differently since: prose is a requirement when it has an actor as subject and a verb or
+a bounded number; every sentence it read and did not take is listed in the notes; the
+"stated in the constraints" bonus and the exclusions count only tokens the author wrote,
+never the engine's own assumed answers; volatile options (in-memory queue, in-process
+timers) are unavailable whenever durability is required; Japanese rewrites that lose a
+negation are flagged. Not re-scored by the reviewer; the honest statement is that the
+listed failures no longer reproduce, not that the scores are now higher.
+

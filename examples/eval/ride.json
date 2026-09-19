@@ -138,8 +138,8 @@
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "sustained rate at 2,000, 5 s",
-        "target": "4000 updates /s",
+        "name": "sustained rate at 4,000, 2,000, 5 s",
+        "target": "400 updates /s",
         "unit": "updates /s"
       },
       "rationale": "assumed by the engine; confirm or override"
@@ -579,24 +579,6 @@
           "description": "from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque"
         },
         {
-          "name": "offer_location",
-          "inputs": [
-            {
-              "name": "location",
-              "type": "Location | id",
-              "description": ""
-            }
-          ],
-          "output": "Location | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque"
-        },
-        {
           "name": "accept_offer",
           "inputs": [
             {
@@ -624,24 +606,6 @@
             }
           ],
           "output": "Offer | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "offer_batch",
-          "inputs": [
-            {
-              "name": "batch",
-              "type": "Batch | id",
-              "description": ""
-            }
-          ],
-          "output": "Batch | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -685,24 +649,6 @@
           "pre": "stated values: 5 seconds (R-3)",
           "post": "",
           "description": "from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv"
-        },
-        {
-          "name": "compute_fare",
-          "inputs": [
-            {
-              "name": "fare",
-              "type": "Fare | id",
-              "description": ""
-            }
-          ],
-          "output": "Fare | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: The system computes the fare from distance and time at the end of the trip and charges the"
         },
         {
           "name": "charge_rider",
@@ -1506,26 +1452,6 @@
         }
       ],
       "description": "Domain entity named in the requirements ('ride'); confirm the fields."
-    },
-    {
-      "id": "E-5",
-      "name": "Location",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('location'); confirm the fields."
     }
   ],
   "flows": [

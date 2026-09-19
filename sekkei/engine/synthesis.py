@@ -111,7 +111,11 @@ _ENTITY_STOP = {"audit", "access", "data", "request", "requests", "log", "logs",
                 "service", "services", "batch", "csv", "json", "pdf", "team", "teams", "threshold", "minute", "minutes",
                 "second", "seconds", "time", "day", "days", "card", "call", "calls", "search", "query", "queries", "id",
                 "level", "levels", "statistic", "statistics", "offer", "offers", "provider", "providers", "server", "servers",
-                "broker", "cluster", "region", "role", "roles", "member", "members", "employee", "employees", "user", "users"}
+                "broker", "cluster", "region", "role", "roles", "member", "members", "employee", "employees", "user", "users",
+                "cloudfront", "s3", "kafka", "redis", "postgres", "postgresql", "mysql", "kubernetes", "airflow", "snowflake", "bigquery", "gcs",
+                "aws", "gcp", "azure", "docker", "python", "java", "kotlin", "go", "rust", "typescript", "previous", "next", "given", "then",
+                "platform", "platforms", "seller", "sellers", "share", "shares", "fee", "fees", "bps", "input", "inputs", "output", "outputs",
+                "credit", "credits", "account", "accounts", "tech", "player", "players", "hour", "hours", "week", "weeks", "month", "months", "year", "years"}
 
 
 def _domain_entities(an: Analysis, functional_units: list[ReqUnit]) -> list[tuple[str, list[str]]]:
@@ -142,7 +146,7 @@ def _domain_entities(an: Analysis, functional_units: list[ReqUnit]) -> list[tupl
                 attrs[noun] = fields
     merged: dict[str, int] = {}
     for n, c in counts.items():
-        base = n[:-1] if n.endswith("s") and not n.endswith("ss") else n
+        base = _singular(n)
         if base in _ENTITY_STOP or n in _ENTITY_STOP or base in T.ACTORS or n in T.ACTORS or len(base) < 3:
             continue
         merged[base] = merged.get(base, 0) + c
@@ -264,7 +268,7 @@ def _object_after(verb: str, sentence: T.Sentence) -> str:
             # verbs and fillers before the run are skipped, the run is at most two tokens long
             run: list[str] = []
             prev = w
-            for w2 in words[i + 1: i + 7]:
+            for w2 in words[i + 1: i + 9]:
                 if w2 in ("(", ")", ",", ";", ":", ".", "#"):
                     if run:
                         break
@@ -275,7 +279,8 @@ def _object_after(verb: str, sentence: T.Sentence) -> str:
                 after_det = prev in T._DETERMINERS
                 prev = w2
                 # "an offer", "the order": a lexicon verb after a determiner is the object
-                if _is_object(w2) or (after_det and T.verb_of(w2) and w2 not in T.STOPWORDS and len(w2) > 2):
+                if _is_object(w2) or (after_det and T.verb_of(w2) and w2 not in T.STOPWORDS and len(w2) > 2) \
+                        or (run and T.verb_of(w2) and w2.endswith("s") and len(w2) > 3):
                     run.append(w2)
                     if len(run) == 2:
                         break
@@ -297,6 +302,25 @@ _INTERNAL_VERBS = {"deliver", "sign", "notify", "persist", "process", "write", "
 _HTTP_ONLY_INTERNAL = {"run", "print"}  # entry points for a CLI, never HTTP operations
 
 
+_NOT_PLURAL = {"redis", "kubernetes", "previous", "status", "analysis", "basis", "bus", "campus", "census", "chassis", "corpus", "crisis",
+               "diagnosis", "focus", "gas", "lens", "news", "series", "species", "virus", "plus", "minus", "bonus", "canvas", "atlas", "alias",
+               "https", "sms", "dns", "tls", "ops", "aws", "gcs", "ios", "macos", "class", "process", "access", "address", "business", "success",
+               "always", "sometimes", "various", "serious", "obvious", "continuous", "anonymous", "famous", "less", "unless", "us", "this", "yes"}
+
+
+def _singular(n: str) -> str:
+    """'orders' -> 'order', 'entries' -> 'entry'; words that only look plural (redis, status, previous) stay."""
+    if n in _NOT_PLURAL or n.endswith(("ss", "us", "is", "ous", "ess", "ness")) or len(n) < 4:
+        return n
+    if n.endswith("ies") and len(n) > 4:
+        return n[:-3] + "y"
+    if n.endswith(("ches", "shes", "xes", "sses")):
+        return n[:-2]
+    if n.endswith("s"):
+        return n[:-1]
+    return n
+
+
 def _plural(noun: str) -> str:
     if noun.endswith("s"):
         return noun
@@ -308,14 +332,15 @@ def _plural(noun: str) -> str:
 def _actor_is_subject(s: T.Sentence) -> bool:
     """True when an actor word comes before the first verb of the sentence (it is the subject)."""
     words = s.words
-    first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))
-    for a in s.actors:
+    first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) in s.verbs and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))
+    actor_toks = {t.rstrip("s") for a in s.actors for t in a.split()}
+    for a in sorted(s.actors, key=len, reverse=True):
         toks = a.split()
         for i in range(min(first_verb, len(words))):
-            if words[i: i + len(toks)] == toks or (len(toks) == 1 and words[i].rstrip("s") == toks[0].rstrip("s")):
+            if [w.rstrip("s") for w in words[i: i + len(toks)]] == [t.rstrip("s") for t in toks]:
                 # everything before the actor must be a determiner or a plain modifier — not an imperative
                 # ("Email the customer …", "Notify operators …") and not a lexicon verb
-                before = words[:i]
+                before = [w for w in words[:i] if w.rstrip("s") not in actor_toks]
                 if any(T.verb_of(w) or w in _IMPERATIVES for w in before):
                     return False
                 return True
@@ -334,6 +359,8 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
         if not _actor_is_subject(u.sentence):
             continue  # "Email the customer …": the actor is the object; a notification, not a use case
         for v in dict.fromkeys(u.sentence.verbs):
+            if v in T.STATIVE_VERBS:
+                continue
             method, iverb = T.VERBS.get(v, ("", v))
             obj = _object_after(v, u.sentence)
             if not obj:
@@ -463,6 +490,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             rationale = (rationale + "; " if rationale else "") + "no catalogue pattern matched; owner chosen by the engine (see the notes)"
         if an.structure and u.sentence.text in an.structure.rationales:
             rationale = (rationale + "; " if rationale else "") + "so that " + an.structure.rationales[u.sentence.text]
+        if u.sentence.row_id:
+            rationale = (rationale + "; " if rationale else "") + f"source id {u.sentence.row_id}"
         if an.normalisation and u.sentence.text in an.normalisation.sources:
             rationale = (rationale + "; " if rationale else "") + "source (ja): " + an.normalisation.sources[u.sentence.text]
         d.requirements.append(Requirement(u.id, u.sentence.text, u.kind, u.priority, _metric_of(u), rationale=rationale))
@@ -561,7 +590,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         nouns = [n for u in functional_units for n in u.sentence.nouns]
         top = max(set(nouns), key=lambda n: (nouns.count(n), -nouns.index(n))) if nouns else "record"
         tmpl = K.ENTITIES["record"]
-        d.entities.append(Entity("E-1", top.capitalize().rstrip("s") or "Record", cid["store"],
+        d.entities.append(Entity("E-1", _singular(top).capitalize() or "Record", cid["store"],
                                  [FieldDef(n, t, c) for n, t, c in tmpl.fields], f"Generic record named after the most frequent noun ('{top}'); refine the fields."))
         trace["E-1"] = {"sentences": [], "rules": ["fallback:top-noun"]}
     for n, e in enumerate(ekeys, 1):
@@ -578,7 +607,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                 continue
             n += 1
             fds = [FieldDef("id", "uuid", "primary key")] + [FieldDef(re.sub(r"\s+", "_", f), "…", "from the text") for f in fields] + [FieldDef("created_at", "timestamp", "")]
-            d.entities.append(Entity(f"E-{n}", base.capitalize(), cid["store"], fds, f"Domain entity named in the requirements ('{base}'); confirm the fields."))
+            d.entities.append(Entity(f"E-{n}", "".join(p.capitalize() for p in base.split("_")), cid["store"], fds, f"Domain entity named in the requirements ('{base}'); confirm the fields."))
             trace[f"E-{n}"] = {"sentences": [], "rules": ["entity:from-text"]}
 
     # synthesised contracts: give parameters the entity type when the name matches an entity
@@ -590,7 +619,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             for o in i.operations:
                 for p in o.inputs:
                     if p.type == "…":
-                        base = p.name[:-1] if p.name.endswith("s") and not p.name.endswith("ss") else p.name
+                        base = _singular(p.name)
                         if base in ent_by_name:
                             p.type = f"list[{ent_by_name[base]}]" if p.name.endswith("s") else ent_by_name[base]
                 if o.output == "…" and o.inputs and o.inputs[0].type != "…":
@@ -642,7 +671,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         if not affects:
             continue
         forced = forced_decisions.get(dk) or forced_decisions.get(dp.title)
-        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints, forced, _peak_rate(an))
+        best, ranked, rationale, consequences = decide(dp, an.qualities, an.constraints, forced, _peak_rate(an), an.stated_constraints)
         n += 1
         chosen[dk] = best.option.name
         avail = [s for s in ranked if s.available]
@@ -738,7 +767,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         acc: list[Acceptance] = []
         acc_n += 1
         acc.append(Acceptance(f"A-{acc_n}", f"unit tests of {', '.join(c.name for c in comps)} pass",
-                              "test", layout.test_command.format(test=" ".join(tests), key=keys[0], Key=keys[0].capitalize())))
+                              "test", layout.test_command.format(test=" ".join(tests), key=keys[0], Key="".join(p.capitalize() for p in keys[0].split("_")))))
         for r in satisfies:
             req = d.requirement(r)
             if req is not None and req.kind == "nonfunctional" and req.metric and req.metric.target != "review":

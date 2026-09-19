@@ -10,15 +10,14 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | # | topic | question answered | engine's answer | basis | if the real answer differs |
 |---|---|---|---|---|---|
 | 1 | stack | Q-deploy | Stateless containers behind an existing ingress, several instances. | default — The default for a networked service; keeps instances interchangeable. | State the deployment; topology, statelessness conventions and store options change. |
-| 2 | load | Q-rate | 100 requests/s sustained, 10x at peak (engine default, not derived). | default — No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption. | State the measured or expected rate; capacity estimates and the queue decision change. |
-| 3 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
-| 4 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
-| 5 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
-| 6 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
-| 7 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
-| 8 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
-| 9 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
-| 10 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
+| 2 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
+| 3 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
+| 4 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
+| 5 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
+| 6 | resilience | Q-external | 10 s timeout, 5 retries with exponential backoff, work queued while the external system is down. | default — Bounded retries with a durable queue keep the system responsive during a one-hour outage. | State the policy; the outbound client and scheduler contracts change. |
+| 7 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
+| 8 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
+| 9 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 
 ## 1b. Requirements placed without a catalogue pattern
 
@@ -31,15 +30,14 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 8.64 M | rate × 86,400 s | 100 (R-16) |
-| storage growth per day (requests) | 181.19 TB | rate × 86,400 × record size | 100 (R-16); 20 MB stated in R-2 |
-| storage after 30 days (requests) | 5435.82 TB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-16); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-16); mean service time assumed 200 ms |
-| in-flight items at the latency target | 80 | rate × latency target (Little's law upper bound) | 100 (R-16) × 800 ms (R-8) |
-| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-16); mean service time assumed 200 ms |
+| requests per day | 86.4 k | rate × 86,400 s | 60 (R-12) |
+| storage growth per day (requests) | 1.81 TB | rate × 86,400 × record size | 60 (R-12); 20 MB stated in R-2 |
+| storage after 30 days (requests) | 54.36 TB | daily growth × 30 | same inputs |
+| backlog after a 1 h downstream outage | 3.6 k requests | rate × outage seconds | 60 (R-12); outage length assumed |
+| concurrent handlers to sustain the rate (requests) | 0.2 | Little's law: rate × mean service time | 60 (R-12); mean service time assumed 200 ms |
+| in-flight items at the latency target | 0.8 | rate × latency target (Little's law upper bound) | 60 (R-12) × 800 ms (R-8) |
 | number of documents | 50 k | stated | 50,000 documents (R-8) |
-| average rate per document (if evenly spread) | 0/s | rate ÷ count | 100 ÷ 50,000 |
+| average rate per document (if evenly spread) | 0/s | rate ÷ count | 60 ÷ 50,000 |
 
 - Assumption: Record size: 20 MB stated in R-2.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -94,15 +92,14 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-7 Where reports are computed: **Materialised aggregates built by a scheduled job into report tables in the primary database**
 - D-8 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
 - D-9 Assumed answer: stack (Q-deploy): **containers behind an ingress**
-- D-10 Assumed answer: load (Q-rate): **100 requests/s**
-- D-11 Assumed answer: quality (Q-availability): **99.9 %**
-- D-12 Assumed answer: data (Q-retention): **indefinite / 1 year**
-- D-13 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-14 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-15 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
-- D-16 Assumed answer: cost (Q-budget): **existing only**
-- D-17 Assumed answer: data (Q-migration): **greenfield**
-- D-18 Assumed answer: operations (Q-alerting): **error rate + queue growth**
+- D-10 Assumed answer: quality (Q-availability): **99.9 %**
+- D-11 Assumed answer: data (Q-retention): **indefinite / 1 year**
+- D-12 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-13 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-14 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-15 Assumed answer: cost (Q-budget): **existing only**
+- D-16 Assumed answer: data (Q-migration): **greenfield**
+- D-17 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 
 ### Notes
 
@@ -111,8 +108,8 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 ## 6. How the text was read
 
 - Patterns recognised: crud_api, notification, auth, rate_limiting, cache, search, file_storage, batch_pipeline, ml_inference, semantic_search, reporting
-- Quality attributes (weight): durability 1.0, performance 1.0, isolation 0.7, availability 0.9, operability 0.8, scalability 0.7, simplicity 0.8
-- Constraint tokens: containers, idp, multi_instance, nightly_batch, object_storage, postgres, vector_db; languages: python; team: 3
+- Quality attributes (weight): durability 1.0, performance 0.8, isolation 0.7, availability 0.9, operability 0.8, scalability 0.7, simplicity 0.8
+- Constraint tokens: containers, durable_required, idp, multi_instance, nightly_batch, object_storage, postgres, vector_db; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -131,11 +128,10 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-13 | constraint | must | auth | security | — |
 | R-14 | functional | must | batch_pipeline | operability, compliance | — |
 | R-15 | functional | could | auth | operability | — |
-| R-16 | nonfunctional | must | — | performance | sustained rate at 1,000 100 requests /s |
-| R-17 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
-| R-18 | nonfunctional | should | — | — | time at 4 h 24 h |
-| R-19 | nonfunctional | should | — | durability | time at 5 10 s |
-| R-20 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
-| R-21 | constraint | must | — | scalability | — |
+| R-16 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
+| R-17 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-18 | nonfunctional | should | — | durability | time at 5 10 s |
+| R-19 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
+| R-20 | constraint | must | — | scalability | — |
+| R-21 | constraint | must | — | — | — |
 | R-22 | constraint | must | — | — | — |
-| R-23 | constraint | must | — | — | — |

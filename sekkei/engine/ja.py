@@ -55,7 +55,7 @@ ACTORS = {
     "教師": "teachers", "講師": "teachers", "学生": "students", "生徒": "students", "受講者": "learners", "保護者": "guests",
     "ドライバー": "drivers", "運転手": "drivers", "乗客": "passengers", "配送員": "drivers", "配達員": "drivers",
     "訪問者": "visitors", "ゲスト": "guests", "閲覧者": "readers", "読者": "readers", "編集者": "editors", "著者": "authors",
-    "審査者": "reviewers", "承認者": "managers", "申請者": "requesters", "市民": "citizens", "住民": "citizens", "経理": "accounting staff",
+    "主治医": "attending physicians", "看護師": "nurses", "患者本人": "patients", "審査者": "reviewers", "承認者": "managers", "申請者": "requesters", "市民": "citizens", "住民": "citizens", "経理": "accounting staff",
     "経理担当": "accounting staff", "情シス": "it staff", "総務": "staff", "人事": "hr staff", "営業": "sales staff", "店舗オーナー": "store owners", "オーナー": "owners",
     "外部サービス": "external services", "外部システム": "external services", "内部サービス": "internal services",
     "他システム": "external services", "連携先": "external services", "基幹システム": "external services",
@@ -136,6 +136,16 @@ NOUNS = {
     "状態": "state", "ステータス": "status", "進捗": "progress", "タスク": "tasks", "プロジェクト": "projects", "マイルストーン": "milestones",
     "モデル": "model", "埋め込み": "embeddings", "要約": "summaries", "翻訳": "translations", "言語": "language",
     "顧客": "customers", "利用者": "users", "ユーザー": "users", "管理者": "admins",   # as objects: 「利用者を招待できる」
+    "測定値": "readings", "測定": "measurement", "機器": "devices", "医療機器": "medical devices", "血圧計": "blood pressure monitors", "体重計": "scales",
+    "パルスオキシメータ": "pulse oximeters", "ゲートウェイ": "gateway", "主治医": "attending physicians", "訪問看護ステーション": "home nursing stations",
+    "閾値": "thresholds", "上限": "upper limit", "下限": "lower limit", "所見": "findings", "電子カルテ": "electronic health record", "訂正履歴": "correction history",
+    "貸与": "loan", "返却": "return", "稼働状況": "status", "時系列グラフ": "time-series chart", "プッシュ通知": "push notifications", "計画停止": "planned downtime",
+    "アクセスログ": "access logs", "在宅": "at home", "患者本人": "patients themselves", "担当患者": "assigned patients", "担当看護師": "assigned nurses",
+    "通信不能": "without connectivity", "改ざん": "tampered with", "復旧後": "after recovery", "即時": "immediately", "改ざん": "tampering", "改ざん不可": "tamper-proof",
+    "不可": "not allowed", "不可能": "not possible", "確認済み": "acknowledged", "確認されない": "unacknowledged", "未確認": "unacknowledged",
+    "国内リージョン": "domestic region", "国内": "domestic", "リージョン": "region", "限定": "restricted to", "夜間バッチ": "nightly batch",
+    "同一技術": "the same technology", "優先": "preferred", "初回リリース": "first release", "月末": "end of month", "初年度": "first year",
+    "薬機法": "PMD Act", "医療法": "Medical Care Act", "準拠": "in compliance with", "認める": "allowed", "以下": "at most",
     "経費": "expenses", "交通費": "travel expenses", "立替経費": "reimbursable expenses", "立替": "reimbursement", "費目": "expense category",
     "領収書": "receipts", "領収書画像": "receipt images", "申請": "requests", "申請一覧": "requests list", "承認済み": "approved", "会計システム": "accounting system",
     "部長承認": "department head approval", "部長": "department head", "月次": "monthly", "月ごと": "per month", "平日": "weekdays", "月末": "month end",
@@ -314,6 +324,8 @@ def numbers(s: str) -> str:
     _MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
     s = re.sub(r"(\d{4})\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*日)?", lambda m: f"{_MON[int(m.group(2)) - 1]}{' ' + m.group(3) if m.group(3) else ''} {m.group(1)}" if 1 <= int(m.group(2)) <= 12 else m.group(0), s)
     s = re.sub(r"毎月\s*(\d{1,2})\s*日", r"on day \1 of every month", s)
+    s = re.sub(r"(?<![\d年])(月|週|日|年)\s*(\d+)\s*回", lambda m: f" {m.group(2)} times per {'month' if m.group(1) == '月' else 'week' if m.group(1) == '週' else 'day' if m.group(1) == '日' else 'year'} ", s)
+    s = re.sub(r"(\d+)\s*年後", r" in year \1 ", s)
     s = re.sub(r"(?<!\d)(\d{1,2})\s*月\s*(\d{1,2})\s*日", r"\1/\2", s)
     # currency: 「5万円」→ 50000 JPY
     s = re.sub(_JA_NUM + r"\s*円", lambda m: f"{_num(m)} JPY", s)
@@ -340,11 +352,11 @@ def _numbers_core(s: str) -> str:
                lambda m: f"{_num(m)} {_COUNTER.get(m.group('what') or '', 'requests')}{_PER[m.group('per')]}", s)
     # rate: 「毎秒 1万件」「1,000件/秒」「1000リクエスト/秒」「秒間 500 件」
     def rate(m: re.Match) -> str:
-        return f"{_num(m)} {_COUNTER.get(m.group('what') or '', 'requests')}{_PER[m.group('per')]}"
+        return f"{_num(m)} {_COUNTER.get(m.group('what') or '', 'requests')}{_PER[m.group('per')]} "
     counters = "|".join(sorted(map(re.escape, _COUNTER), key=len, reverse=True))
     s = re.sub(_JA_NUM + r"\s*(?P<what>" + counters + r")?\s*(?:/|毎|あたり|につき|ごと)\s*(?P<per>秒|分|時間|日|月)", rate, s)
     s = re.sub(r"(?:毎|秒間|分間)?(?P<per>秒|分|時間|日|月)(?:間|あたり|に|毎)?\s*" + _JA_NUM + r"\s*(?P<what>" + counters + r")",
-               lambda m: f"{_num(m)} {_COUNTER.get(m.group('what'), 'requests')}{_PER[m.group('per')]}", s)
+               lambda m: f"{_num(m)} {_COUNTER.get(m.group('what'), 'requests')}{_PER[m.group('per')]} ", s)
     # percentiles: 「p95で」 stays; 「95パーセンタイル」
     s = re.sub(r"(\d{2,3})\s*パーセンタイル", r"p\1", s)
     # duration/latency with comparator suffix: 「300ms以内」「5秒以下」「10分未満」「99.9%以上」
@@ -477,10 +489,18 @@ class Rewrite:
     source: str
     english: str
     untranslated: list[str] = field(default_factory=list)
+    warning: str = ""     # e.g. a negation in the source that the English does not carry
+
+    def check_polarity(self) -> "Rewrite":
+        neg_src = re.search(r"不可|禁止|してはならない|してはいけない|ならない|できない|しない|せず|ない[。]?$|決して|絶対に", self.source) is not None
+        neg_en = re.search(r"\b(?:not|never|no|without|tamper-proof|prohibited|forbidden|unacknowledged|cannot|must not)\b", self.english, re.I) is not None
+        if neg_src and not neg_en:
+            self.warning = "the source is negative (不可/ない/禁止) but the rewrite has no negation — check the polarity"
+        return self
 
 
 #: fixed phrases folded into one modal before tokenising (inflection tails would otherwise split them)
-_PRE = {"してはならない": "禁止", "してはいけない": "禁止", "しては行けない": "禁止", "してはならず": "禁止",
+_PRE = {"不可であること": "禁止", "不可とする": "禁止", "不可能であること": "禁止", "できないこと": "禁止", "してはならない": "禁止", "してはいけない": "禁止", "しては行けない": "禁止", "してはならず": "禁止",
         "てはならない": "禁止", "てはならず": "禁止", "てはいけない": "禁止", "てはいけず": "禁止",
         "しなければならない": "必須", "しなくてはならない": "必須", "しなければいけない": "必須", "する必要がある": "必須",
         "なければならない": "必須", "ねばならない": "必須", "できるようにする": "できる", "できること": "できる",
@@ -542,7 +562,7 @@ def rewrite_sentence(src: str) -> Rewrite:
     rw.english = _restore_times(re.sub(r"\s+([.,])", r"\1", re.sub(r"\s{2,}", " ", rw.english)).strip())
     if rw.english and not rw.english.endswith("."):
         rw.english += "."
-    return rw
+    return rw.check_polarity()
 
 
 def _force_modal(en: str, modal: str) -> str:
@@ -678,7 +698,10 @@ class Normalised:
              "The engine reads English. Each Japanese sentence was rewritten with a glossary and a particle-driven reorder; "
              "check the right-hand column — it is what was designed, not the left.\n",
              "| source | rewritten as |", "|---|---|"]
-        s += [f"| {r.source.replace('|', '¦')} | {r.english.replace('|', '¦')} |" for r in self.rewrites]
+        s += [f"| {r.source.replace('|', '¦')} | {r.english.replace('|', '¦')}{' **⚠ ' + r.warning + '**' if r.warning else ''} |" for r in self.rewrites]
+        warned = [r for r in self.rewrites if r.warning]
+        if warned:
+            s.append(f"\n**{len(warned)} rewrite(s) may have lost a negation** — marked ⚠ above; a must-not that reads as allowed is the most dangerous error this layer can make.")
         if self.untranslated:
             s.append("\nWords the glossary does not know (dropped from the English; add them to the text in English or extend the glossary): "
                      + ", ".join(f"「{w}」" for w in sorted(set(self.untranslated))))

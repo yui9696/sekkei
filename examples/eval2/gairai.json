@@ -815,24 +815,6 @@
           "description": "from R-1: Patients departments choose doctors. The system can register, change and cancel available"
         },
         {
-          "name": "update_slots",
-          "inputs": [
-            {
-              "name": "slots",
-              "type": "Slots | id",
-              "description": ""
-            }
-          ],
-          "output": "Slots | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Patients departments choose doctors. The system can register, change and cancel available"
-        },
-        {
           "name": "cancel_slots",
           "inputs": [
             {
@@ -959,24 +941,6 @@
           "description": "from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi"
         },
         {
-          "name": "schedule_patients",
-          "inputs": [
-            {
-              "name": "patients",
-              "type": "Patients | id",
-              "description": ""
-            }
-          ],
-          "output": "Patients | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi"
-        },
-        {
           "name": "generate_departments",
           "inputs": [
             {
@@ -1029,60 +993,6 @@
           "pre": "",
           "post": "",
           "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
-        },
-        {
-          "name": "log_bookings",
-          "inputs": [
-            {
-              "name": "bookings",
-              "type": "Bookings | id",
-              "description": ""
-            }
-          ],
-          "output": "Bookings | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
-        },
-        {
-          "name": "cancel_rows",
-          "inputs": [
-            {
-              "name": "rows",
-              "type": "Rows | id",
-              "description": ""
-            }
-          ],
-          "output": "Rows | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
-        },
-        {
-          "name": "record_health",
-          "inputs": [
-            {
-              "name": "health",
-              "type": "Health | id",
-              "description": ""
-            }
-          ],
-          "output": "Health | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-7: The system must integrate confirmed bookings existing electronic health record system (ext"
         }
       ],
       "stability": "draft",
@@ -1544,30 +1454,6 @@
           "description": "from R-1: Patients departments choose doctors. The system can register, change and cancel available"
         },
         {
-          "name": "PUT /slots/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            },
-            {
-              "name": "body",
-              "type": "slots fields",
-              "description": ""
-            }
-          ],
-          "output": "200 slots",
-          "errors": [
-            "400 invalid body",
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Patients departments choose doctors. The system can register, change and cancel available"
-        },
-        {
           "name": "POST /slots/{id}/cancel",
           "inputs": [
             {
@@ -1949,26 +1835,6 @@
         }
       ],
       "description": "Domain entity named in the requirements ('appointment'); confirm the fields."
-    },
-    {
-      "id": "E-10",
-      "name": "Health",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('health'); confirm the fields."
     }
   ],
   "flows": [

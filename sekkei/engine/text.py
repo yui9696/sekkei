@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 MODALITY = {
     "must": ("must", "shall", "required", "always", "never", "at least once", "exactly once", "mandatory"),
-    "should": ("should", "expected", "normally", "ought"),
+    "should": ("should", "expected", "normally", "ought", "need", "needs", "require", "requires", "want", "wants", "is mandatory", "are mandatory"),
     "could": ("could", "may", "optionally", "nice to have", "ideally", "optional"),
 }
 
@@ -24,7 +24,8 @@ SECTION_HEADINGS = {
     "nonfunctional": ("non-functional", "nonfunctional", "non functional", "quality", "qualities", "performance", "nfr", "nfrs", "operational", "ops"),
     "constraint": ("constraint", "constraints", "environment", "assumptions", "context", "given", "tech stack", "stack"),
     "functional": ("functional", "features", "capabilities", "user stories", "scope"),
-    "generic": ("requirements", "goals", "background", "alternatives"),
+    "background": ("background", "motivation", "context", "overview", "summary", "introduction"),
+    "generic": ("requirements", "goals", "alternatives"),
 }
 
 ACTORS = (
@@ -40,6 +41,12 @@ ACTORS = (
     "ops", "developer", "developers", "internal service", "internal services", "service", "services",
     "client", "clients", "team", "system", "subscriber", "subscribers", "tenant", "tenants",
     "engineer", "engineers", "analyst", "analysts", "agent", "agents", "visitor", "visitors", "we",
+    "trader", "traders", "risk officer", "risk officers", "compliance", "compliance officer", "viewer", "viewers", "rights manager", "rights managers",
+    "category manager", "category managers", "inspector", "inspectors", "physician", "physicians", "attending physician", "attending physicians",
+    "marketplace", "marketplaces", "partner", "partners", "supplier", "suppliers", "vendor", "vendors", "auditor", "auditors", "regulator", "regulators",
+    "support agent", "support agents", "warehouse operator", "warehouse operators", "data scientist", "data scientists", "scientist", "scientists",
+    "researcher", "researchers", "underwriter", "underwriters", "applicant", "applicants", "borrower", "borrowers", "office staff", "sre", "sres",
+    "model owner", "model owners", "reviewer", "reviewers", "on-call", "the desk", "desk", "back office", "front office", "accounting staff", "requester", "requesters",
     "applicant", "applicants", "borrower", "borrowers", "underwriter", "underwriters", "senior underwriter", "auditor", "auditors",
     "regulator", "regulators", "accountant", "accountants", "recruiter", "recruiters", "candidate", "candidates", "contractor", "contractors",
     "supplier", "suppliers", "vendor", "vendors", "partner", "partners", "physician", "physicians", "pharmacist", "pharmacists",
@@ -67,7 +74,8 @@ VERBS = {
     "list": ("GET", "list"), "see": ("GET", "get"), "view": ("GET", "get"), "get": ("GET", "get"),
     "show": ("GET", "get"), "read": ("GET", "get"), "query": ("GET", "query"), "search": ("GET", "search"),
     "download": ("GET", "download"), "inspect": ("GET", "get"), "check": ("GET", "check"),
-    "update": ("PUT", "update"), "edit": ("PUT", "update"), "change": ("PUT", "update"),
+    "update": ("PUT", "update"), "edit": ("PUT", "update"), "change": ("PUT", "update"), "amend": ("PUT", "amend"), "halt": ("POST", "halt"), "replay": ("POST", "replay"),
+    "trim": ("PUT", "trim"), "clip": ("POST", "clip"), "promote": ("POST", "promote"), "rollback": ("POST", "rollback"), "acknowledge": ("POST", "acknowledge"),
     "set": ("PUT", "set"), "choose": ("", "set"), "configure": ("PUT", "configure"),
     "save": ("POST", "save"), "load": ("GET", "load"), "open": ("", "open"), "close": ("", "close"),
     "switch": ("", "switch"), "adjust": ("PUT", "adjust"), "move": ("POST", "move"), "filter": ("GET", "filter"),
@@ -89,7 +97,25 @@ VERBS = {
     "aggregate": ("", "aggregate"), "archive": ("", "archive"), "purge": ("DELETE", "purge"),
     "authenticate": ("", "authenticate"), "authorize": ("", "authorize"), "log": ("", "log"),
     "print": ("", "print"), "write": ("", "write"), "process": ("", "process"), "transform": ("", "transform"),
+    "define": ("POST", "define"), "materialize": ("", "materialize"), "materialise": ("", "materialise"), "browse": ("GET", "browse"),
+    "promote": ("POST", "promote"), "score": ("", "score"), "finish": ("", "finish"), "page": ("", "page"), "resolve": ("POST", "resolve"),
+    "restore": ("POST", "restore"), "copy": ("", "copy"), "migrate": ("", "migrate"), "replace": ("", "replace"), "forward": ("", "forward"),
+    "poll": ("", "poll"), "fetch": ("", "fetch"), "consume": ("", "consume"), "produce": ("", "produce"), "emit": ("", "emit"), "route": ("", "route"),
+    "dispatch": ("", "dispatch"), "encrypt": ("", "encrypt"), "hash": ("", "hash"), "mask": ("", "mask"), "retain": ("", "retain"), "expire": ("", "expire"),
+    "escalate": ("", "escalate"), "alert": ("", "alert"), "monitor": ("", "monitor"), "deploy": ("", "deploy"), "connect": ("", "connect"),
+    "integrate": ("", "integrate"), "handle": ("", "handle"), "serve": ("", "serve"), "expose": ("GET", "expose"), "build": ("", "build"),
+    "implement": ("", "implement"), "compute": ("", "compute"), "book": ("POST", "book"), "settle": ("", "settle"), "attribute": ("", "attribute"),
+    "instruct": ("", "instruct"), "compare": ("", "compare"), "open": ("", "open"), "halt": ("POST", "halt"), "replay": ("POST", "replay"),
+    "need": ("", "need"), "want": ("", "want"), "require": ("", "require"), "keep": ("", "keep"), "agree": ("", "agree"), "expect": ("", "expect"),
+    "block": ("", "block"), "provide": ("", "provide"), "support": ("", "support"), "allow": ("", "allow"), "enable": ("POST", "enable"),
+    "revisit": ("", "revisit"), "pick": ("", "pick"), "land": ("", "land"), "stall": ("", "stall"), "adapt": ("", "adapt"), "tap": ("", "tap"),
 }
+
+#: verbs that state a need or a property, never an operation of the system
+STATIVE_VERBS = {"need", "want", "require", "keep", "agree", "expect", "block", "provide", "support", "allow", "revisit", "pick", "land",
+                 "stall", "adapt", "tap", "finish", "page", "expire", "retain", "handle", "serve", "build", "implement", "compute", "attribute",
+                 "compare", "open", "materialize", "materialise", "score", "copy", "migrate", "replace", "forward", "poll", "consume", "produce",
+                 "emit", "route", "dispatch", "encrypt", "hash", "mask", "escalate", "alert", "monitor", "deploy", "connect", "integrate", "instruct", "settle"}
 
 STOPWORDS = set("""
 a an the and or but if then else of to in on at by for with from as is are was were be been being
@@ -129,9 +155,10 @@ _UNIT_KIND = {
     "x": "factor",
 }
 
-_NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB])?(?![:\d])(?=[\s%/a-zA-Z)]|$)"
+_NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB](?![a-zA-Z]))?(?![:\d])(?=[\s%/a-zA-Z)-]|$)"
 _UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|business days?|working days?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
-_QUANT_RE = re.compile(_NUM + r"\s?" + _UNIT + r"(?![a-zA-Z])", re.I)
+_QUANT_RE = re.compile(_NUM + r"[\s-]?" + _UNIT + r"(?![a-zA-Z])", re.I)
+_CODE_CONTEXT = re.compile(r"\b(?:status|http|returns?|code|response|error|responds? with|reply|replies|retry-after|rate[- ]limit\w*|except|honou?rs?)\b|\b[45]xx\b", re.I)
 _PERCENTILE_RE = re.compile(r"\bp(50|90|95|99|999)\b", re.I)
 _INTERVAL_RE = re.compile(r"\bevery (\d+|ten|five|two|three|thirty|sixty) ?(seconds?|s|minutes?|min|hours?|h)\b", re.I)
 _WORD_NUM = {"two": 2, "three": 3, "five": 5, "ten": 10, "thirty": 30, "sixty": 60}
@@ -145,7 +172,7 @@ def interval_seconds(text: str) -> float | None:
     n = _WORD_NUM.get(m.group(1).lower()) or float(m.group(1))
     unit = m.group(2).lower()
     return n * (60 if unit.startswith("min") else 3600 if unit.startswith("h") else 1)
-_COMPARATOR_RE = re.compile(r"\b(not (?:add |take |exceed )?more than|not exceed|no more than|under|below|less than|at most|within|up to|<=|<|at least|more than|over|>=|>|exactly|sustained)\b", re.I)
+_COMPARATOR_RE = re.compile(r"\b(not (?:add |take |exceed )?more than|not exceed|no more than|under|below|less than|at most|within|up to|at least|more than|over|exactly|sustained)\b|(<=|<|>=|>)(?=\s*$)", re.I)
 
 
 @dataclass
@@ -184,6 +211,8 @@ class Sentence:
     nouns: list[str] = field(default_factory=list)
     words: list[str] = field(default_factory=list)
     assumed: bool = False      # came from an engine-generated "(Assumed by the engine)" section
+    intro: bool = False        # prose before the first heading (the document's introduction)
+    row_id: str = ""           # "R-01" / "F-3": the id the author gave this row in a requirements table
 
     @property
     def lower(self) -> str:
@@ -200,7 +229,8 @@ class Sentence:
 
 _BULLET_RE = re.compile(r"^\s*(?:[-*•](?=\s|[A-Za-z])|\d+[.)]\s)\s*")
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s*(.+?)\s*#*\s*$")
-_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\"'])")
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Za-z(\"'@])")
+_ABBREV_DOT = re.compile(r"\b(e\.g|i\.e|etc|vs|approx|cf|no|fig|dr|mr|ms|prof|inc|ltd|co|st)\.", re.I)
 
 
 def _section_of(line: str) -> str:
@@ -227,7 +257,8 @@ def _units(text: str) -> list[tuple[str, bool]]:
 
     def flush() -> None:
         if prose:
-            for s in _SENT_SPLIT.split(" ".join(prose)):
+            joined = _ABBREV_DOT.sub(lambda m: m.group(0).replace(".", "\x00"), " ".join(prose))
+            for s in (x.replace("\x00", ".") for x in _SENT_SPLIT.split(joined)):
                 if not s.strip():
                     continue
                 if out and out[-1][0] and not out[-1][1] and len(s.split()) <= 2:
@@ -253,7 +284,8 @@ def _units(text: str) -> list[tuple[str, bool]]:
             continue
         if _HEADING_RE.match(line):
             flush(); flush_bullet()
-            out.append(("#" + _HEADING_RE.match(line).group(1).strip(), False))
+            level = len(line.strip()) - len(line.strip().lstrip("#"))
+            out.append(("#" * max(1, level) + _HEADING_RE.match(line).group(1).strip(), False))
             continue
         if _BULLET_RE.match(line):
             flush(); flush_bullet()
@@ -295,20 +327,22 @@ def quantities(text: str) -> list[Quantity]:
         kind = _UNIT_KIND.get(unit, "number")
         if unit == "m":
             unit, kind = "min", "duration"
-        if kind == "number" and int(value) in _HTTP_CODES and not mult:
-            kind = "code"  # an HTTP status code, not a quantity
         before = text[max(0, m.start() - 24): m.start()]
         after = text[m.end(): m.end() + 32]
-        cmp_m = _COMPARATOR_RE.search(before)
-        comparator = cmp_m.group(1) if cmp_m else ""
+        if kind == "number" and int(value) in _HTTP_CODES and not mult and _CODE_CONTEXT.search(before + " " + after[:16]) \
+                and not re.match(r"\s*[a-zA-Z]+ ?(?:per |/)", after):
+            kind = "code"  # "returns 429", "status 404": an HTTP status code, not a quantity ("500 requests per second" is one)
+        cmps = list(_COMPARATOR_RE.finditer(before))
+        cmp_m = cmps[-1] if cmps else None        # the comparator adjacent to the number, not an earlier "over EDI"
+        comparator = (cmp_m.group(1) or cmp_m.group(2)) if cmp_m and len(before) - cmp_m.end() <= 6 else ""
         pct = _PERCENTILE_RE.search(before + " " + after)
         noun = ""
         if kind == "code":
             out.append(Quantity(value, "", "code", m.group("num"), "", "", ""))
             continue
         if kind == "number":
-            nm = re.match(r"\s*([a-zA-Z][a-zA-Z_-]*)(?:\s+([a-zA-Z][a-zA-Z_-]*))?\s*(/s\b|/sec\b|per second|per sec\b|/min\b|per minute|/h\b|per hour|/day\b|per day)?", after)
-            if nm and nm.group(1).lower() not in STOPWORDS and nm.group(1).lower() not in VERBS and not nm.group(1).lower().startswith("xx"):
+            nm = re.match(r"\s*([a-zA-Z][a-zA-Z_-]*)(?:\s+((?!per\b)[a-zA-Z][a-zA-Z_-]*))?\s*(/s\b|/sec\b|per second|per sec\b|/min\b|per minute|/h\b|per hour|/day\b|per day)?", after)
+            if nm and nm.group(1).lower() not in STOPWORDS and (nm.group(1).lower() not in VERBS or nm.group(3) or nm.group(2)) and not nm.group(1).lower().startswith("xx"):
                 noun = nm.group(1).lower()
                 second = (nm.group(2) or "").lower()
                 if nm.group(3) and second and second not in STOPWORDS:
@@ -367,19 +401,60 @@ def verb_of(word: str) -> str:
     return ""
 
 
+_NOUN_VERBS = {"order", "request", "offer", "return", "report", "review", "change", "update", "schedule", "search", "filter", "export", "import",
+               "sync", "charge", "match", "rate", "comment", "index", "tag", "share", "book", "load", "record", "process", "trigger", "run", "check",
+               "count", "sign", "log", "measure", "scan", "set", "print", "ship", "cancel", "refund", "split", "trim", "clip", "halt", "replay"}
+_VERB_LEADERS = {"can", "could", "may", "must", "should", "shall", "will", "would", "to", "and", "or", "then", "also", "not", "never", "always",
+                 "cannot", "automatically", "manually", "immediately", "we", "they", "it", "who", "that", "which", "users", "user", "system", "i", "you"}
 _DETERMINERS = {"a", "an", "the", "each", "every", "per", "their", "own", "of", "this", "that", "these", "those", "any", "no", "one", "same",
                 "original", "new", "existing", "current", "delivered", "returned", "first", "last", "next", "all", "its", "his", "her", "our", "my", "your", "another"}
 
 
+_ROW_ID = re.compile(r"^\s*([A-Za-z]{1,4}-?\d{1,4})\s+(?=\S)")
+_FORCED = re.compile(r"\s*\((must|should|could)\)\s*$")
+
+
 def analyse_sentence(index: int, text: str, section: str, is_bullet: bool) -> Sentence:
+    forced = ""
+    fm = _FORCED.search(text)
+    if fm:
+        forced = fm.group(1)
+        text = text[:fm.start()].rstrip()
+    rid = _ROW_ID.match(text)
+    if rid and not re.match(r"^\s*[A-Za-z]{1,4}-?\d{1,4}\s+(?:ms|s|min|h|days?|users?|requests?)\b", text):
+        text = text[rid.end():]
     words = tokens(text)
-    # a lexicon verb right after a determiner is a noun ("an order item", "the refund", "each return")
-    verbs = [v for i, w in enumerate(words) for v in [verb_of(w)] if v and not (i > 0 and words[i - 1] in _DETERMINERS)]
-    nouns = [w for w in words if w not in STOPWORDS and not verb_of(w) and len(w) > 2
-             and not w.replace(".", "").isdigit()]
     low = text.lower()
     actors = sorted({a for a in ACTORS if re.search(r"\b" + re.escape(a) + r"s?\b", low)}, key=len, reverse=True)
-    return Sentence(index, text, section, modality(text), is_bullet, quantities(text), actors, verbs, nouns, words)
+    # token positions covered by a multi-word actor ("support agents", "risk officer"): never verbs
+    in_actor: set[int] = set()
+    for a in actors:
+        toks = a.split()
+        if len(toks) < 2:
+            continue
+        for i in range(len(words) - len(toks) + 1):
+            if [w.rstrip("s") for w in words[i: i + len(toks)]] == [t.rstrip("s") for t in toks]:
+                in_actor.update(range(i, i + len(toks)))
+    # a lexicon verb right after a determiner is a noun ("an order item", "the refund", "each return");
+    # a noun-verb ("order", "request", "report", …) is a verb only in a verb position: after a modal/actor/"to"/"and",
+    # or before a determiner ("order the", "request a")
+    verbs = []
+    for i, w in enumerate(words):
+        v = verb_of(w)
+        if not v or (i > 0 and words[i - 1] in _DETERMINERS) or i in in_actor:
+            continue
+        if v in _NOUN_VERBS:
+            prev = words[i - 1] if i > 0 else ""
+            nxt = words[i + 1] if i + 1 < len(words) else ""
+            verb_pos = prev in _VERB_LEADERS or nxt in _DETERMINERS or prev in ACTORS or prev.rstrip("s") in ACTORS or i == 0 and is_bullet
+            if not verb_pos:
+                continue
+        verbs.append(v)
+    nouns = [w for w in words if w not in STOPWORDS and not verb_of(w) and len(w) > 2
+             and not w.replace(".", "").isdigit()]
+    sent = Sentence(index, text, section, forced or modality(text), is_bullet, quantities(text), actors, verbs, nouns, words)
+    sent.row_id = rid.group(1) if rid else ""
+    return sent
 
 
 def segment(text: str) -> list[Sentence]:
@@ -387,24 +462,37 @@ def segment(text: str) -> list[Sentence]:
     out: list[Sentence] = []
     section = ""
     assumed = False
+    heading_seen = False
     n = 0
     for unit, is_bullet in _units(text):
         if not unit:
             continue
         if unit.startswith("#"):
-            section = _section_of(unit[1:]) or ""
+            level = len(unit) - len(unit.lstrip("#"))
+            title = unit.lstrip("#")
+            section = _section_of(title) or ""
             section = "" if section == "generic" else section
             assumed = "assumed by the engine" in unit.lower()
+            heading_seen = heading_seen or level >= 2 or bool(_section_of(title))
             continue
         sec = _section_of(unit) if not is_bullet else ""
         if sec:
             section = "" if sec == "generic" else sec
             assumed = "assumed by the engine" in unit.lower()
+            heading_seen = True
             continue
         sent = analyse_sentence(n, unit, section, is_bullet)
         sent.assumed = assumed
+        sent.intro = not heading_seen and not is_bullet
         out.append(sent)
         n += 1
+    # an "introduction" is at most three sentences before the first of at least two headings; a document that is
+    # mostly prose (meeting notes) has no introduction — every sentence is read
+    intro = [s for s in out if s.intro]
+    headings = sum(1 for u, b in _units(text) if u.startswith("#") and (len(u) - len(u.lstrip("#")) >= 2 or _section_of(u.lstrip("#"))))
+    if len(intro) > 3 or headings < 2:
+        for s in intro:
+            s.intro = False
     return out
 
 

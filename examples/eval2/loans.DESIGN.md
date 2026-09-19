@@ -41,12 +41,11 @@ _version 0.1.0 · schema sekkei/1_
 | R-12 | constraint | must | Python 3.12, PostgreSQL and S3-compatible object storage available; containers behind an existing ingress; single region. Team of 5. | — |
 | R-13 | constraint | must | Applicants authenticate with the bank's OIDC identity provider; underwriters with the corporate SSO. | — |
 | R-14 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-15 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
-| R-16 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
-| R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
-| R-18 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
-| R-19 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
-| R-20 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
+| R-15 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-17 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-18 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
+| R-19 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
 ## Components
 
@@ -157,7 +156,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-7
 - **requires**: I-1, I-9, I-3, I-13, I-11, I-4, I-8
-- **satisfies**: R-1, R-2, R-3, R-5, R-9, R-12, R-19, R-20
+- **satisfies**: R-1, R-2, R-3, R-5, R-9, R-12, R-18, R-19
 
 ### C-8 — Notifier
 
@@ -173,7 +172,7 @@ graph LR
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
 - **provides**: I-9
 - **requires**: —
-- **satisfies**: R-11, R-18
+- **satisfies**: R-11, R-17
 
 ### C-10 — Authentication
 
@@ -253,7 +252,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-19
 - **requires**: I-7, I-9, I-10, I-12, I-14
-- **satisfies**: R-8, R-12, R-15, R-16, R-17
+- **satisfies**: R-8, R-12, R-15, R-16
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -340,10 +339,8 @@ graph LR
 | | from R-1: Applicants can create an application (amount, term, income, employment), upload identity d | | | |
 | `verify_applicant` | `applicant`: Applicant \| id | Applicant \| None | ValidationError, NotFound | stated values: 10 s (R-2) |
 | | from R-2: The service verifies the applicant's identity through an external KYC provider and fetches | | | |
-| `approve_threshold` | `threshold`: Threshold \| id | Threshold \| None | ValidationError, NotFound | — |
-| | from R-3: A scoring model predicts default risk from the application and the credit report; applicat | | | |
-| `request_documents` | `documents`: Documents \| id | Documents \| None | ValidationError, NotFound | stated values: 2 business days (R-4) |
-| | from R-4: Underwriters review borderline applications in a queue, request more documents, and approv | | | |
+| `fetch_report` | `report`: Report \| id | Report \| None | ValidationError, NotFound | stated values: 10 s (R-2) |
+| | from R-2: The service verifies the applicant's identity through an external KYC provider and fetches | | | |
 | `approve_reason` | `reason`: Reason \| id | Reason \| None | ValidationError, NotFound | stated values: 2 business days (R-4) |
 | | from R-4: Underwriters review borderline applications in a queue, request more documents, and approv | | | |
 | `reject_reason` | `reason`: Reason \| id | Reason \| None | ValidationError, NotFound | stated values: 2 business days (R-4) |
@@ -565,36 +562,18 @@ Domain entity named in the requirements ('document'); confirm the fields.
 | `id` | uuid | primary key |
 | `created_at` | timestamp |  |
 
-### E-8 — Decision (owner C-1)
-
-Domain entity named in the requirements ('decision'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-9 — Credit (owner C-1)
-
-Domain entity named in the requirements ('credit'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-10 — Input (owner C-1)
-
-Domain entity named in the requirements ('input'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-11 — Loan (owner C-1)
+### E-8 — Loan (owner C-1)
 
 Domain entity named in the requirements ('loan'); confirm the fields.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `created_at` | timestamp |  |
+
+### E-9 — Status (owner C-1)
+
+Domain entity named in the requirements ('status'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|
@@ -715,7 +694,7 @@ sequenceDiagram
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -753,7 +732,7 @@ _Affects:_ C-10
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). PostgreSQL: 3.17; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -775,7 +754,7 @@ _Affects:_ C-1
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). One image, role by flag: `api` and `worker` proc: 1.77; Single process with background threads: 1.43; Separate services per concern: 1.28
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). One image, role by flag: `api` and `worker` proc: 1.79; Single process with background threads: 1.45; Separate services per concern: 1.29
 
 **Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
@@ -800,7 +779,7 @@ _Affects:_ C-19, C-15
   - − a large system to operate
   - − a team of two cannot own it
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Explicit state machine in code: a transitions ta: 1.81; Embedded workflow library: 1.41; External BPM engine: 1.07
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Explicit state machine in code: a transitions ta: 1.84; Embedded workflow library: 1.42; External BPM engine: 1.07
 
 **Consequences.** Not choosing 'Embedded workflow library' gives up: declarative definitions, guards and callbacks built in. Not choosing 'External BPM engine' gives up: business users edit the process, rich tooling.
 
@@ -825,7 +804,7 @@ _Affects:_ C-14
   - − joins across two stores
   - − a second store
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Encryption at rest by the platform plus strict a: 1.75; Field-level encryption for identifiers and sensi: 1.56; Separate personal-data store with tokenised refe: 1.42
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Encryption at rest by the platform plus strict a: 1.71; Field-level encryption for identifiers and sensi: 1.55; Separate personal-data store with tokenised refe: 1.44
 
 **Consequences.** Not choosing 'Field-level encryption for identifiers and sensi' gives up: a dump does not expose people, deletion = key destruction where fields are only encrypted. Not choosing 'Separate personal-data store with tokenised refe' gives up: blast radius contained, deletion in one place.
 
@@ -850,7 +829,7 @@ _Affects:_ C-18, C-1
   - − coupled to the legacy schema
   - − capture tooling to operate
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Scheduled batch file exchange: 2.63; API façade: 1.69; Change data capture from the legacy database: 1.40. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41. stated in the constraints
 
 **Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
@@ -860,11 +839,11 @@ _Affects:_ C-17
 
 **Context.** Two callers may change the same record at the same time and the result must be consistent.
 
-- ✔ **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
+- ✘ **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
   - + no locks held across requests
   - + works with stateless instances
   - − callers must handle 409
-- ✘ **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
+- ✔ **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
   - + simple mental model
   - + no client retry
   - − lock waits under contention
@@ -873,9 +852,9 @@ _Affects:_ C-17
   - + nothing to implement
   - − lost updates
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Optimistic concurrency: version column checked o: 1.61; Row locks inside a short transaction: 1.59; Last write wins: 1.44
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Row locks inside a short transaction: 1.58; Optimistic concurrency: version column checked o: 1.57; Last write wins: 1.39
 
-**Consequences.** Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.
+**Consequences.** Not choosing 'Optimistic concurrency: version column checked o' gives up: no locks held across requests, works with stateless instances. Not choosing 'Last write wins' gives up: nothing to implement.
 
 _Affects:_ C-1, C-7
 
@@ -897,27 +876,13 @@ _Affects:_ C-1, C-7
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Two or more interchangeable instances per role b: 1.41; Single instance with health-based restart: 1.25; Active-active across two regions: unavailable (ruled out by single_region)
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.26; Active-active across two regions: unavailable (ruled out by single_region)
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
 _Affects:_ C-19
 
-### D-9 — Assumed answer: load (Q-rate) (proposed)
-
-**Context.** The requirements do not say. Question: Q-rate. No evidence in the text; engine default.
-
-- ✔ **100 requests/s**
-- ✘ **10 requests/s**
-- ✘ **1,000 requests/s**
-
-**Rationale.** No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.
-
-**Consequences.** If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.
-
-_Affects:_ C-19
-
-### D-10 — Assumed answer: load (Q-payload) (proposed)
+### D-9 — Assumed answer: load (Q-payload) (proposed)
 
 **Context.** The requirements do not say. Question: Q-payload. No evidence in the text; engine default.
 
@@ -931,7 +896,7 @@ _Affects:_ C-19
 
 _Affects:_ C-19
 
-### D-11 — Assumed answer: data (Q-backup) (proposed)
+### D-10 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -945,7 +910,7 @@ _Affects:_ C-19
 
 _Affects:_ C-1
 
-### D-12 — Assumed answer: data (Q-migration) (proposed)
+### D-11 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.
 
@@ -959,7 +924,7 @@ _Affects:_ C-1
 
 _Affects:_ C-17
 
-### D-13 — Assumed answer: security (Q-authz) (proposed)
+### D-12 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -973,7 +938,7 @@ _Affects:_ C-17
 
 _Affects:_ C-7, C-10
 
-### D-14 — Assumed answer: operations (Q-alerting) (proposed)
+### D-13 — Assumed answer: operations (Q-alerting) (proposed)
 
 **Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
 
@@ -987,7 +952,7 @@ _Affects:_ C-7, C-10
 
 _Affects:_ C-9
 
-### D-15 — Assumed answer: cost (Q-budget) (proposed)
+### D-14 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -1112,7 +1077,7 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
 - **components**: C-1, C-9 · **implements**: I-1, I-9
-- **depends on**: — · **satisfies**: R-9, R-11, R-12, R-18
+- **depends on**: — · **satisfies**: R-9, R-11, R-12, R-17
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
 - **acceptance**:
   - A-3 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
@@ -1182,7 +1147,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-7 · **implements**: I-7
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-7, WP-8 · **satisfies**: R-1, R-2, R-3, R-5, R-9, R-12, R-19, R-20
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-7, WP-8 · **satisfies**: R-1, R-2, R-3, R-5, R-9, R-12, R-18, R-19
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-13 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
@@ -1238,7 +1203,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-19 · **implements**: I-19
-- **depends on**: WP-3, WP-6, WP-9, WP-10, WP-11 · **satisfies**: R-8, R-12, R-15, R-16, R-17
+- **depends on**: WP-3, WP-6, WP-9, WP-10, WP-11 · **satisfies**: R-8, R-12, R-15, R-16
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-19 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
@@ -1264,11 +1229,10 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 | R-13 | must | C-10 | WP-6 | A-9, A-10 |
 | R-14 | could | C-10 | WP-6 | A-9, A-10 |
 | R-15 | must | C-19 | WP-14 | A-19, A-20 |
-| R-16 | must | C-19 | WP-14 | A-19, A-20 |
-| R-17 | should | C-19 | WP-14 | A-19, A-20 |
-| R-18 | must | C-9 | WP-3 | A-3, A-4, A-5 |
+| R-16 | should | C-19 | WP-14 | A-19, A-20 |
+| R-17 | must | C-9 | WP-3 | A-3, A-4, A-5 |
+| R-18 | must | C-7 | WP-9 | A-13, A-14 |
 | R-19 | must | C-7 | WP-9 | A-13, A-14 |
-| R-20 | must | C-7 | WP-9 | A-13, A-14 |
 
 ## Conventions
 

@@ -160,18 +160,6 @@
     },
     {
       "id": "R-15",
-      "statement": "The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text).",
-      "kind": "nonfunctional",
-      "priority": "must",
-      "metric": {
-        "name": "sustained rate at 1,000",
-        "target": "100 requests /s",
-        "unit": "requests /s"
-      },
-      "rationale": "assumed by the engine; confirm or override"
-    },
-    {
-      "id": "R-16",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -183,7 +171,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-17",
+      "id": "R-16",
       "statement": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -195,7 +183,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-18",
+      "id": "R-17",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -207,14 +195,14 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-19",
+      "id": "R-18",
       "statement": "The existing system named in the requirements stays in place; integration, not migration (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-20",
+      "id": "R-19",
       "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
@@ -335,8 +323,8 @@
         "R-5",
         "R-9",
         "R-12",
-        "R-19",
-        "R-20"
+        "R-18",
+        "R-19"
       ],
       "tags": [
         "layer:1",
@@ -372,7 +360,7 @@
       "requires": [],
       "satisfies": [
         "R-11",
-        "R-18"
+        "R-17"
       ],
       "tags": [
         "layer:1",
@@ -561,8 +549,7 @@
         "R-8",
         "R-12",
         "R-15",
-        "R-16",
-        "R-17"
+        "R-16"
       ],
       "tags": [
         "layer:3",
@@ -963,40 +950,22 @@
           "description": "from R-2: The service verifies the applicant's identity through an external KYC provider and fetches"
         },
         {
-          "name": "approve_threshold",
+          "name": "fetch_report",
           "inputs": [
             {
-              "name": "threshold",
-              "type": "Threshold | id",
+              "name": "report",
+              "type": "Report | id",
               "description": ""
             }
           ],
-          "output": "Threshold | None",
+          "output": "Report | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
-          "pre": "",
+          "pre": "stated values: 10 s (R-2)",
           "post": "",
-          "description": "from R-3: A scoring model predicts default risk from the application and the credit report; applicat"
-        },
-        {
-          "name": "request_documents",
-          "inputs": [
-            {
-              "name": "documents",
-              "type": "Documents | id",
-              "description": ""
-            }
-          ],
-          "output": "Documents | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 2 business days (R-4)",
-          "post": "",
-          "description": "from R-4: Underwriters review borderline applications in a queue, request more documents, and approv"
+          "description": "from R-2: The service verifies the applicant's identity through an external KYC provider and fetches"
         },
         {
           "name": "approve_reason",
@@ -2058,66 +2027,6 @@
     },
     {
       "id": "E-8",
-      "name": "Decision",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('decision'); confirm the fields."
-    },
-    {
-      "id": "E-9",
-      "name": "Credit",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('credit'); confirm the fields."
-    },
-    {
-      "id": "E-10",
-      "name": "Input",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('input'); confirm the fields."
-    },
-    {
-      "id": "E-11",
       "name": "Loan",
       "owner": "C-1",
       "fields": [
@@ -2135,6 +2044,26 @@
         }
       ],
       "description": "Domain entity named in the requirements ('loan'); confirm the fields."
+    },
+    {
+      "id": "E-9",
+      "name": "Status",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('status'); confirm the fields."
     }
   ],
   "flows": [
@@ -2318,7 +2247,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
@@ -2395,7 +2324,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). PostgreSQL: 3.17; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
       "consequences": "",
       "affects": [
         "C-1"
@@ -2440,7 +2369,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). One image, role by flag: `api` and `worker` proc: 1.77; Single process with background threads: 1.43; Separate services per concern: 1.28",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). One image, role by flag: `api` and `worker` proc: 1.79; Single process with background threads: 1.45; Separate services per concern: 1.29",
       "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
         "C-19",
@@ -2487,7 +2416,7 @@
         }
       ],
       "choice": "Explicit state machine in code: a transitions table (state, action, role) -> state, history rows in the store",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Explicit state machine in code: a transitions ta: 1.81; Embedded workflow library: 1.41; External BPM engine: 1.07",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Explicit state machine in code: a transitions ta: 1.84; Embedded workflow library: 1.42; External BPM engine: 1.07",
       "consequences": "Not choosing 'Embedded workflow library' gives up: declarative definitions, guards and callbacks built in. Not choosing 'External BPM engine' gives up: business users edit the process, rich tooling.",
       "affects": [
         "C-14"
@@ -2533,7 +2462,7 @@
         }
       ],
       "choice": "Encryption at rest by the platform plus strict access control and audit",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Encryption at rest by the platform plus strict a: 1.75; Field-level encryption for identifiers and sensi: 1.56; Separate personal-data store with tokenised refe: 1.42",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Encryption at rest by the platform plus strict a: 1.71; Field-level encryption for identifiers and sensi: 1.55; Separate personal-data store with tokenised refe: 1.44",
       "consequences": "Not choosing 'Field-level encryption for identifiers and sensi' gives up: a dump does not expose people, deletion = key destruction where fields are only encrypted. Not choosing 'Separate personal-data store with tokenised refe' gives up: blast radius contained, deletion in one place.",
       "affects": [
         "C-18",
@@ -2580,7 +2509,7 @@
         }
       ],
       "choice": "Scheduled batch file exchange (CSV/fixed format) through a shared drop",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Scheduled batch file exchange: 2.63; API façade: 1.69; Change data capture from the legacy database: 1.40. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41. stated in the constraints",
       "consequences": "Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
       "affects": [
         "C-17"
@@ -2623,9 +2552,9 @@
           ]
         }
       ],
-      "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Optimistic concurrency: version column checked o: 1.61; Row locks inside a short transaction: 1.59; Last write wins: 1.44",
-      "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
+      "choice": "Row locks inside a short transaction (SELECT ... FOR UPDATE)",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Row locks inside a short transaction: 1.58; Optimistic concurrency: version column checked o: 1.57; Last write wins: 1.39",
+      "consequences": "Not choosing 'Optimistic concurrency: version column checked o' gives up: no locks held across requests, works with stateless instances. Not choosing 'Last write wins' gives up: nothing to implement.",
       "affects": [
         "C-1",
         "C-7"
@@ -2670,7 +2599,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), performance (weight 0.78). Two or more interchangeable instances per role b: 1.41; Single instance with health-based restart: 1.25; Active-active across two regions: unavailable (ruled out by single_region)",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.26; Active-active across two regions: unavailable (ruled out by single_region)",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-19"
@@ -2679,35 +2608,6 @@
     },
     {
       "id": "D-9",
-      "title": "Assumed answer: load (Q-rate)",
-      "context": "The requirements do not say. Question: Q-rate. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "100 requests/s",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "10 requests/s",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "1,000 requests/s",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "100 requests/s",
-      "rationale": "No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.",
-      "consequences": "If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.",
-      "affects": [
-        "C-19"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-10",
       "title": "Assumed answer: load (Q-payload)",
       "context": "The requirements do not say. Question: Q-payload. No evidence in the text; engine default.",
       "options": [
@@ -2736,7 +2636,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-11",
+      "id": "D-10",
       "title": "Assumed answer: data (Q-backup)",
       "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
       "options": [
@@ -2765,7 +2665,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-12",
+      "id": "D-11",
       "title": "Assumed answer: data (Q-migration)",
       "context": "The requirements do not say. Question: Q-migration. Evidence: legacy_integration pattern.",
       "options": [
@@ -2794,7 +2694,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-13",
+      "id": "D-12",
       "title": "Assumed answer: security (Q-authz)",
       "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
       "options": [
@@ -2824,7 +2724,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-14",
+      "id": "D-13",
       "title": "Assumed answer: operations (Q-alerting)",
       "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
       "options": [
@@ -2853,7 +2753,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-15",
+      "id": "D-14",
       "title": "Assumed answer: cost (Q-budget)",
       "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
       "options": [
@@ -3233,7 +3133,7 @@
         "R-9",
         "R-11",
         "R-12",
-        "R-18"
+        "R-17"
       ],
       "files": [
         "app/store.py",
@@ -3476,8 +3376,8 @@
         "R-5",
         "R-9",
         "R-12",
-        "R-19",
-        "R-20"
+        "R-18",
+        "R-19"
       ],
       "files": [
         "app/core.py",
@@ -3657,8 +3557,7 @@
         "R-8",
         "R-12",
         "R-15",
-        "R-16",
-        "R-17"
+        "R-16"
       ],
       "files": [
         "app/surface_api.py",

@@ -23,7 +23,7 @@ SECTIONS = [
     ("Requirements", ("requirements", "要件", "要求", "要求事項", "仕様")),
     ("Alternatives", ("alternatives", "alternatives considered", "options considered", "rejected alternatives", "代替案", "検討した代替案", "不採用案")),
     ("Background", ("motivation", "background", "context", "overview", "summary", "introduction", "problem", "why", "概要", "背景", "目的", "現状", "課題")),
-    ("Aside", ("appendix", "references", "open questions", "questions", "risks", "glossary", "changelog", "history", "参考", "付録", "用語", "更新履歴", "備考", "検討事項")),
+    ("Aside", ("appendix", "references", "open questions", "questions", "risks", "glossary", "changelog", "history", "actions", "action items", "next steps", "open items", "参考", "付録", "用語", "更新履歴", "備考", "検討事項", "宿題", "アクション", "次のステップ", "未決事項")),
 ]
 _SECTION_KEYS = {k: canon for canon, keys in SECTIONS for k in keys}
 
@@ -33,15 +33,16 @@ _LABELLED = re.compile(r"^\s*(?:\d+(?:\.\d+)*[.)]?\s+)?(?P<label>[^:：。.]{1,2
 _HEADING = re.compile(r"^\s*(#{1,6})\s*(.+?)\s*#*\s*$")
 _BULLET = re.compile(r"^(?P<indent>\s*)(?:[-*+•・●○■□▪◦]|\d+[.)．]|[①-⑳])\s+(?P<body>.*)$")
 _CHECKBOX = re.compile(r"^\[( |x|X|✓)\]\s*")
-_META_KEY = re.compile(r"^\s*\**(?:author|authors|status|owner|owners|reviewers?|date|created|updated|version|labels?|story points|epic|priority|tags?|present|attendees|作成|作成者|作成日|更新日|更新|版|ステータス|担当|承認|レビュー|出席|参加者)\**\s*[:：]", re.I)
+_META_KEY = re.compile(r"^\s*\**(?:author|authors|status|owner|owners|epic owner|reviewers?|date|created|updated|version|labels?|story points|epic|sprint(?: target)?|priority|tags?|present|attendees|requested by|requester|channel|approvers?|作成|作成者|作成日|更新日|更新|版|ステータス|担当|承認|レビュー|出席|参加者|依頼者)\**\s*[:：]", re.I)
+_TITLE_LINE = re.compile(r"^\s*(?:epic|change request|cr|rfc|ticket|story|issue|design doc|spec|proposal|要件定義書|仕様書)\s*[:：]?\s*(?:[A-Z]+-\d+|\d+)?\s*[—–:-]?\s*(?P<rest>[^\n]{3,})$", re.I)
 _META_INLINE = re.compile(r"(?:\*\*[^*]{1,20}:\*\*|[A-Za-z ]{1,20}:)\s*[^·|]{1,40}(?:\s*[·|]\s*|$)")
-_STORY = re.compile(r"^\s*(?:[A-Z]+-\d+\s*[—–-]\s*)?as an? (?P<actor>[a-z][a-z /-]{1,40}?),\s*i (?:want|need|would like)(?: to)?\s+(?P<want>.+?)(?:,?\s+so that\s+(?P<why>.+))?[.]?\s*$", re.I)
+_STORY = re.compile(r"^\s*(?:[A-Z][A-Z0-9]+-\d+\s*[—–:-]?\s*)?as an? (?P<actor>[a-z][a-z /-]{1,40}?),\s*i (?:want|need|would like)(?: to)?\s+(?P<want>.+?)(?:,?\s+so that\s+(?P<why>.+))?[.]?\s*$", re.I)
 _TICKET = re.compile(r"^\s*(?P<key>[A-Z][A-Z0-9]+-\d+)\s*[—–:-]\s*(?P<rest>.+)$")
 _TODO = re.compile(r"^\s*(?:todo|fixme|question|q|open question|要確認|未定|要検討|宿題)\b\s*[:：]?\s*", re.I)
 _TENTATIVE = re.compile(r"\b(?:maybe|later maybe|perhaps|not sure|tbd|tbc|to be decided|to be confirmed)\b|\?\s*$|未定|検討中|かも", re.I)
-_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|対象外|スコープ外|やらないこと)\s*[:：]\s*(?P<body>.+)$", re.I)
+_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|対象外|スコープ外|やらないこと)[^:：]{0,20}[:：]\s*(?P<body>.+)$", re.I)
 _DECIDED = re.compile(r"^\s*(?:decided|decision|agreed|決定|確定)\s*[:：]\s*(?P<body>.+)$", re.I)
-_SPEAKER = re.compile(r"^\s*(?P<name>[A-Z][a-z]{1,15})\s*:\s+(?P<body>[a-z].+)$")
+_SPEAKER = re.compile(r"^\s*(?P<name>[A-Z][a-z]{1,15})\s*:\s+(?P<body>.+)$")
 _SEPARATOR_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _DEADLINE = re.compile(r"(?:\bMVP\b|\brelease\b|\bship\b|\blaunch\b|\bgo[- ]live\b|\bdeadline\b|\bdue\b|リリース|納期|稼働開始|ローンチ)[^.。]{0,30}?(?:\d{4}\s*年\s*\d{1,2}\s*月|\d{4}[/-]\d{1,2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{4}|q[1-4] \d{4}|\d+ (?:weeks?|months?|days?)|\d+\s*(?:週間|ヶ月|か月|日))|\b(?:in|within) \d+ (?:weeks?|months?)\b|\d{4}\s*年\s*\d{1,2}\s*月\s*(?:リリース|稼働|ローンチ)", re.I)
 _DATE_LINE = re.compile(r"^\s*[^。.]{0,30}(?:\d{4}[/.-]\d{1,2}[/.-]\d{1,2}|\d{4}年\d{1,2}月)[^。.]{0,30}$")
@@ -141,13 +142,96 @@ def _split_row(line: str) -> list[str]:
     return [c.replace("\\¦", "|") for c in re.split(r"(?<!\\)\|", s.replace("\\|", "\\¦"))]
 
 
+_GWT = re.compile(r"^\s*(given|when|then|and|but)\b\s*(.*)$", re.I)
+_STORY_PROSE = re.compile(r"^\s*(?:[A-Z][A-Z0-9]+-\d+\s*[—–:-]?\s*)?as an? [a-z][a-z /-]{1,40}?,\s*i (?:want|need|would like)\b", re.I)
+_SECTION_NUM = re.compile(r"^\s*\d+(?:\.\d+)+\s+(?=[A-Za-z぀-ヿ㐀-䶿一-鿿])")
+_PAGE_LINE = re.compile(r"^\s*(?:page\s+\d+(?:\s+of\s+\d+)?|\d+\s*/\s*\d+|-\s*\d+\s*-|\d+)\s*$", re.I)
+_META_TABLE_HEADERS = {"field", "value", "key", "item", "property", "attribute", "項目", "値", "term", "definition", "glossary", "用語", "定義", "意味"}
+_TEAM_COUNT = re.compile(r"(\d+)\s*(?:x\s*)?(?:engineers?|devs?|developers?|sres?|people|persons?|members?|backend|frontend|mobile|platform|full[- ]stack|qa|designers?|ops|contractors?|名|人)", re.I)
+_SYSTEMS_AFFECTED = re.compile(r"^\s*(?:systems? affected|affected systems?|services? affected|existing services?|touches|impacted services?|対象システム|影響システム)\s*[:：]\s*(?P<body>.+)$", re.I)
+_ACTION_SECTION = ("actions", "action items", "next steps", "todo", "todos", "open questions", "questions", "open items", "宿題", "アクション", "次のステップ", "検討事項", "未決事項")
+
+
+def _is_meta_table(rows: list[list[str]]) -> bool:
+    """A two-column key/value table (Owner | Priya …, Status | DRAFT) is front matter, not requirements."""
+    if not rows or len(rows[0]) != 2:
+        return False
+    header = [c.strip().lower().strip("*") for c in rows[0]]
+    if any(h in _META_TABLE_HEADERS for h in header):
+        return True
+    body = rows[1:]
+    if not body:
+        return False
+    keys = [r[0].strip().lower() for r in body if len(r) == 2]
+    if all(_META_KEY.match(k + ":") for k in keys):
+        return True
+    return all(len(r[1].strip()) <= 60 and not re.search(r"\b(?:must|should|can|shall|within|every)\b|[。]", r[1]) for r in body if len(r) == 2) and len(body) <= 8
+
+
+def _merge_two_line_header(rows: list[list[str]]) -> list[list[str]]:
+    """'| ID | Requirement | Prio- |' + '|    |             | rity |' -> one header row."""
+    if len(rows) >= 3 and len(rows[0]) == len(rows[1]) and all(len(c.strip()) <= 6 or not c.strip() for c in rows[1]) \
+            and any(c.strip() for c in rows[1]) and not any(re.search(r"\b(?:must|should|can)\b|[。.]", c) for c in rows[1]):
+        merged = [(a.strip().rstrip("-") + b.strip()) if a.strip().endswith("-") else (a.strip() + (" " + b.strip() if b.strip() else "")) for a, b in zip(rows[0], rows[1])]
+        return [merged] + rows[2:]
+    return rows
+
+
+_PAGE_MARK = re.compile(r"\bpage\s+\d+\s+of\s+\d+\b|^\s*[-–]\s*\d+\s*[-–]\s*$", re.I)
+
+
+def _unwrap_pasted(lines: list[str], notes: list[str]) -> list[str]:
+    """Text pasted from a PDF: repeated page headers/footers are dropped and hard-wrapped lines are re-joined
+    (a line without end punctuation followed by a line starting in lower case; 'auto-' + 'approved' stays one word)."""
+    if not any(_PAGE_MARK.search(l) for l in lines):
+        return lines
+    counts: dict[str, int] = {}
+    for l in lines:
+        k = re.sub(r"\s+", " ", _PAGE_MARK.sub("", l)).strip()
+        if k:
+            counts[k] = counts.get(k, 0) + 1
+    repeated = {k for k, n in counts.items() if n >= 2 and len(k) >= 8}
+    kept: list[str] = []
+    dropped = 0
+    seen: set[str] = set()
+    for n, l in enumerate(lines):
+        k = re.sub(r"\s+", " ", _PAGE_MARK.sub("", l)).strip()
+        if k in repeated and not _BULLET.match(l):
+            if n <= 1 and k not in seen:
+                seen.add(k)
+                kept.append(_PAGE_MARK.sub("", l).rstrip())     # the document title, kept once
+                continue
+            dropped += 1
+            continue
+        if _PAGE_MARK.search(l):
+            dropped += 1
+            continue
+        kept.append(l)
+    out: list[str] = []
+    for l in kept:
+        s = l.rstrip()
+        if len(out) > 1 and out[-1] and s and not _BULLET.match(s) and not _HEADING.match(s) and not s.startswith("|"):
+            prev = out[-1]
+            if prev.endswith("-") and s[:1].islower():
+                out[-1] = prev + s.lstrip()
+                continue
+            if not prev.rstrip().endswith((".", "!", "?", ":", ";", "。", "|")) and not prev.strip().startswith("|") and len(prev.strip()) > 40 \
+                    and not _SECTION_NUM.match(s) and not _NUMBERED.match(s) and not _NUMBERED.match(prev) and not _HEADING.match(prev) \
+                    and not _META_KEY.match(s):
+                out[-1] = prev.rstrip() + " " + s.lstrip()
+                continue
+        out.append(l)
+    notes.append(f"pasted-document cleanup: {dropped} header/footer/page lines dropped, {len(kept) - len(out)} wrapped lines re-joined")
+    return out
+
+
 def canonicalise(text: str) -> Canonical:
     can = Canonical("")
     out: list[str] = []
-    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    if lines and lines[0].startswith("﻿"):
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").split("\n")
+    if lines and lines[0].startswith("\ufeff"):
         lines[0] = lines[0][1:]
-    seen_heading = False
+    lines = _unwrap_pasted(lines, can.notes)
     seen_content = False
     section = ""
     i = 0
@@ -155,13 +239,34 @@ def canonicalise(text: str) -> Canonical:
     parent_stack: list[tuple[int, str]] = []   # (indent, bullet text) for nested bullets
     title_written = False
     story_actor_now = ""
+    gwt: list[str] = []                        # Given/When/Then lines being collected
+    in_actions = False
+
+    def emit_section(canon: str) -> None:
+        nonlocal section, in_actions
+        section = canon
+        in_actions = False
+        out.append("")
+        out.append("## " + canon)
+
+    def flush_gwt() -> None:
+        nonlocal gwt
+        if gwt:
+            parts = [g[0].upper() + g[1:] if n == 0 else g for n, g in enumerate(gwt)]
+            sent = ", ".join(parts)
+            out.append("- " + _resolve_i(sent, story_actor_now).rstrip(".") + ".")
+            can.notes.append(f"Given/When/Then folded into one acceptance requirement: {sent[:50]}…")
+            gwt = []
 
     def flush_table() -> None:
         nonlocal table
-        if len(table) >= 2:
-            out.extend(_table_to_bullets(table, can.notes))
-        elif table:
-            out.append("- " + "; ".join(c.strip() for c in table[0] if c.strip()))
+        rows = _merge_two_line_header(table)
+        if _is_meta_table(rows):
+            can.notes.append("front matter skipped: key/value table (" + ", ".join(r[0].strip() for r in rows[1:6] if r) + ")")
+        elif len(rows) >= 2:
+            out.extend(_table_to_bullets(rows, can.notes))
+        elif rows:
+            out.append("- " + "; ".join(c.strip() for c in rows[0] if c.strip()))
         table = []
 
     while i < len(lines):
@@ -171,6 +276,7 @@ def canonicalise(text: str) -> Canonical:
         stripped = line.strip()
         # ---- tables
         if stripped.startswith("|") or (table and "|" in stripped and not stripped.startswith(("-", "*", "#"))):
+            flush_gwt()
             if _SEPARATOR_ROW.match(stripped):
                 continue
             table.append(_split_row(stripped))
@@ -178,19 +284,56 @@ def canonicalise(text: str) -> Canonical:
         if table:
             flush_table()
         if not stripped:
+            flush_gwt()
             out.append("")
             parent_stack.clear()
             continue
-        # ---- numbered section headings without '#': "2. 機能要件", "3.1 Performance"
-        nm = _NUMBERED.match(line)
-        if nm and _section_of(nm.group("title")):
-            canon = _section_of(nm.group("title"))
-            section = canon
-            out.append("")
-            out.append("## " + canon)
-            can.notes.append(f"heading without '#': {stripped[:40]} → {canon}")
-            seen_heading = True
+        if _PAGE_LINE.match(stripped) and seen_content:
+            can.notes.append(f"page marker dropped: {stripped}")
             continue
+        # ---- Given/When/Then lines (any indentation, no bullet needed)
+        gm = _GWT.match(stripped)
+        if gm and (gwt or gm.group(1).lower() in ("given", "when")) and not _BULLET.match(line):
+            gwt.append(stripped[0].lower() + stripped[1:] if gwt else stripped)
+            continue
+        flush_gwt()
+        # ---- systems affected: a constraint that names the existing systems
+        sm2 = _SYSTEMS_AFFECTED.match(stripped)
+        if sm2:
+            names = [n.strip() for n in re.split(r"[,、;]\s*", sm2.group("body")) if n.strip()]
+            out.append("")
+            out.append("## Constraints")
+            out.append("- The existing systems " + ", ".join(names) + " are changed, not replaced; integration with each of them is required.")
+            out.append("")
+            out.append("## " + (section or "Requirements"))
+            can.notes.append(f"'systems affected' became a constraint naming {len(names)} existing systems")
+            seen_content = True
+            continue
+        # ---- numbered section headings without '#': "2. 機能要件", "3.1 Performance", "5. Rollout"
+        nm = _NUMBERED.match(line)
+        if nm and not _BULLET.match(line) or (nm and _section_of(nm.group("title"))):
+            title = nm.group("title").strip()
+            canon = _section_of(title)
+            if canon:
+                if canon == "Aside" and title.strip().lower() in _ACTION_SECTION:
+                    section, in_actions = "Aside", True
+                    continue
+                emit_section(canon)
+                can.notes.append(f"heading without '#': {stripped[:40]} → {canon}")
+                continue
+            if len(title) <= 30 and not re.search(r"[a-z]{3,} [a-z]{3,} [a-z]{3,}", title):
+                emit_section("Requirements")            # an unknown numbered heading resets the section
+                out.append("### " + title)
+                can.notes.append(f"heading without '#': {stripped[:40]} → (generic)")
+                continue
+        if nm and _BULLET.match(line) and len(nm.group("title").split()) <= 4 and not re.search(r"[.!?。:]", nm.group("title")) \
+                and not _TEAM_COUNT.search(nm.group("title")) and re.match(r"^\s*\d+[.)]\s", line):
+            nxt = next((l for l in lines[i:] if l.strip()), "")
+            if not re.match(r"^\s*\d+[.)]\s", nxt) and not _section_of(nm.group("title")):
+                emit_section("Requirements")
+                out.append("### " + nm.group("title").strip())
+                can.notes.append(f"heading without '#': {stripped[:40]} → (generic)")
+                continue
         # ---- markdown headings
         hm = _HEADING.match(line)
         if hm:
@@ -202,59 +345,69 @@ def canonicalise(text: str) -> Canonical:
                 out.append(_story_sentence(st))
                 story_actor_now = st.group("actor").strip()
                 can.notes.append(f"user story in heading folded into a requirement: {title[:60]}")
-                seen_heading = seen_content = True
+                seen_content = True
                 continue
             tk = _TICKET.match(title)
             if len(hashes) == 1 and tk and not title_written:
                 out.append("# " + tk.group("rest").strip())
-                title_written = seen_heading = True
+                title_written = True
                 continue
             if tk and len(hashes) >= 2 and len(tk.group("rest").split()) >= 5 and not _section_of(tk.group("rest")):
                 out.append("")
                 out.append(f"- {tk.group('rest').strip()}")
                 can.notes.append(f"ticket heading {tk.group('key')} folded into a requirement")
-                seen_heading = seen_content = True
+                seen_content = True
                 continue
             canon = _section_of(title)
             if len(hashes) == 1 and not title_written:
                 out.append("# " + title)
                 title_written = True
-                seen_heading = True
                 continue
-            section = canon or ""
+            if canon == "Aside" and re.sub(r"^\d+(?:\.\d+)*[.)]?\s*", "", title.lower().strip(":：")) in _ACTION_SECTION:
+                section, in_actions = "Aside", True
+                continue
             if canon in ("Alternatives", "Aside"):
-                seen_heading = True
+                section, in_actions = canon, False
                 continue
-            out.append(("## " + canon) if canon else f"{hashes} {title}")
-            seen_heading = True
+            if canon:
+                emit_section(canon)
+            else:
+                emit_section("Requirements")
+                out[-1] = f"{hashes} {title}"
+                section = ""
             continue
         # ---- bare title line before any content; list-intro lines ("Acceptance criteria:")
-        if not seen_content and not title_written and len(stripped) <= 60 and not stripped.endswith(("。", ".", "!", "?")) \
-                and not _META_KEY.match(stripped) and not _BULLET.match(line):
-            title = stripped
+        tl = _TITLE_LINE.match(stripped) if not title_written and not seen_content else None
+        if tl or (not seen_content and not title_written and len(stripped) <= 80 and not stripped.endswith(("。", ".", "!", "?"))
+                  and not _META_KEY.match(stripped) and not _BULLET.match(line)):
+            title = (tl.group("rest") if tl else stripped).strip()
             canon = _section_of(title)
             if canon:
-                section = canon
-                out.append("")
-                out.append("## " + canon)
-                seen_heading = True
+                emit_section(canon)
                 continue
             out.append("# " + re.sub(r"\s*(?:v\d+(?:\.\d+)*|\(案\)|\(draft\)|draft)\s*$", "", title, flags=re.I).strip())
             title_written = True
-            seen_heading = True
             continue
         if re.fullmatch(r"[^。.!?]{2,40}[:：]", stripped) and not _BULLET.match(line):
             canon = _section_of(stripped)
-            if canon:
-                section = canon
-                out.append("")
-                out.append("## " + canon)
+            if canon == "Aside" and stripped.lower().strip(":：") in _ACTION_SECTION:
+                section, in_actions = "Aside", True
+            elif canon in ("Alternatives", "Aside"):
+                section, in_actions = canon, False
+            elif canon:
+                emit_section(canon)
             else:
                 can.notes.append(f"list intro dropped: {stripped}")
             continue
-        if nm and not _BULLET.match(line) and len(nm.group("title")) <= 30 and not re.search(r"[a-z]{3,} [a-z]{3,} [a-z]{3,}", nm.group("title")):
-            out.append("")
-            out.append("### " + nm.group("title").strip())
+        # a bare word/short line that is a section name ("Summary", "Stories", "Technical notes (from grooming)")
+        if not _BULLET.match(line) and len(stripped) <= 60 and _section_of(stripped) and not stripped.endswith(("。", ".")):
+            canon = _section_of(stripped)
+            if canon == "Aside" and stripped.lower() in _ACTION_SECTION:
+                section, in_actions = "Aside", True
+            elif canon in ("Alternatives", "Aside"):
+                section, in_actions = canon, False
+            else:
+                emit_section(canon)
             continue
         # ---- front matter / metadata
         if not seen_content and (_META_KEY.match(stripped) or _DATE_LINE.match(stripped) or stripped.startswith(("※", "Status:", "Labels:", "**Labels"))):
@@ -266,13 +419,18 @@ def canonicalise(text: str) -> Canonical:
         if re.fullmatch(r"(?:\*\*[^*]+:\*\*\s*[^*]+\s*){2,}", stripped) or (stripped.count("·") >= 1 and _META_INLINE.match(stripped) and len(stripped) < 120):
             can.notes.append(f"metadata line skipped: {stripped[:50]}")
             continue
-        # ---- alternatives / aside sections are not requirements
+        # ---- alternatives / actions / aside sections are not requirements
         if section == "Alternatives":
             bm = _BULLET.match(line)
             if bm:
                 can.alternatives.append(bm.group("body").strip())
             continue
         if section == "Aside":
+            if in_actions:
+                bm = _BULLET.match(line)
+                body = (bm.group("body") if bm else stripped).strip()
+                if body:
+                    can.todos.append(body)
             continue
         seen_content = True
         # ---- bullets
@@ -287,23 +445,24 @@ def canonicalise(text: str) -> Canonical:
                     can.notes.append(f"checked item kept as a requirement (already done?): {body[:50]}")
             om = _OUT_INLINE.match(body)
             if om:
-                out.append("")
-                out.append("## Out of scope")
+                emit_section("Out of scope")
                 for part in re.split(r"[、,;]\s*", om.group("body")):
                     if part.strip():
                         out.append("- " + part.strip())
                 out.append("")
-                out.append("## " + (section or "Requirements"))
+                out.append("## " + (section_before(out) or "Requirements"))
+                section = section_before(out) or ""
                 can.notes.append("inline 'out of scope:' became a section")
                 continue
             dm = _DECIDED.match(body)
             if dm:
                 body = dm.group("body").strip()
-                out.append("")
-                out.append("## Constraints")
+                prev = section
+                emit_section("Constraints")
                 out.append("- " + body)
                 out.append("")
-                out.append("## " + (section or "Requirements"))
+                out.append("## " + (prev or "Requirements"))
+                section = prev
                 can.notes.append(f"DECIDED: folded into constraints: {body[:50]}")
                 continue
             tm = _TODO.match(body)
@@ -312,30 +471,22 @@ def canonicalise(text: str) -> Canonical:
                 can.notes.append(f"TODO/question lifted out of the requirements: {body[:50]}")
                 continue
             sm = _SPEAKER.match(body)
-            if sm and sm.group("name").lower() not in ("auth", "team", "note", "goal", "cost", "todo", "api", "deploy", "data"):
-                body = sm.group("body").strip()
+            if sm and sm.group("name").lower() not in _NOT_SPEAKERS:
                 can.notes.append(f"speaker label dropped: {sm.group('name')}")
+                lines.insert(i, " " * indent + "- " + sm.group("body").strip())
+                continue
             st = _STORY.match(body)
             if st:
                 body = _story_sentence(st).lstrip("- ").strip()
                 story_actor_now = st.group("actor").strip()
             elif story_actor_now and re.search(r"\bI\b|\bmy\b", body):
-                body = re.sub(r"\bI ([a-z]+(?:-[a-z]+)*)\b", lambda m: f"the {story_actor_now} " + (m.group(1) if m.group(1) in _NO_S else _third_person(m.group(1))), body)
-                body = re.sub(r"\bI\b", "the " + story_actor_now, body)
-                body = re.sub(r"\bmy\b", "their", body)
+                body = _resolve_i(body, story_actor_now)
             tk = _TICKET.match(body)
             if tk:
                 body = tk.group("rest").strip()
-            tm2 = re.match(r"^(?:team|チーム|体制|members?)\s*[:：]\s*(?P<names>.+)$", body, re.I)
-            if tm2 and not re.search(r"\bteam of \d|\d\s*(?:名|人)", body):
-                head = re.sub(r"\b(?:half|full|part)[- ]time\b|\(.*?\)", "", re.split(r"[.。;]", tm2.group("names"))[0])
-                names = [n.strip() for n in re.split(r"\s*(?:\+|,|、|/| and | & )\s*", head) if n.strip() and len(n.strip().split()) <= 2]
-                if names:
-                    body = f"Team of {len(names)} ({', '.join(n.strip() for n in names)}). " + body
-                    can.notes.append(f"team size {len(names)} read from the names")
+            body = _team_line(body, can)
             if _TENTATIVE.search(body) and not re.search(r"\bmust\b|必須", body):
                 can.tentative.append(body)
-            # nested bullets: keep them as their own requirement but remember the parent for the notes
             while parent_stack and parent_stack[-1][0] >= indent:
                 parent_stack.pop()
             if parent_stack and indent > parent_stack[-1][0]:
@@ -346,7 +497,21 @@ def canonicalise(text: str) -> Canonical:
                 can.deadline = dl.group(0).strip()
             out.append(" " * indent + "- " + body)
             continue
-        # ---- labelled prose lines: "3.1 性能: 一覧検索は…" / "auth: Google SSO"
+        # ---- user stories written as prose ("VOD-2211 As a viewer, I want …")
+        if _STORY_PROSE.match(stripped):
+            st = _STORY.match(re.sub(r"^\s*([A-Z][A-Z0-9]+-\d+)\s*[—–:-]?\s*", "", stripped))
+            if st:
+                out.append("")
+                out.append(_story_sentence(st))
+                story_actor_now = st.group("actor").strip()
+                can.notes.append(f"user story folded into a requirement: {stripped[:60]}")
+                continue
+        # ---- section-numbered requirement lines: "2.1 checkout-api must accept …"
+        if _SECTION_NUM.match(stripped):
+            stripped = _SECTION_NUM.sub("", stripped, count=1)
+            line = stripped
+            can.notes.append(f"section number dropped from: {stripped[:40]}")
+        # ---- labelled prose lines: "3.1 性能: 一覧検索は…" / "auth: Google SSO" / "Raj: feature store first. …"
         lm = _LABELLED.match(line)
         if lm and not stripped.startswith(("http", "www")):
             label, body = lm.group("label").strip(), lm.group("body").strip()
@@ -355,42 +520,93 @@ def canonicalise(text: str) -> Canonical:
                 can.deadline = dl.group(0).strip()
             om = _OUT_INLINE.match(stripped)
             if om:
-                out.append("")
-                out.append("## Out of scope")
+                prev = section
+                emit_section("Out of scope")
                 for part in re.split(r"[、,;]\s*", om.group("body")):
                     if part.strip():
                         out.append("- " + part.strip())
                 out.append("")
-                out.append("## " + (section or "Requirements"))
+                out.append("## " + (prev or "Requirements"))
+                section = prev
                 continue
             dm = _DECIDED.match(stripped)
             if dm:
+                prev = section
+                emit_section("Constraints")
                 out.append("- " + dm.group("body").strip())
+                out.append("")
+                out.append("## " + (prev or "Requirements"))
+                section = prev
                 continue
             if _TODO.match(stripped):
                 can.todos.append(body)
                 continue
             canon = _section_of(label)
             if canon and canon not in ("Background", "Aside"):
-                section = canon
-                out.append("")
-                out.append("## " + canon)
-                out.append("- " + body)
+                emit_section(canon)
+                out.append("- " + _team_line(body, can))
                 continue
-            if len(label.split()) <= 3 and not re.fullmatch(r"[\d\s.:：]+", label) and not re.match(r"\d{1,2}$", label):
-                out.append("- " + body)
-                can.notes.append(f"label '{label}' dropped from: {body[:40]}")
+            bad_label = re.fullmatch(r"[\d\s.:：]+", label) or re.search(r"\d$", label) and re.match(r"\d", body) or re.match(r"\d{1,2}$", label)
+            if len(label.split()) <= 3 and not bad_label:
+                speaker = re.fullmatch(r"[A-Z][a-z]{1,15}", label) and label.lower() not in _NOT_SPEAKERS
+                can.notes.append(f"{'speaker' if speaker else 'label'} '{label}' dropped from: {body[:40]}")
+                lines.insert(i, body)       # the body goes through every branch again (out of scope:, DECIDED:, TODO …)
                 continue
         if section == "Background":
-            out.append(line)       # prose: summary, not a requirement
+            out.append(line)       # prose: summary, not a requirement (reported in the notes as read-not-designed)
             continue
-        out.append(line)           # indentation kept: a wrapped bullet continues on an indented line
+        out.append(_team_line(line, can) if _TEAM_COUNT.search(line) else line)   # indentation kept: a wrapped bullet continues on an indented line
+    flush_gwt()
     if table:
         flush_table()
     can.text = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
     can.rationales = {k: v for k, v in _WHY.items() if k in can.text}
     _WHY.clear()
     return can
+
+
+_NOT_SPEAKERS = {"auth", "team", "note", "goal", "cost", "todo", "api", "deploy", "data", "load", "scale", "target", "volume", "security",
+                 "stack", "infra", "deadline", "owner", "status", "summary", "context", "scope", "risk", "risks", "actions", "decision", "decided"}
+
+
+def section_before(out: list[str]) -> str:
+    """The section heading in force before the last emitted one (for returning after an inline fold)."""
+    heads = [l[3:] for l in out[:-2] if l.startswith("## ")]
+    for h in reversed(heads):
+        if h not in ("Out of scope", "Constraints"):
+            return h
+    return heads[-1] if heads else ""
+
+
+def _resolve_i(body: str, actor: str) -> str:
+    if not actor:
+        return body
+    body = re.sub(r"\bI am\b", f"the {actor} is", body)
+    body = re.sub(r"\bI ([a-z]+(?:-[a-z]+)*)\b", lambda m: f"the {actor} " + (m.group(1) if m.group(1) in _NO_S else _third_person(m.group(1))), body)
+    body = re.sub(r"\bI\b", "the " + actor, body)
+    body = re.sub(r"\bmy\b", "their", body)
+    return body
+
+
+def _team_line(body: str, can: Canonical) -> str:
+    """'Team: 5 engineers, 1 SRE' / 'Team of 4 backend + 2 mobile' / 'team: Bo + Chen' -> a 'Team of N' the engine reads."""
+    if re.search(r"\bteam of \d+\.", body, re.I):
+        return body
+    m = re.match(r"^(?:team|チーム|体制|members?|staffing)\s*(?:is|are|=|:|：)?\s*(?P<rest>.+)$", body, re.I) or re.search(r"\bteam of (?P<rest>\d+[^.。]*?\+[^.。]*)", body, re.I)
+    if not m:
+        return body
+    rest = re.split(r"[.。;]", m.group("rest"))[0]
+    counts = [int(x) for x in _TEAM_COUNT.findall(rest)]
+    if counts:
+        n = sum(counts)
+        can.notes.append(f"team size {n} read from '{rest.strip()[:40]}'")
+        return f"Team of {n}. " + body
+    head = re.sub(r"\b(?:half|full|part)[- ]time\b|\(.*?\)", "", rest)
+    names = [x.strip() for x in re.split(r"\s*(?:\+|,|、|/| and | & )\s*", head) if x.strip() and len(x.strip().split()) <= 2 and re.match(r"[A-Z][a-z]+", x.strip())]
+    if len(names) >= 1 and all(re.fullmatch(r"[A-Z][a-z]+(?: [A-Z][a-z]+)?", x) for x in names):
+        can.notes.append(f"team size {len(names)} read from the names")
+        return f"Team of {len(names)} ({', '.join(names)}). " + body
+    return body
 
 
 _NO_S = {"can", "may", "must", "should", "will", "would", "could", "am", "have", "had", "was", "did", "do", "cannot", "need", "want", "get", "see"} - {"want", "get", "see", "need"}
@@ -411,10 +627,27 @@ def _third_person(v: str) -> str:
 _WHY: dict[str, str] = {}
 
 
+_WANT_VERBS = {"be", "have", "get", "see", "know", "receive", "find", "use", "access", "understand", "share", "make", "keep", "avoid", "stop", "start", "mark", "track", "manage", "give", "let", "take", "put", "add", "remove"}
+
+
 def _story_sentence(m: re.Match) -> str:
+    from . import text as T
     actor = m.group("actor").strip()
     want = re.sub(r"\bmy\b", "their", re.sub(r"\bI\b", "they", m.group("want").strip().rstrip(".")))
     why = re.sub(r"\bmy\b", "their", re.sub(r"\bI\b", "they", (m.group("why") or "").strip().rstrip(".")))
+    first = want.split()[0].lower() if want.split() else ""
+    # "I want playback to adapt …", "I want clips to be geo-blocked …": the wish is about a thing, not an action
+    if first and not T.verb_of(first) and first not in _WANT_VERBS and first not in ("to", "an", "a", "the"):
+        om = re.match(r"^(?P<obj>[A-Za-z][\w' -]{0,50}?) to (?P<rest>.+)$", want)
+        if om:
+            actor_pl = actor if actor.endswith("s") else actor + "s"
+            obj = om.group("obj").strip()
+            s = f"- {obj[0].upper() + obj[1:]} must {om.group('rest').strip()} (for {actor_pl})"
+            if why:
+                _WHY[s[2:] + "."] = why
+            return s + "."
+    if first == "to":
+        want = want[3:]
     actor_pl = actor if actor.endswith("s") else actor + "s"
     s = f"- {actor_pl.capitalize()} can {want}"
     if why:

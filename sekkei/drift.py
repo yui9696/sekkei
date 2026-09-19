@@ -12,6 +12,8 @@ Standard-library ``ast`` only, Python only. Checks:
 """
 from __future__ import annotations
 
+import re
+
 import ast
 from dataclasses import dataclass
 from pathlib import Path
@@ -160,6 +162,9 @@ def check(design: Design, root: str | Path) -> list[Finding]:
             continue
         syms = _collect_symbols(files)
         for o in iface.operations:
+            if re.match(r"^(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+/", o.name) or "/" in o.name or " " in o.name.strip():
+                out.append(Finding("not_checkable", "info", f"operation {o.name!r} is an HTTP route, not a Python symbol", iface.id))
+                continue
             name = o.name.split("(")[0].split(".")[-1].strip()
             if name in syms.functions:
                 declared = [p.name for p in o.inputs]

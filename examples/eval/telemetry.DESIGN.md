@@ -303,15 +303,15 @@ graph LR
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
 | `store_duplicates` | `duplicates`: Duplicates \| id | Duplicates \| None | ValidationError, NotFound | — |
 | | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
-| `get_latest` | `latest`: Latest \| id | Latest \| None | ValidationError, NotFound | — |
+| `get_latest` | `latest`: Latest \| id | Latest \| None | ValidationError, NotFound | stated values: 24-hour (R-3) |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
-| `get_truck` | `truck`: Truck \| id | Truck \| None | ValidationError, NotFound | — |
+| `get_truck` | `truck`: Truck \| id | Truck \| None | ValidationError, NotFound | stated values: 24-hour (R-3) |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
 | `notify_sms` | `sms`: Sms \| id | Sms \| None | ValidationError, NotFound | stated values: 5 minutes (R-4) |
 | | from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n | | | |
 | `aggregate_readings` | `readings`: Readings \| id | Readings \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
-| `export_sftp` | `sftp`: Sftp \| id | Sftp \| None | ValidationError, NotFound | — |
+| `export_server` | `server`: Server \| id | Server \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 
 ### I-8 — Notifier interface
@@ -385,7 +385,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `GET /latests/{id}` | `id`: str | 200 latest | 401 unauthenticated, 404 unknown id | — |
+| `GET /latests/{id}` | `id`: str | 200 latest | 401 unauthenticated, 404 unknown id | stated values: 24-hour (R-3) |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
 
 ### I-15 — MQTT consumer interface
@@ -499,11 +499,11 @@ sequenceDiagram
 
 **Context.** Management operations must be attributable to a customer or operator.
 
-- ✘ **API keys per customer, hashed at rest, sent as a bearer token**
+- ✔ **API keys per customer, hashed at rest, sent as a bearer token**
   - + simple
   - + scriptable
   - − no delegation or expiry unless added
-- ✔ **OAuth2 / OIDC with the platform's identity provider**
+- ✘ **OAuth2 / OIDC with the platform's identity provider**
   - + single sign-on
   - + expiry and scopes
   - − integration effort
@@ -517,9 +517,9 @@ sequenceDiagram
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.29; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
-**Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
+**Consequences.** Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
 _Affects:_ C-10
 
@@ -608,7 +608,7 @@ _Affects:_ C-14, C-12
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 1.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s). stated in the constraints
 
 _Affects:_ C-2
 
@@ -928,7 +928,7 @@ Implement Readings processor: Computes over readings on behalf of the core. Synt
 - **depends on**: WP-1 · **satisfies**: R-2
 - **write scope**: `src/main/java/app/ReadingsProcessor.java`, `src/test/java/app/ReadingsProcessorTest.java`
 - **acceptance**:
-  - A-7 (test) unit tests of Readings processor pass — `./gradlew test --tests app.Readings_processorTest`
+  - A-7 (test) unit tests of Readings processor pass — `./gradlew test --tests app.ReadingsProcessorTest`
 - **notes**: family: synthesised:readings_processor
 
 ### WP-5 — Domain core (S)
@@ -951,7 +951,7 @@ Implement MQTT consumer: Subscribes to the broker's topics, validates and de-dup
 - **depends on**: WP-1, WP-5 · **satisfies**: R-1
 - **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`
 - **acceptance**:
-  - A-10 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.Mqtt_consumerTest`
+  - A-10 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.MqttConsumerTest`
 - **notes**: family: mqtt_ingest
 
 ### WP-7 — Import/export (S)
@@ -985,7 +985,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-9, R-13, R-15
 - **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
 - **acceptance**:
-  - A-14 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
+  - A-14 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.SurfaceApiTest`
   - A-15 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
 - **notes**: family: infra
 

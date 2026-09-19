@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import graph as G
+from . import model as M
 from . import render as RD
 from .model import Design, Requirement, WorkPackage
 
@@ -87,6 +88,7 @@ def executive_summary(design: Design, notes) -> str:
     nfr = [r for r in design.requirements if r.kind == "nonfunctional" and r.metric]
     risks = sorted(design.risks, key=lambda k: -(LEVEL.get(k.likelihood, 2) * LEVEL.get(k.impact, 2)))[:5]
     open_qs = [q for q in notes.questions if q.id not in {a.question_id for a in notes.answers}]
+    text_qs = list(getattr(notes, "text_questions", []) or [])
     s = [f"# {design.name} — executive summary\n", design.summary or "", "",
          "## What is being built\n"]
     s += [f"- {g}" for g in design.goals[:8]] or ["- (no goals derived; see the requirements)"]
@@ -105,7 +107,8 @@ def executive_summary(design: Design, notes) -> str:
     s += [f"- **{k.id}** ({k.likelihood}/{k.impact}): {k.description} — *{k.mitigation}*" for k in risks]
     s += ["", "## Decisions that need a human\n"]
     s += [f"- {d.id} {d.title}: proposed **{d.choice}**" for d in design.decisions if d.status == "proposed"][:10] or ["- none; every decision is backed by the text"]
-    s += ["", f"## Open questions: {len(open_qs)}\n"]
+    s += ["", f"## Open questions: {len(open_qs) + len(text_qs)}\n"]
+    s += [f"- (from the text) {q}" for q in text_qs[:10]]
     s += [f"- {q.question}" for q in open_qs[:10]]
     return "\n".join(s).rstrip() + "\n"
 
@@ -230,7 +233,7 @@ def fmea(design: Design) -> str:
     for c in design.components:
         is_async = bool(arch[c.id] & _ASYNC)
         affected = {c.id} if is_async else {c.id} | deps.get(c.id, set())
-        sat = sorted({r for x in design.components if x.id in affected for r in x.satisfies})
+        sat = sorted({r for x in design.components if x.id in affected for r in x.satisfies if r in req and req[r].kind != "constraint"})
         musts = [r for r in sat if r in req and req[r].priority == "must"]
         sev = ("medium" if musts else "low") if is_async else ("high" if musts else "medium" if sat else "low")
         for mode, effect in _MODES:
@@ -335,26 +338,46 @@ def slos(design: Design) -> str:
         if r.kind != "nonfunctional" or not r.metric or r.rationale.startswith("assumed"):
             continue
         m = r.metric
-        if not any(k in m.name for k in ("latency", "availability", "ratio", "rate", "lost", "time")) or m.target == "review":
-            continue
+        low = r.statement.lower()
+        is_avail = ("%" in m.target or m.unit.strip().startswith("%")) and re.search(r"availab|uptime|during|monthly|of the time|trading hours|business hours|稼働", low) is not None
+        is_latency = "latency" in m.name
+        is_loss = "lost" in m.name or "duplicate" in m.name
+        if not (is_avail or is_latency or is_loss) or m.target == "review":
+            continue          # rates, sizes, retention periods and "99.9 % of payments within 24 h" are not SLOs to page on
         cmp, val = _num(m.target)
         budget = ""
-        if val is not None and (m.unit.strip().startswith("%") or "%" in m.target) and 90 <= val < 100:
-            minutes = (100 - val) / 100 * 30 * 24 * 60
-            budget = f"error budget {minutes:.1f} min / 30 days = (100 − {val:g}) % × 43,200 min"
+        pct = re.search(r"\bp(50|90|95|99|999)\b", m.name)
+        p = "p" + pct.group(1) if pct else "p95"
+        if is_avail and val is not None and 90 <= val < 100:
+            window_min = 30 * 24 * 60
+            note = ""
+            hm = re.search(r"(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})", r.statement)
+            if hm:
+                hours = (int(hm.group(3)) * 60 + int(hm.group(4)) - int(hm.group(1)) * 60 - int(hm.group(2))) / 60
+                if 0 < hours < 24:
+                    days = 22 if re.search(r"trading|business|weekday|営業", low) else 30
+                    window_min = int(hours * 60 * days)
+                    note = f" (stated window {hm.group(0)}: {hours:g} h × {days} days)"
+            minutes = (100 - val) / 100 * window_min
+            budget = f"error budget {minutes:.1f} min / 30 days = (100 − {val:g}) % × {window_min:,} min{note}"
             alert = "page at 14.4× burn over 1 h and 6× over 6 h (multi-window burn rate)"
-        elif "latency" in m.name and val is not None:
-            budget = f"5 % of requests may exceed {val:g} {m.unit.strip()} (p95)" if "p95" in m.name else f"target {m.target} {m.unit}"
-            alert = f"alert when the 5-minute p95 exceeds {val:g} {m.unit.strip()} for 10 minutes"
-        elif val is not None:
-            budget = "as stated"
-            alert = "alert on breach for 10 minutes"
-        else:
+        elif is_latency and val is not None:
+            unit = m.unit.strip() if m.unit.strip() not in m.target else ""
+            shown = f"{val:g} {unit}".strip() if unit else m.target.lstrip("<=> ")
+            share = {"p50": "50 %", "p90": "10 %", "p95": "5 %", "p99": "1 %", "p999": "0.1 %"}[p]
+            budget = f"{share} of requests may exceed {shown} ({p})" if pct else f"target {M.metric_text(m)}"
+            alert = f"alert when the 5-minute {p} exceeds {shown} for 10 minutes"
+        elif is_loss and val is not None:
+            budget = "zero tolerance: every occurrence is an incident"
+            alert = "alert on the first occurrence"
+        elif val is None:
             budget = "**target to agree** (quality statement without a number)"
             alert = "—"
+        else:
+            continue
         rows.append([r.id, m.name, _slo_target(m), budget, alert, r.statement[:120]])
-    return ("# SLOs\n\nOne row per measurable quality requirement stated in the text (latency, availability, rate, loss, time); engine assumptions are not SLOs. "
-            "Error budgets use a 30-day window. Burn-rate thresholds are the usual SRE defaults; tune after a month of data.\n\n"
+    return ("# SLOs\n\nOne row per availability, latency or loss target stated in the text; rates, sizes and retention periods are capacity/compliance facts, not SLOs, and engine assumptions are never SLOs. "
+            "Error budgets use a 30-day window (or the stated service window × 22 trading days). Burn-rate thresholds are the usual SRE defaults; tune after a month of data.\n\n"
             + (_table(["req", "SLI", "SLO", "budget", "alerting", "source"], rows) if rows else "No measurable quality requirement stated; agree SLOs before go-live.\n"))
 
 
@@ -476,17 +499,36 @@ def runbooks(design: Design) -> str:
 # ---------------------------------------------------------------------------
 
 
+MANIFEST = ".sekkei-deliverables.json"
+
+
 @dataclass
 class Package:
     files: dict[str, str] = field(default_factory=dict)
 
     def write(self, out: Path) -> list[Path]:
+        """Writes the package. Files written by an earlier `deliver` into the same directory (listed in its manifest)
+        and not produced this time are removed, so a stale ADR never survives a re-run; files sekkei never wrote are left alone."""
+        stale: list[str] = []
+        manifest = out / MANIFEST
+        if manifest.exists():
+            try:
+                old = json.loads(manifest.read_text(encoding="utf-8")).get("files", [])
+            except (ValueError, OSError):
+                old = []
+            for name in old:
+                if name not in self.files and (out / name).is_file():
+                    (out / name).unlink()
+                    stale.append(name)
         written = []
         for name, body in self.files.items():
             p = out / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(body, encoding="utf-8")
             written.append(p)
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(json.dumps({"files": sorted(self.files), "removed_stale": stale}, indent=1) + "\n", encoding="utf-8")
+        self.removed_stale = stale
         return written
 
 

@@ -11,5 +11,4 @@
 
 ## info
 
-- **RT01** [R-14] deleting this constraint changes nothing: it coincides with what the engine assumes by default (still worth stating)
-  - evidence: Patients authenticate existing patient portal (OIDC).
+- **RT02** [constraint R-14 removed (Patients authenticate existing patient portal (OIDC).)] 1 decision(s) change: Caller authentication: OAuth2 / OIDC with the platform's identity provider → API keys per customer, hashed at rest, sent as a bearer token

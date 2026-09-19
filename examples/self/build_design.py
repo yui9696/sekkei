@@ -174,7 +174,7 @@ b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort,
 b.component("C-27", "Japanese input", "Glossary, number/unit grammar, modality lexicon and particle-driven reorder that rewrite Japanese requirements into canonical English, with an audit table of every rewrite.",
             path="sekkei/engine/ja.py", satisfies=["R-20"])
 b.component("C-30", "Structure pass", "Reads real-world document structure (tables, numbered headings, stories, labels, front matter) into the canonical Markdown shape the engine reads, reporting every fold.",
-            path="sekkei/engine/structure.py", satisfies=["R-23"])
+            path="sekkei/engine/structure.py", requires=["I-13"], satisfies=["R-23"])
 b.component("C-31", "Exports", "Tracker issues (bodies, gh script, CSV) and an OpenAPI 3.0 skeleton derived from the design.",
             path="sekkei/export.py", requires=["I-1", "I-3"], satisfies=["R-24"])
 b.component("C-28", "Deliverables", "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
@@ -548,7 +548,7 @@ b.work_package("WP-18", "Japanese input", goal="Rewrite Japanese requirements in
                files=["sekkei/engine/ja.py", "tests/test_ja.py", "examples/ja/zaiko.md"],
                acceptance=[check("A-27", "Japanese tests pass (sentences, numbers, document, design, determinism)", command=T + "tests/test_ja.py")])
 b.work_package("WP-20", "Structure pass and exports", goal="Read specifications as engineers write them; export packages to trackers and interfaces to OpenAPI.",
-               components=["C-30", "C-31"], implements=["I-30", "I-31"], depends_on=["WP-1", "WP-2"], satisfies=["R-23", "R-24"], size="M",
+               components=["C-30", "C-31"], implements=["I-30", "I-31"], depends_on=["WP-1", "WP-2", "WP-12"], satisfies=["R-23", "R-24"], size="M",
                files=["sekkei/engine/structure.py", "sekkei/export.py", "tests/test_structure.py", "tests/test_export.py", "examples/real/"],
                acceptance=[check("A-30", "structure tests pass (tables, stories, labels, real specs lint-clean and deterministic, fuzz)", command=T + "tests/test_structure.py"),
                            check("A-31", "export tests pass (issues in dependency order, OpenAPI shape)", command=T + "tests/test_export.py")])

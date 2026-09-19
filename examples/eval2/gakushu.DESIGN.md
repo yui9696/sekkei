@@ -280,7 +280,7 @@ graph LR
 | | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
 | `notify_deadline` | `deadline`: Deadline \| id | Deadline \| None | ValidationError, NotFound | stated values: 3 days (R-5) |
 | | from R-5: The system must notify deadline 3 days before not yet taken employees email. | | | |
-| `get_email` | `email`: Email \| id | Email \| None | ValidationError, NotFound | — |
+| `get_employees` | `employees`: Employees \| id | Employees \| None | ValidationError, NotFound | — |
 | | from R-7: The system must view pages email employees locale (Japanese English). | | | |
 
 ### I-7 — Notifier interface

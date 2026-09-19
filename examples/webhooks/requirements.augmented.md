@@ -4,7 +4,7 @@ We run a SaaS. Customers register webhook endpoints; when things happen in our p
 (order.created, order.paid, refund.issued, ...) we must deliver a signed JSON event to
 every endpoint subscribed to that event type.
 
-Functional
+## Functional
 - Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose
   event types, rotate the signing secret.
 - Internal services publish events through an internal API (HTTP or in-process call).
@@ -19,7 +19,7 @@ Functional
 - Endpoints that fail continuously for 3 days are disabled automatically and the customer
   is notified by email.
 
-Non-functional
+## Non-functional
 - 1,000 events/s sustained publish rate, 5,000 endpoints; delivery latency p95 under 5 s
   for a healthy endpoint.
 - No event lost on process crash (persist before ack).
@@ -27,7 +27,7 @@ Non-functional
 - metrics (queue depth, delivery success rate, attempt latency) exposed for
   Prometheus; structured logs.
 
-Constraints
+## Constraints
 - Python 3.12, PostgreSQL available, Redis available. Single region. Team of 3.
 - Must run as a set of stateless containers behind our existing ingress.
 

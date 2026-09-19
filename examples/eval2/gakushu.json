@@ -915,15 +915,15 @@
           "description": "from R-5: The system must notify deadline 3 days before not yet taken employees email."
         },
         {
-          "name": "get_email",
+          "name": "get_employees",
           "inputs": [
             {
-              "name": "email",
-              "type": "Email | id",
+              "name": "employees",
+              "type": "Employees | id",
               "description": ""
             }
           ],
-          "output": "Email | None",
+          "output": "Employees | None",
           "errors": [
             "ValidationError",
             "NotFound"

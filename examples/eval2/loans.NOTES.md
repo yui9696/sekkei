@@ -9,31 +9,27 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | # | topic | question answered | engine's answer | basis | if the real answer differs |
 |---|---|---|---|---|---|
-| 1 | load | Q-rate | 100 requests/s sustained, 10x at peak (engine default, not derived). | default — No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption. | State the measured or expected rate; capacity estimates and the queue decision change. |
-| 2 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
-| 3 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
-| 4 | data | Q-migration | An existing system stays the system of record; records are exchanged, nothing is migrated in one shot. | evidence: legacy_integration pattern — The text names an existing system and describes an exchange with it. | State whether data moves; a migration package and risk are added. |
-| 5 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
-| 6 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
-| 7 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
+| 1 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
+| 2 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
+| 3 | data | Q-migration | An existing system stays the system of record; records are exchanged, nothing is migrated in one shot. | evidence: legacy_integration pattern — The text names an existing system and describes an exchange with it. | State whether data moves; a migration package and risk are added. |
+| 4 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
+| 5 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
+| 6 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
 
 ## 2. Capacity estimates
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 8.64 M | rate × 86,400 s | 100 (R-15) |
-| storage growth per day (requests) | 17.69 GB | rate × 86,400 × record size | 100 (R-15); 2 KB stated in R-16 |
-| storage after 30 days (requests) | 530.84 GB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-15); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-15); mean service time assumed 200 ms |
-| in-flight items at the latency target | 200 | rate × latency target (Little's law upper bound) | 100 (R-15) × 2 s (R-8) |
-| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-15); mean service time assumed 200 ms |
-| number of applications | 2 k | stated | 2,000 applications (R-8) |
-| average rate per application (if evenly spread) | 0.05/s | rate ÷ count | 100 ÷ 2,000 |
+| applications per day | 2 k | rate × 86,400 s | 2,000 (R-8) |
+| storage growth per day (applications) | 4.1 MB | rate × 86,400 × record size | 2,000 (R-8); 2 KB stated in R-15 |
+| storage after 30 days (applications) | 122.88 MB | daily growth × 30 | same inputs |
+| backlog after a 1 h downstream outage | 83.33 applications | rate × outage seconds | 2,000 (R-8); outage length assumed |
+| concurrent handlers to sustain the rate (applications) | 0 | Little's law: rate × mean service time | 2,000 (R-8); mean service time assumed 200 ms |
+| in-flight items at the latency target | 0.05 | rate × latency target (Little's law upper bound) | 2,000 (R-8) × 2 s (R-8) |
 | number of pending | 1 k | stated | 1,000 pending (R-8) |
-| average rate per pending (if evenly spread) | 0.1/s | rate ÷ count | 100 ÷ 1,000 |
+| average rate per pending (if evenly spread) | 0/s | rate ÷ count | 2,000 ÷ 1,000 |
 
-- Assumption: Record size: 2 KB stated in R-16.
+- Assumption: Record size: 2 KB stated in R-15.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
 
 ## 3. Effort and schedule
@@ -74,6 +70,10 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 
 ## 5. What the engine could not decide
 
+### Assumptions made
+
+- 1 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
@@ -82,23 +82,22 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 - D-4 How the approval workflow is implemented: **Explicit state machine in code: a transitions table (state, action, role) -> state, history rows in the store**
 - D-5 Protection of personal data: **Encryption at rest by the platform plus strict access control and audit**
 - D-6 Integration with the existing system: **Scheduled batch file exchange (CSV/fixed format) through a shared drop**
-- D-7 Concurrency control for conflicting writes: **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
+- D-7 Concurrency control for conflicting writes: **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
 - D-8 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
-- D-9 Assumed answer: load (Q-rate): **100 requests/s**
-- D-10 Assumed answer: load (Q-payload): **2 KB / 256 KB**
-- D-11 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-12 Assumed answer: data (Q-migration): **integrate, no migration**
-- D-13 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-14 Assumed answer: operations (Q-alerting): **error rate + queue growth**
-- D-15 Assumed answer: cost (Q-budget): **existing only**
+- D-9 Assumed answer: load (Q-payload): **2 KB / 256 KB**
+- D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-11 Assumed answer: data (Q-migration): **integrate, no migration**
+- D-12 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-13 Assumed answer: operations (Q-alerting): **error rate + queue growth**
+- D-14 Assumed answer: cost (Q-budget): **existing only**
 
 Every requirement was recognised and every active quality has a tactic. Review the decisions above; they are the judgement calls.
 
 ## 6. How the text was read
 
 - Patterns recognised: observability, auth, file_storage, batch_pipeline, ml_inference, audit_log, import_export, kyc, workflow, compliance_data, legacy_integration
-- Quality attributes (weight): consistency 0.55, durability 0.55, performance 0.78, availability 0.78, security 0.62, operability 1.0, simplicity 0.7, compliance 0.55
-- Constraint tokens: containers, idp, nightly_batch, object_storage, postgres, single_region; languages: python; team: 5
+- Quality attributes (weight): consistency 0.55, durability 0.55, performance 0.62, availability 0.78, security 0.62, operability 1.0, simplicity 0.7, compliance 0.55
+- Constraint tokens: containers, durable_required, idp, nightly_batch, object_storage, postgres, single_region; languages: python; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -116,9 +115,12 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-12 | constraint | must | file_storage | scalability, simplicity | — |
 | R-13 | constraint | must | auth | security | — |
 | R-14 | functional | could | auth | operability | — |
-| R-15 | nonfunctional | must | — | performance | sustained rate at 1,000 100 requests /s |
-| R-16 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
-| R-17 | nonfunctional | should | — | — | time at 4 h 24 h |
-| R-18 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
+| R-15 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
+| R-16 | nonfunctional | should | — | — | time at 4 h 24 h |
+| R-17 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |
+| R-18 | constraint | must | — | — | — |
 | R-19 | constraint | must | — | — | — |
-| R-20 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “A digital lender takes personal-loan applications online, checks identity and cr” (introduction before the first heading)

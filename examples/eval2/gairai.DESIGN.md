@@ -282,8 +282,6 @@ graph LR
 | | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
 | `register_slots` | `slots`: Slots \| id | Slots \| None | ValidationError, NotFound | — |
 | | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
-| `update_slots` | `slots`: Slots \| id | Slots \| None | ValidationError, NotFound | — |
-| | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
 | `cancel_slots` | `slots`: Slots \| id | Slots \| None | ValidationError, NotFound | — |
 | | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
 | `accept_patients` | `patients`: Patients \| id | Patients \| None | ValidationError, NotFound | — |
@@ -298,20 +296,12 @@ graph LR
 | | from R-3: Patients bookings the day before email or SMS receive reminders. | | | |
 | `get_information` | `information`: Information \| id | Information \| None | ValidationError, NotFound | — |
 | | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
-| `schedule_patients` | `patients`: Patients \| id | Patients \| None | ValidationError, NotFound | — |
-| | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 | `generate_departments` | `departments`: Departments \| id | Departments \| None | ValidationError, NotFound | — |
 | | from R-5: The system must generate slots departments each opening hours doctors shifts from weekly. | | | |
 | `update_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
-| `log_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
-| `cancel_rows` | `rows`: Rows \| id | Rows \| None | ValidationError, NotFound | — |
-| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
-| `record_health` | `health`: Health \| id | Health \| None | ValidationError, NotFound | — |
-| | from R-7: The system must integrate confirmed bookings existing electronic health record system (ext | | | |
 
 ### I-7 — Notifier interface
 
@@ -410,8 +400,6 @@ graph LR
 |---|---|---|---|---|
 | `POST /slots` | `body`: slots fields | 201 {slots id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
-| `PUT /slots/{id}` | `id`: str, `body`: slots fields | 200 slots | 400 invalid body, 401 unauthenticated, 404 unknown id | — |
-| | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
 | `POST /slots/{id}/cancel` | `id`: str | 202 cancel accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-1: Patients departments choose doctors. The system can register, change and cancel available | | | |
 | `POST /patients/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
@@ -507,15 +495,6 @@ Domain entity named in the requirements ('department'); confirm the fields.
 ### E-9 — Appointment (owner C-1)
 
 Domain entity named in the requirements ('appointment'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-10 — Health (owner C-1)
-
-Domain entity named in the requirements ('health'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|

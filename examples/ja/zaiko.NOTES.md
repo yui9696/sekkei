@@ -67,11 +67,15 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 
 ## 5. What the engine could not decide
 
+### Assumptions made
+
+- 2 sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.
+
 ### Decisions taken (scored trade-offs)
 
 - D-1 API style: **REST/JSON over HTTP**
 - D-2 Primary store: **PostgreSQL**
-- D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
+- D-3 Caller authentication: **API keys per customer, hashed at rest, sent as a bearer token**
 - D-4 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-5 Concurrency control for conflicting writes: **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
 - D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
@@ -97,7 +101,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: crud_api, notification, observability, search, import_export, batch_pipeline, auth, audit_log
 - Quality attributes (weight): consistency 0.78, durability 0.78, performance 0.78, availability 0.78, operability 1.0, simplicity 0.8, compliance 0.62
-- Constraint tokens: containers, idp, nightly_batch, postgres; languages: typescript; team: 2
+- Constraint tokens: containers, durable_required, idp, nightly_batch, postgres; languages: typescript; team: 2
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -122,6 +126,10 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-19 | constraint | must | — | — | — |
 | R-20 | constraint | must | auth | security | — |
 | R-21 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Staff can record stock movements warehouses stock.” (introduction before the first heading); “Managers can track out of stock service.” (introduction before the first heading)
 
 ## 7. Input normalisation (Japanese → canonical English)
 
