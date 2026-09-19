@@ -95,7 +95,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 ## 6. How the text was read
 
 - Patterns recognised: observability, auth, batch_pipeline, geo, realtime, payments
-- Quality attributes (weight): consistency 0.57, durability 1.0, performance 0.83, availability 0.83, operability 0.83, simplicity 0.8
+- Quality attributes (weight): consistency 0.57, durability 1.0, performance 0.83, availability 0.83, operability 0.74, simplicity 0.8
 - Constraint tokens: containers, idp, nightly_batch, postgres, redis, single_region; languages: go; team: 4
 
 | id | kind | priority | patterns | qualities | metric |
@@ -110,7 +110,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-8 | nonfunctional | should | — | durability | records lost across a process crash = 0 records |
 | R-9 | nonfunctional | should | — | — | time 30 days |
 | R-10 | constraint | must | geo | simplicity | — |
-| R-11 | constraint | must | auth | security, operability | — |
+| R-11 | constraint | must | auth | security | — |
 | R-12 | functional | must | batch_pipeline | operability, compliance | — |
 | R-13 | nonfunctional | must | — | performance | sustained rate at 2,000, 5 s 4000 updates /s |
 | R-14 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |

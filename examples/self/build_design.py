@@ -103,6 +103,12 @@ b.requirement("R-21", "The whole hand-over package is derived from the design: e
 b.requirement("R-22", "The design is attacked with the requirements as the oracle: inert sentences, lost numbers, contradictions, "
                       "fragile decisions, assumption load, non-determinism and deliverable drift are reported with a severity.")
 
+b.requirement("R-23", "Specifications as engineers write them are read: numbered headings without '#', requirement tables, user stories in "
+                      "headings, Given/When/Then, checkboxes, nested bullets, speaker labels, TODO and out-of-scope lines, DECIDED lines, "
+                      "front matter and 'alternatives considered'; every fold is reported in the notes.")
+b.requirement("R-24", "Work packages export as tracker issues (Markdown bodies, a GitHub CLI script in dependency order, CSV) and the "
+                      "HTTP interfaces export as an OpenAPI 3.0 skeleton.")
+
 # --- components -------------------------------------------------------------
 b.component("C-1", "Model", "Dataclasses for the design, tolerant JSON loading, serialisation and the JSON Schema.",
             path="sekkei/model.py", satisfies=["R-1", "R-7"])
@@ -124,7 +130,7 @@ b.component("C-9", "Design engine", "Model backends (Claude Code CLI, anthropic 
             "review prompts, and the draft/review/revise pipeline.",
             path="sekkei/llm.py", requires=["I-1", "I-2"], satisfies=["R-10"])
 b.component("C-10", "CLI", "argparse front end over every module.", kind="cli",
-            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12", "I-19", "I-20", "I-26", "I-28", "I-29"],
+            path="sekkei/cli.py", requires=["I-1", "I-2", "I-3", "I-4", "I-5", "I-6", "I-7", "I-9", "I-11", "I-12", "I-19", "I-20", "I-26", "I-28", "I-29", "I-31"],
             satisfies=["R-11", "R-8"])
 b.component("C-11", "Starter", "The example design written by `sekkei init`.",
             path="sekkei/examples.py", requires=["I-1", "I-8"], satisfies=["R-11"])
@@ -137,7 +143,7 @@ b.component("C-14", "Catalogue", "The knowledge base: archetypes, entity and flo
             path="sekkei/engine/catalog.py", satisfies=["R-13"])
 b.component("C-15", "Requirements analysis", "Turns sentences into requirement units (kind, priority, metric), matches patterns and "
             "qualities, extracts constraints, and lists what was not recognised.",
-            path="sekkei/engine/analysis.py", requires=["I-27", "I-13", "I-14"], satisfies=["R-13", "R-15"])
+            path="sekkei/engine/analysis.py", requires=["I-27", "I-30", "I-13", "I-14"], satisfies=["R-13", "R-15"])
 b.component("C-16", "Synthesis", "Instantiates and merges archetypes into components and interfaces, derives operations from "
             "verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and "
             "work packages; records the trace.", path="sekkei/engine/synthesis.py",
@@ -148,7 +154,7 @@ b.component("C-17", "Evaluation", "Scores decision options against the active qu
 b.component("C-18", "Repair", "Runs the linter over the synthesised design and applies the few repairs synthesis may make.",
             path="sekkei/engine/repair.py", requires=["I-1", "I-2"], satisfies=["R-13"])
 b.component("C-19", "Engine facade", "design(text, assume): analyse, answer open questions and re-analyse, synthesise, record assumed decisions, inject threats, repair, review, notes; ask(text): questions only.",
-            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-27", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
+            path="sekkei/engine/__init__.py", requires=["I-1", "I-2", "I-15", "I-27", "I-30", "I-16", "I-17", "I-18", "I-20", "I-22", "I-23", "I-24", "I-25"],
             satisfies=["R-13", "R-14", "R-15", "R-16", "R-17"])
 b.component("C-24", "Answers", "Answer rules for every gap question: evidence from the text first, defensible defaults second; appends the answers to the requirements.",
             path="sekkei/engine/answers.py", requires=["I-15", "I-20", "I-21"], satisfies=["R-17"])
@@ -167,6 +173,10 @@ b.component("C-23", "Architect's notes", "Assembles questions, capacity, effort,
 
 b.component("C-27", "Japanese input", "Glossary, number/unit grammar, modality lexicon and particle-driven reorder that rewrite Japanese requirements into canonical English, with an audit table of every rewrite.",
             path="sekkei/engine/ja.py", satisfies=["R-20"])
+b.component("C-30", "Structure pass", "Reads real-world document structure (tables, numbered headings, stories, labels, front matter) into the canonical Markdown shape the engine reads, reporting every fold.",
+            path="sekkei/engine/structure.py", satisfies=["R-23"])
+b.component("C-31", "Exports", "Tracker issues (bodies, gh script, CSV) and an OpenAPI 3.0 skeleton derived from the design.",
+            path="sekkei/export.py", requires=["I-1", "I-3"], satisfies=["R-24"])
 b.component("C-28", "Deliverables", "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
             path="sekkei/deliverables.py", requires=["I-1", "I-3", "I-4", "I-13"], satisfies=["R-21"])
 b.component("C-29", "Red team", "Adversarial self-audit: re-runs the engine on perturbed requirements and compares design shapes; contradictions, lost numbers, assumption load, determinism.",
@@ -178,6 +188,16 @@ b.interface("I-27", "Japanese input API", owner="C-27", kind="module", operation
     op("normalise", [("text", "str")], "Normalised: text, rewrites, untranslated, title, sources"),
     op("rewrite_sentence", [("src", "str")], "Rewrite (source, english, untranslated)"),
     op("numbers", [("s", "str")], "str with Japanese quantities rewritten"),
+])
+b.interface("I-30", "Structure pass API", owner="C-30", kind="module", operations=[
+    op("canonicalise", [("text", "str")], "Canonical: text, notes, tentative, todos, alternatives, deadline, rationales"),
+    op("story_actor", [("text", "str")], "str"),
+])
+b.interface("I-31", "Exports API", owner="C-31", kind="module", operations=[
+    op("issues", [("d", "Design")], "dict: file name -> text"),
+    op("issue_body", [("d", "Design"), ("wp", "WorkPackage")], "Markdown"),
+    op("openapi", [("d", "Design")], "dict (OpenAPI 3.0.3 document)"),
+    op("openapi_json", [("d", "Design")], "str"),
 ])
 b.interface("I-28", "Deliverables API", owner="C-28", kind="module", operations=[
     op("package", [("result", "EngineResult"), ("prices", "dict | None")], "Package: files (name -> text); write(out) -> paths"),
@@ -499,7 +519,7 @@ b.work_package("WP-12", "Engine: text and catalogue", goal="Implement the requir
                files=["sekkei/engine/text.py", "sekkei/engine/catalog.py", "tests/test_engine.py", "tests/fixtures"],
                acceptance=[check("A-14", "text tests pass: quantities, sections, modality, verb inflection", command=T + "tests/test_engine.py -k 'quantities or segmentation'")])
 b.work_package("WP-13", "Engine: analysis and evaluation", goal="Implement requirement-unit analysis with pattern/quality/constraint matching, decision scoring and the self-review.",
-               components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12", "WP-18"], satisfies=["R-13", "R-15"], size="M",
+               components=["C-15", "C-17"], implements=["I-15", "I-17"], depends_on=["WP-12", "WP-18", "WP-20"], satisfies=["R-13", "R-15"], size="M",
                files=["sekkei/engine/analysis.py", "sekkei/engine/evaluate.py"],
                acceptance=[check("A-15", "analysis tests pass on the fixtures", command=T + "tests/test_engine.py -k analysis")])
 b.work_package("WP-16", "Engine: questions, sizing, answers and owners", goal="Implement the gap questions, capacity/effort estimates, the answer rules for every question (which use the implied rate) and the owner placement for unrecognised requirements.",
@@ -515,7 +535,7 @@ b.work_package("WP-15", "Engine: architect's notes", goal="Implement the STRIDE-
                files=["sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
                acceptance=[check("A-18", "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks", command=T + "tests/test_notes.py")])
 b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
-               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",
+               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16", "WP-20"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",
                files=["sekkei/engine/synthesis.py", "sekkei/engine/repair.py", "sekkei/engine/__init__.py"],
                acceptance=[check("A-16", "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture", command=T + "tests/test_engine.py"),
                            check("A-17", "R-14: two runs on the same text produce identical JSON", kind="metric", metric="R-14")])
@@ -527,13 +547,18 @@ b.work_package("WP-18", "Japanese input", goal="Rewrite Japanese requirements in
                components=["C-27"], implements=["I-27"], satisfies=["R-20"], size="M",
                files=["sekkei/engine/ja.py", "tests/test_ja.py", "examples/ja/zaiko.md"],
                acceptance=[check("A-27", "Japanese tests pass (sentences, numbers, document, design, determinism)", command=T + "tests/test_ja.py")])
+b.work_package("WP-20", "Structure pass and exports", goal="Read specifications as engineers write them; export packages to trackers and interfaces to OpenAPI.",
+               components=["C-30", "C-31"], implements=["I-30", "I-31"], depends_on=["WP-1", "WP-2"], satisfies=["R-23", "R-24"], size="M",
+               files=["sekkei/engine/structure.py", "sekkei/export.py", "tests/test_structure.py", "tests/test_export.py", "examples/real/"],
+               acceptance=[check("A-30", "structure tests pass (tables, stories, labels, real specs lint-clean and deterministic, fuzz)", command=T + "tests/test_structure.py"),
+                           check("A-31", "export tests pass (issues in dependency order, OpenAPI shape)", command=T + "tests/test_export.py")])
 b.work_package("WP-19", "Deliverables and red team", goal="Derive the hand-over package from the design and attack the design with the requirements as oracle.",
                components=["C-28", "C-29"], implements=["I-28", "I-29"], depends_on=["WP-14", "WP-17"], satisfies=["R-21", "R-22"], size="M",
                files=["sekkei/deliverables.py", "sekkei/redteam.py", "tests/test_deliverables.py", "tests/test_redteam.py"],
                acceptance=[check("A-28", "deliverables tests pass (every document, determinism, no guessed prices, one calendar formula)", command=T + "tests/test_deliverables.py"),
                            check("A-29", "red-team tests pass (inert sentence found on the document-search spec, contradiction, lost number)", command=T + "tests/test_redteam.py")])
 b.work_package("WP-10", "CLI", goal="Expose every operation on the command line with exit codes and JSON output, and prove the whole loop end to end.",
-               components=["C-10"], implements=["I-10"], depends_on=["WP-6", "WP-7", "WP-8", "WP-9", "WP-11", "WP-14", "WP-17", "WP-19"], satisfies=["R-11", "R-8", "R-12"], size="M",
+               components=["C-10"], implements=["I-10"], depends_on=["WP-6", "WP-7", "WP-8", "WP-9", "WP-11", "WP-14", "WP-17", "WP-19", "WP-20"], satisfies=["R-11", "R-8", "R-12"], size="M",
                files=["sekkei/cli.py", "sekkei/__main__.py", "tests/test_cli.py", "tests/test_self.py"],
                acceptance=[check("A-10", "CLI round-trip test passes: init, lint, render, plan, brief, accept, next", command=T + "tests/test_cli.py"),
                            check("A-11", "self design lints clean and drift check on the repository reports no error", command=T + "tests/test_self.py"),

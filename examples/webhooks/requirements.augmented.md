@@ -24,7 +24,7 @@ Non-functional
   for a healthy endpoint.
 - No event lost on process crash (persist before ack).
 - Per-endpoint isolation: one slow endpoint must not delay others.
-- Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for
+- metrics (queue depth, delivery success rate, attempt latency) exposed for
   Prometheus; structured logs.
 
 Constraints

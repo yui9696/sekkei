@@ -133,25 +133,25 @@ The engine reads English. Each Japanese sentence was rewritten with a glossary a
 |---|---|
 | 社員が動画教材で受講し、確認テストを受け、上長が受講状況を把握するためのシステム。 | Employees can take video courses. Managers can track tests and progress system. |
 | 日本語と英語で使う。 | Japanese English. |
-| 管理者は講座(タイトル、説明、動画ファイル、確認テスト)を作成・公開・非公開にできる。 | Admins can create, publish and unpublish courses videos files tests. |
+| 管理者は講座(タイトル、説明、動画ファイル、確認テスト)を作成・公開・非公開にできる。 | Admins can create, publish and unpublish courses (videos, files, tests). |
 | 社員は講座を検索して受講し、動画の視聴位置を保存して後で再開できる。 | Employees can search and take courses. Employees can save and resume playback position videos later. |
 | 社員は確認テストを受験し、採点結果と解説を即時に閲覧できる。 | Employees can take tests. Employees can view explanations grades immediately. |
 | 上長は部下の受講状況と成績を一覧で閲覧し、CSV でエクスポートできる。 | Managers can list and view grades their reports progress. Managers can export CSV. |
 | 受講期限の 3 日前に未受講の社員へメールで通知する。 | The system must notify deadline 3 days before not yet taken employees email. |
 | 講座の受講完了と成績は監査のため 5 年間保持する。 | Courses completions grades audit for 5 years retention. |
-| 画面とメールは社員のロケール(日本語・英語)で表示する。 | The system must view pages email employees locale Japanese English. |
+| 画面とメールは社員のロケール(日本語・英語)で表示する。 | The system must view pages email employees locale (Japanese English). |
 | 動画ファイルは最大 2GB。 | Videos files up to 2 GB. |
 | アップロードは 10 分以内に完了すること。 | The system must complete upload within 10 min. |
 | 同時に 2,000 人が動画を視聴しても再生が途切れないこと。 | The system must view videos concurrently 2000 users playback must not stall. |
-| 講座一覧は 300ms 以内(p95)に応答すること。 | The system must respond courses list within 300 ms p95. |
+| 講座一覧は 300ms 以内(p95)に応答すること。 | The system must respond courses list within 300 ms (p95). |
 | 成績は失われてはならず、二重に記録されてはならない。 | Grades must never be lost. Grades must not record double-applied. |
 | 月間稼働率 99.9% 以上。 | Monthly availability at least 99.9 %. |
 | Prometheus 向けメトリクスを出力する。 | The system must export Prometheus for metrics. |
-| TypeScript(Node 20)、PostgreSQL、S3 互換のオブジェクトストレージを利用可能。 | The system can use object storage TypeScript Node 20 PostgreSQL S3. |
+| TypeScript(Node 20)、PostgreSQL、S3 互換のオブジェクトストレージを利用可能。 | The system can use object storage TypeScript (Node 20) PostgreSQL S3. |
 | チームは 4 名。 | Team of 4. |
-| 社員の認証は社内 SSO(OIDC)。 | Employees authenticate internal SSO OIDC. |
+| 社員の認証は社内 SSO(OIDC)。 | Employees authenticate internal SSO (OIDC). |
 | コンテナで既存のイングレスの背後に配置する。 | Containers existing ingress behind. |
-| 動画のトランスコード(既存サービスに委ねる)。 | Videos transcoding existing service delegated to. |
-| 外部受講者(社外)への提供。 | Outside learners external. |
+| 動画のトランスコード(既存サービスに委ねる)。 | Videos transcoding (existing service delegated to). |
+| 外部受講者(社外)への提供。 | Outside learners (external). |
 
-Words the glossary does not know (dropped from the English; add them to the text in English or extend the glossary): 「め」, 「タイトル」, 「互換」, 「使う」, 「受け」, 「提供」, 「説明」, 「部」, 「配置」
+Words the glossary does not know (dropped from the English; add them to the text in English or extend the glossary): 「め」, 「互換」, 「使う」, 「受け」, 「提供」, 「部」, 「配置」

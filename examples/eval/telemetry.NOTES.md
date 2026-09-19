@@ -88,36 +88,37 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-3 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-4 Work queue technology: **Managed broker (SQS/RabbitMQ/Kafka)**
 - D-5 Time-series storage: **TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)**
-- D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
-- D-7 Assumed answer: load (Q-payload): **2 KB / 256 KB**
-- D-8 Assumed answer: quality (Q-availability): **99.9 %**
-- D-9 Assumed answer: data (Q-retention): **indefinite / 1 year**
-- D-10 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
-- D-11 Assumed answer: security (Q-auth): **OIDC**
-- D-12 Assumed answer: cost (Q-budget): **existing only**
-- D-13 Assumed answer: data (Q-migration): **greenfield**
-- D-14 Assumed answer: security (Q-authz): **owner-scoped + admin role**
-- D-15 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
-- D-16 Assumed answer: operations (Q-alerting): **error rate + queue growth**
+- D-6 Concurrency control for conflicting writes: **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
+- D-7 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**
+- D-8 Assumed answer: load (Q-payload): **2 KB / 256 KB**
+- D-9 Assumed answer: quality (Q-availability): **99.9 %**
+- D-10 Assumed answer: data (Q-retention): **indefinite / 1 year**
+- D-11 Assumed answer: data (Q-backup): **daily / 24 h / 4 h**
+- D-12 Assumed answer: security (Q-auth): **OIDC**
+- D-13 Assumed answer: cost (Q-budget): **existing only**
+- D-14 Assumed answer: data (Q-migration): **greenfield**
+- D-15 Assumed answer: security (Q-authz): **owner-scoped + admin role**
+- D-16 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
+- D-17 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 
 ## 6. How the text was read
 
 - Patterns recognised: notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
-- Quality attributes (weight): durability 1.0, performance 0.9, availability 0.9, operability 0.8, simplicity 0.7
+- Quality attributes (weight): consistency 0.6, durability 1.0, performance 0.9, availability 0.9, operability 0.8, simplicity 0.7
 - Constraint tokens: broker, containers, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
 | R-1 | functional | must | batch_pipeline, mqtt_ingest | — | — |
-| R-2 | functional | must | **none** | — | — |
+| R-2 | functional | must | **none** | consistency | — |
 | R-3 | functional | must | **none** | — | — |
 | R-4 | functional | must | notification, sms_notification | — | — |
 | R-5 | functional | must | batch_pipeline, sftp_export, import_export | — | — |
 | R-6 | nonfunctional | must | — | performance | p95 latency at 5,000, 20,000 <= 10 s |
-| R-7 | nonfunctional | must | — | durability | records lost across a process crash = 0 records |
+| R-7 | nonfunctional | must | — | consistency, durability | lost or duplicate updates under concurrent writes to one record = 0 updates |
 | R-8 | nonfunctional | should | batch_pipeline | — | time at 5 years 90 days |
 | R-9 | constraint | must | — | simplicity | — |
-| R-10 | constraint | must | mqtt_ingest | operability | — |
+| R-10 | constraint | must | mqtt_ingest | — | — |
 | R-11 | functional | must | batch_pipeline | operability, compliance | — |
 | R-12 | functional | could | auth | operability | — |
 | R-13 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |

@@ -43,7 +43,7 @@ although the text implies 2,000 drivers × one position every 5 s = 400/s. Right
 start: OIDC (stated), PostgreSQL, optimistic concurrency, redundancy for the availability
 target, a Payments component with the provider, the 30-day retention as a metric.
 
-After: a Public HTTP API with `POST /rides/{id}/request`, `POST /drivers/{id}/accept|decline`,
+After: a Public HTTP API with `POST /rides/{id}/request`, `POST /offers/{id}/accept|decline` (was `/drivers/{id}/…` until 9/19: the object of "accept an offer" is the offer),
 `POST /trips/{id}/rate`, `GET /trips/{id}`; a Geospatial index (`update_position`, `nearest`);
 Ride and Trip entities; the implied rate derived and shown with its formula (`2,000 drivers ÷
 every 5 s`), and used as the answer to the rate question. Still missing: the **offer state

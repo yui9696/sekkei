@@ -160,7 +160,7 @@ def capacity(an: Analysis) -> Capacity:
         cap.estimates.append(Estimate(f"concurrent handlers at the stated peak ({q.noun or 'requests'})", _fmt(conc),
                                       "Little's law: peak rate × mean service time", f"{q.raw} ({u.id}); mean service time assumed {DEFAULT_SERVICE_MS} ms",
                                       "rate * service_ms / 1000", {"rate": r, "service_ms": DEFAULT_SERVICE_MS}, conc))
-    populations = [(u, q) for u, q in counts if q.value >= 100 or q.noun in POPULATION_NOUNS]
+    populations = [(u, q) for u, q in counts if (q.value >= 100 or q.noun in POPULATION_NOUNS) and q.value > 0]
     for u, q in populations[:3]:
         cap.estimates.append(Estimate(f"number of {q.noun}", _fmt(q.value), "stated", f"{q.raw} {q.noun} ({u.id})", "count", {"count": q.value}, q.value))
         if rates:
@@ -206,7 +206,7 @@ def effort(design: Design, an: Analysis) -> Effort:
         for w in wave:
             best[w] = days[w] + max((best.get(d, 0) for d in g[w]), default=0)
     critical = max(best.values(), default=0)
-    team = an.team_size or 2
+    team = an.team_size if an.team_size and an.team_size > 0 else 2
     phase = [max(max((days[w] for w in wave), default=0), -(-sum(days[w] for w in wave) // team)) for wave in waves]
     calendar = sum(phase)
     return Effort(total, critical, calendar, team, waves,

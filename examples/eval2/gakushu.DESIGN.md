@@ -20,27 +20,27 @@ _version 0.1.0 · schema sekkei/1_
 
 **Non-goals**
 
-- Videos transcoding existing service delegated to.
-- Outside learners external.
+- Videos transcoding (existing service delegated to).
+- Outside learners (external).
 
 ## Requirements
 
 | id | kind | priority | statement | metric |
 |---|---|---|---|---|
-| R-1 | functional | must | Admins can create, publish and unpublish courses videos files tests. | — |
+| R-1 | functional | must | Admins can create, publish and unpublish courses (videos, files, tests). | — |
 | R-2 | functional | must | Employees can search and take courses. Employees can save and resume playback position videos later. | — |
 | R-3 | functional | must | Employees can take tests. Employees can view explanations grades immediately. | — |
 | R-4 | functional | must | Managers can list and view grades their reports progress. Managers can export CSV. | — |
 | R-5 | functional | must | The system must notify deadline 3 days before not yet taken employees email. | — |
 | R-6 | functional | must | Courses completions grades audit for 5 years retention. | — |
-| R-7 | functional | must | The system must view pages email employees locale Japanese English. | — |
+| R-7 | functional | must | The system must view pages email employees locale (Japanese English). | — |
 | R-8 | nonfunctional | must | Videos files up to 2 GB. The system must complete upload within 10 min. | latency at 2 GB <= 10 min |
 | R-9 | nonfunctional | must | The system must view videos concurrently 2000 users playback must not stall. | number of users 2000 users |
-| R-10 | nonfunctional | must | The system must respond courses list within 300 ms p95. | p95 latency <= 300 ms |
+| R-10 | nonfunctional | must | The system must respond courses list within 300 ms (p95). | p95 latency <= 300 ms |
 | R-11 | nonfunctional | must | Grades must never be lost. Grades must not record double-applied. | lost or duplicate updates under concurrent writes to one record = 0 updates |
 | R-12 | nonfunctional | must | Monthly availability at least 99.9 %. The system must export Prometheus for metrics. | ratio >= 99.9 % |
-| R-13 | constraint | must | The system can use object storage TypeScript Node 20 PostgreSQL S3. Team of 4. | — |
-| R-14 | constraint | must | Employees authenticate internal SSO OIDC. Containers existing ingress behind. | — |
+| R-13 | constraint | must | The system can use object storage TypeScript (Node 20) PostgreSQL S3. Team of 4. | — |
+| R-14 | constraint | must | Employees authenticate internal SSO (OIDC). Containers existing ingress behind. | — |
 | R-15 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
 | R-16 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
 | R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
@@ -265,9 +265,9 @@ graph LR
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
 | `create_courses` | `courses`: Courses \| id | Courses \| None | ValidationError, NotFound | — |
-| | from R-1: Admins can create, publish and unpublish courses videos files tests. | | | |
+| | from R-1: Admins can create, publish and unpublish courses (videos, files, tests). | | | |
 | `publish_courses` | `courses`: Courses \| id | Courses \| None | ValidationError, NotFound | — |
-| | from R-1: Admins can create, publish and unpublish courses videos files tests. | | | |
+| | from R-1: Admins can create, publish and unpublish courses (videos, files, tests). | | | |
 | `search_courses` | `courses`: Courses \| id | Courses \| None | ValidationError, NotFound | — |
 | | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
 | `save_playback` | `playback`: Playback \| id | Playback \| None | ValidationError, NotFound | — |
@@ -276,12 +276,12 @@ graph LR
 | | from R-3: Employees can take tests. Employees can view explanations grades immediately. | | | |
 | `list_grades` | `grades`: Grades \| id | Grades \| None | ValidationError, NotFound | — |
 | | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
-| `export_managers` | `managers`: Managers \| id | Managers \| None | ValidationError, NotFound | — |
+| `export_progress` | `progress`: Progress \| id | Progress \| None | ValidationError, NotFound | — |
 | | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
 | `notify_deadline` | `deadline`: Deadline \| id | Deadline \| None | ValidationError, NotFound | stated values: 3 days (R-5) |
 | | from R-5: The system must notify deadline 3 days before not yet taken employees email. | | | |
 | `get_email` | `email`: Email \| id | Email \| None | ValidationError, NotFound | — |
-| | from R-7: The system must view pages email employees locale Japanese English. | | | |
+| | from R-7: The system must view pages email employees locale (Japanese English). | | | |
 
 ### I-7 — Notifier interface
 
@@ -367,16 +367,14 @@ graph LR
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
 | `POST /courses` | `body`: courses fields | 201 {courses id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
-| | from R-1: Admins can create, publish and unpublish courses videos files tests. | | | |
+| | from R-1: Admins can create, publish and unpublish courses (videos, files, tests). | | | |
 | `GET /courses` | `filter`: query, `page`: cursor | 200 [courses], next cursor | 401 unauthenticated | — |
 | | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
 | `POST /playbacks/{id}/save` | `id`: str | 202 save accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
-| `GET /grades/{id}` | `id`: str | 200 grades | 401 unauthenticated, 404 unknown id | — |
-| | from R-3: Employees can take tests. Employees can view explanations grades immediately. | | | |
 | `GET /grades` | `filter`: query, `page`: cursor | 200 [grades], next cursor | 401 unauthenticated | — |
-| | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
-| `GET /managers` | `filter`: query, `page`: cursor | 200 [managers], next cursor | 401 unauthenticated | — |
+| | from R-3: Employees can take tests. Employees can view explanations grades immediately. | | | |
+| `GET /progress` | `filter`: query, `page`: cursor | 200 [progress], next cursor | 401 unauthenticated | — |
 | | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
 
 ## Entities
@@ -425,6 +423,9 @@ Domain entity named in the requirements ('course'); confirm the fields.
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
+| `videos` | … | from the text |
+| `files` | … | from the text |
+| `tests` | … | from the text |
 | `created_at` | timestamp |  |
 
 ### E-6 — Grade (owner C-1)
@@ -504,8 +505,17 @@ _Affects:_ C-14
 - ✔ **PostgreSQL**
   - + transactions
   - + indexes and JSON
-  - + already available
+  - + widely available
   - − operational dependency
+- ✘ **MySQL / MariaDB (the stated database)**
+  - + transactions
+  - + already operated by the team
+  - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
+  - + scales without operations
+  - + flexible records
+  - − no cross-record transactions by default
+  - − query patterns must be designed up front
 - ✘ **SQLite**
   - + zero operations
   - + single file
@@ -520,9 +530,7 @@ _Affects:_ C-14
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; In-memory: 1.31; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
-
-**Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -542,8 +550,13 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Email one-time code / magic link (no account needed)**
+  - + no password, no sign-up
+  - + works for occasional customers
+  - − depends on email delivery
+  - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 

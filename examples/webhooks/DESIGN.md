@@ -10,6 +10,7 @@ _version 0.1.0 · schema sekkei/1_
 - Customers or operators manage resources through an authenticated API.
 - Producers hand events to the system, which persists them before acknowledging.
 - Work is queued durably and performed by workers with a retry schedule.
+- Events are delivered to endpoints customers registered.
 - Outbound requests carry an HMAC signature; secrets rotate with a grace window.
 - The system notifies people through an external channel.
 - Targets that keep failing are disabled by policy and the owner is told.
@@ -32,7 +33,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-8 | nonfunctional | must | 1,000 events/s sustained publish rate, 5,000 endpoints; delivery latency p95 under 5 s for a healthy endpoint. | p95 latency at 1,000, 5,000 < 5 s |
 | R-9 | nonfunctional | should | No event lost on process crash (persist before ack). | records lost across a process crash = 0 records |
 | R-10 | nonfunctional | must | Per-endpoint isolation: one slow endpoint must not delay others. | p95 latency of healthy targets while one target stalls within the stated latency target |
-| R-11 | nonfunctional | should | Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs. | required metrics exposed = all listed |
+| R-11 | nonfunctional | should | metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs. | required metrics exposed = all listed |
 | R-12 | constraint | must | Python 3.12, PostgreSQL available, Redis available. Single region. Team of 3. | — |
 | R-13 | constraint | must | Must run as a set of stateless containers behind our existing ingress. | — |
 | R-14 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
@@ -140,7 +141,7 @@ graph LR
 - **responsibility**: The customer's HTTPS receiver; outside our control.
 - **provides**: I-5
 - **requires**: —
-- **satisfies**: R-1, R-4, R-5, R-6, R-8, R-11
+- **satisfies**: R-1, R-4
 
 ### C-6 — Audit log
 
@@ -328,9 +329,7 @@ graph LR
 |---|---|---|---|---|
 | `register_endpoints` | `endpoints`: Endpoints \| id | Endpoints \| None | ValidationError, NotFound | — |
 | | from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o | | | |
-| `deliver_event` | `event`: Event \| id | Event \| None | ValidationError, NotFound | — |
-| | from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o | | | |
-| `sign_event` | `event`: Event \| id | Event \| None | ValidationError, NotFound | — |
+| `deliver_signed` | `signed`: Signed \| id | Signed \| None | ValidationError, NotFound | — |
 | | from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o | | | |
 | `manage_endpoints` | `endpoints`: Endpoints \| id | Endpoints \| None | ValidationError, NotFound | — |
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
@@ -344,24 +343,12 @@ graph LR
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
 | `rotate_secret` | `secret`: Secret \| id | Secret \| None | ValidationError, NotFound | — |
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
-| `sign_secret` | `secret`: Secret \| id | Secret \| None | ValidationError, NotFound | — |
-| | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
 | `publish_events` | `events`: Events \| id | Events \| None | ValidationError, NotFound | — |
 | | from R-3: Internal services publish events through an internal API (HTTP or in-process call). | | | |
 | `get_attempts` | `attempts`: Attempts \| id | Attempts \| None | ValidationError, NotFound | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
 | `redeliver_timestamps` | `timestamps`: Timestamps \| id | Timestamps \| None | ValidationError, NotFound | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
-| `disable_fail` | `fail`: Fail \| id | Fail \| None | ValidationError, NotFound | stated values: 3 days (R-7) |
-| | from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is | | | |
-| `notify_customer` | `customer`: Customer \| id | Customer \| None | ValidationError, NotFound | stated values: 3 days (R-7) |
-| | from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is | | | |
-| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
-| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
-| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-14) |
-| | from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-8 — Outbound HTTP client interface
 
@@ -475,7 +462,7 @@ graph LR
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
 | `POST /events` | `body`: events fields | 201 {events id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-3: Internal services publish events through an internal API (HTTP or in-process call). | | | |
-| `GET /attempts/{id}` | `id`: str | 200 attempts | 401 unauthenticated, 404 unknown id | — |
+| `GET /attempts` | `filter`: query, `page`: cursor | 200 [attempts], next cursor | 401 unauthenticated | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
 | `POST /timestamps/{id}/redeliver` | `id`: str | 202 redeliver accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
@@ -734,8 +721,17 @@ _Affects:_ C-17
 - ✔ **PostgreSQL**
   - + transactions
   - + indexes and JSON
-  - + already available
+  - + widely available
   - − operational dependency
+- ✘ **MySQL / MariaDB (the stated database)**
+  - + transactions
+  - + already operated by the team
+  - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
+  - + scales without operations
+  - + flexible records
+  - − no cross-record transactions by default
+  - − query patterns must be designed up front
 - ✘ **SQLite**
   - + zero operations
   - + single file
@@ -750,9 +746,7 @@ _Affects:_ C-17
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.28; In-memory: 1.29; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints
-
-**Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.27; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -772,8 +766,13 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Email one-time code / magic link (no account needed)**
+  - + no password, no sign-up
+  - + works for occasional customers
+  - − depends on email delivery
+  - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.32; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -795,7 +794,7 @@ _Affects:_ C-12, C-17
   - + decoupled
   - − new infrastructure
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.80; In-process client library that writes the outbox: 1.55; Message bus topic: unavailable (needs broker, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.79; In-process client library that writes the outbox: 1.56; Message bus topic: unavailable (needs broker, not in the constraints)
 
 **Consequences.** Not choosing 'In-process client library that writes the outbox' gives up: no lost events at the source.
 
@@ -826,7 +825,7 @@ _Affects:_ C-18
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.14; Redis Streams with consumer groups: 1.81; In-memory queue: 1.37; Managed broker: unavailable (needs broker, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.13; Redis Streams with consumer groups: 1.81; In-memory queue: 1.36; Managed broker: unavailable (needs broker, not in the constraints)
 
 **Consequences.** Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.
 
@@ -847,7 +846,7 @@ _Affects:_ C-2, C-18, C-13
   - + no store
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.92; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.91; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34
 
 **Consequences.** Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.
 
@@ -871,7 +870,7 @@ _Affects:_ C-14, C-2
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.88; Separate services per concern: 1.63; Single process with background threads: 1.37
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.87; Separate services per concern: 1.64; Single process with background threads: 1.36
 
 **Consequences.** Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.
 
@@ -911,7 +910,7 @@ _Affects:_ C-8
   - + simplest
   - − database dump exposes every customer secret
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.33; External secrets manager: unavailable (needs vault, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.31; External secrets manager: unavailable (needs vault, not in the constraints)
 
 **Consequences.** Not choosing 'Plaintext column' gives up: simplest.
 
@@ -933,7 +932,7 @@ _Affects:_ C-3, C-9
   - + bounded blast radius without per-target state
   - − a slow target still delays its shard
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.75; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.76; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34
 
 **Consequences.** Not choosing 'Hash targets to N shards, one worker pool per sh' gives up: bounded blast radius without per-target state. Not choosing 'Single FIFO queue with a global worker pool' gives up: simplest.
 
@@ -957,7 +956,7 @@ _Affects:_ C-2, C-13
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.50; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
@@ -1347,13 +1346,13 @@ Implement Health policy: Evaluates per-target failure history against the disabl
 | R-2 | must | C-3, C-7, C-9, C-12, C-17 | WP-2, WP-5, WP-7, WP-8, WP-9 | A-2, A-3, A-4, A-5, A-6, A-13, A-14, A-15, A-17, A-18, A-19, A-20, A-21 |
 | R-3 | must | C-2, C-7, C-18 | WP-2, WP-8, WP-12 | A-2, A-3, A-4, A-5, A-6, A-18, A-27, A-28, A-29, A-30 |
 | R-4 | must | C-2, C-5, C-7, C-8, C-13, C-14 | WP-2, WP-4, WP-5, WP-8, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-18, A-22, A-23, A-24, A-25 |
-| R-5 | must | C-2, C-3, C-5, C-7, C-8, C-9, C-13, C-14 | WP-2, WP-4, WP-5, WP-7, WP-8, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-17, A-18, A-22, A-23, A-24, A-25 |
-| R-6 | must | C-2, C-5, C-7, C-8, C-12, C-13, C-14, C-17 | WP-2, WP-4, WP-5, WP-8, WP-9, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-18, A-19, A-20, A-21, A-22, A-23, A-24, A-25 |
+| R-5 | must | C-2, C-3, C-7, C-8, C-9, C-13, C-14 | WP-2, WP-4, WP-5, WP-7, WP-8, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-17, A-18, A-22, A-23, A-24, A-25 |
+| R-6 | must | C-2, C-7, C-8, C-12, C-13, C-14, C-17 | WP-2, WP-4, WP-5, WP-8, WP-9, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-18, A-19, A-20, A-21, A-22, A-23, A-24, A-25 |
 | R-7 | must | C-4, C-7, C-10, C-15 | WP-6, WP-8, WP-13 | A-16, A-18, A-31 |
-| R-8 | must | C-2, C-5, C-8, C-13, C-14, C-17, C-18 | WP-2, WP-4, WP-5, WP-9, WP-10, WP-12 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-27, A-28, A-29, A-30 |
+| R-8 | must | C-2, C-8, C-13, C-14, C-17, C-18 | WP-2, WP-4, WP-5, WP-9, WP-10, WP-12 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-27, A-28, A-29, A-30 |
 | R-9 | should | C-1, C-2, C-18 | WP-2, WP-12 | A-2, A-3, A-4, A-5, A-6, A-27, A-28, A-29, A-30 |
 | R-10 | must | C-13, C-17, C-18 | WP-9, WP-10, WP-12 | A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-27, A-28, A-29, A-30 |
-| R-11 | should | C-2, C-5, C-8, C-11, C-13, C-14 | WP-2, WP-3, WP-4, WP-5, WP-10 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15, A-22, A-23, A-24, A-25 |
+| R-11 | should | C-2, C-8, C-11, C-13, C-14 | WP-2, WP-3, WP-4, WP-5, WP-10 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10, A-11, A-12, A-13, A-14, A-15, A-22, A-23, A-24, A-25 |
 | R-12 | must | C-1, C-7 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-6, A-18 |
 | R-13 | must | C-13, C-17, C-18 | WP-9, WP-10, WP-12 | A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-27, A-28, A-29, A-30 |
 | R-14 | must | C-14, C-16 | WP-5, WP-11 | A-13, A-14, A-15, A-26 |

@@ -23,7 +23,8 @@ SECTION_HEADINGS = {
     "nongoal": ("out of scope", "non-goals", "non goals", "nongoals", "not in scope", "exclusions"),
     "nonfunctional": ("non-functional", "nonfunctional", "non functional", "quality", "qualities", "performance", "nfr", "nfrs", "operational", "ops"),
     "constraint": ("constraint", "constraints", "environment", "assumptions", "context", "given", "tech stack", "stack"),
-    "functional": ("functional", "features", "capabilities", "user stories", "requirements", "scope"),
+    "functional": ("functional", "features", "capabilities", "user stories", "scope"),
+    "generic": ("requirements", "goals", "background", "alternatives"),
 }
 
 ACTORS = (
@@ -105,7 +106,10 @@ manually automatically continuously directly only also then later again currentl
 NON_OBJECTS = {"json", "csv", "xml", "http", "https", "signed", "valid", "matching", "current", "new", "old", "same",
                "existing", "named", "large", "small", "whole", "own", "each", "every", "other", "day", "days", "hour",
                "hours", "minute", "minutes", "second", "seconds", "week", "weeks", "month", "months", "year", "years",
-               "ms", "time", "times", "way", "ways", "thing", "things", "code", "codes"}
+               "ms", "time", "times", "way", "ways", "thing", "things", "code", "codes", "twice", "ever", "once", "again", "given", "then",
+               "original", "partial", "clear", "background", "older", "less", "more", "most", "first", "last", "next", "later", "sometimes",
+               "always", "never", "still", "already", "also", "only", "just", "even", "here", "there", "now", "today", "tomorrow", "yesterday",
+               "business", "working", "monthly", "daily", "weekly", "hourly", "nightly", "system", "web", "online", "offline"}
 
 _PASSIVE_AUX = {"is", "are", "be", "been", "was", "were", "get", "gets", "got", "being"}
 
@@ -118,7 +122,7 @@ _UNIT_KIND = {
     "s": "duration", "sec": "duration", "secs": "duration", "second": "duration", "seconds": "duration",
     "min": "duration", "mins": "duration", "minute": "duration", "minutes": "duration",
     "h": "duration", "hr": "duration", "hrs": "duration", "hour": "duration", "hours": "duration",
-    "d": "duration", "day": "duration", "days": "duration", "week": "duration", "weeks": "duration",
+    "d": "duration", "day": "duration", "days": "duration", "business day": "duration", "business days": "duration", "working day": "duration", "working days": "duration", "week": "duration", "weeks": "duration",
     "month": "duration", "months": "duration", "year": "duration", "years": "duration",
     "%": "percent", "percent": "percent",
     "kb": "size", "mb": "size", "gb": "size", "tb": "size", "bytes": "size", "byte": "size",
@@ -126,7 +130,7 @@ _UNIT_KIND = {
 }
 
 _NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB])?(?![:\d])(?=[\s%/a-zA-Z)]|$)"
-_UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
+_UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|business days?|working days?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
 _QUANT_RE = re.compile(_NUM + r"\s?" + _UNIT + r"(?![a-zA-Z])", re.I)
 _PERCENTILE_RE = re.compile(r"\bp(50|90|95|99|999)\b", re.I)
 _INTERVAL_RE = re.compile(r"\bevery (\d+|ten|five|two|three|thirty|sixty) ?(seconds?|s|minutes?|min|hours?|h)\b", re.I)
@@ -141,7 +145,7 @@ def interval_seconds(text: str) -> float | None:
     n = _WORD_NUM.get(m.group(1).lower()) or float(m.group(1))
     unit = m.group(2).lower()
     return n * (60 if unit.startswith("min") else 3600 if unit.startswith("h") else 1)
-_COMPARATOR_RE = re.compile(r"\b(under|below|less than|at most|no more than|within|up to|<=|<|at least|more than|over|>=|>|exactly|sustained)\b", re.I)
+_COMPARATOR_RE = re.compile(r"\b(not (?:add |take |exceed )?more than|not exceed|no more than|under|below|less than|at most|within|up to|<=|<|at least|more than|over|>=|>|exactly|sustained)\b", re.I)
 
 
 @dataclass
@@ -156,6 +160,9 @@ class Quantity:
 
     def target(self) -> str:
         """A metric target string like '<= 5 s' or '>= 1000 /s'."""
+        low = self.comparator.lower()
+        if low.startswith("not ") and "more than" in low or low == "not exceed":
+            return f"<= {int(self.value) if float(self.value).is_integer() else self.value} {self.unit if self.unit and self.kind != 'count' else self.noun}".strip()
         cmp = {"under": "<", "below": "<", "less than": "<", "at most": "<=", "no more than": "<=",
                "within": "<=", "up to": "<=", "<=": "<=", "<": "<", "at least": ">=", "more than": ">",
                "over": ">", ">=": ">=", ">": ">", "exactly": "=", "sustained": ">="}.get(self.comparator.lower(), "")
@@ -221,7 +228,11 @@ def _units(text: str) -> list[tuple[str, bool]]:
     def flush() -> None:
         if prose:
             for s in _SENT_SPLIT.split(" ".join(prose)):
-                if s.strip():
+                if not s.strip():
+                    continue
+                if out and out[-1][0] and not out[-1][1] and len(s.split()) <= 2:
+                    out[-1] = (out[-1][0] + " " + s.strip(), False)     # "Ever." belongs to the sentence before
+                else:
                     out.append((s.strip(), False))
             prose.clear()
 
@@ -229,7 +240,9 @@ def _units(text: str) -> list[tuple[str, bool]]:
 
     def flush_bullet() -> None:
         if bullet:
-            out.append((" ".join(bullet).strip(), True))
+            text_ = " ".join(bullet).strip()
+            text_ = re.sub(r"(?<=[.!?]) (?=[A-Z][a-z]{0,8}\.$)", " ", text_)
+            out.append((text_, True))
             bullet.clear()
 
     for raw in text.splitlines():
@@ -256,7 +269,7 @@ def _units(text: str) -> list[tuple[str, bool]]:
 
 def modality(text: str) -> str:
     low = text.lower()
-    if re.search(r"\bmay not\b|\bmay never\b|\bmust not\b|\bshall not\b", low):
+    if re.search(r"\bmay not\b|\bmay never\b|\bmust not\b|\bshall not\b|\bno \w+(?: \w+)? (?:may|can|should) (?:be|ever)\b|\bnever\b", low):
         return "must"          # a prohibition is a hard requirement, not an option
     for kind in ("must", "should", "could"):
         for cue in MODALITY[kind]:
@@ -294,11 +307,14 @@ def quantities(text: str) -> list[Quantity]:
             out.append(Quantity(value, "", "code", m.group("num"), "", "", ""))
             continue
         if kind == "number":
-            nm = re.match(r"\s*([a-zA-Z][a-zA-Z_-]*)\s*(/s\b|/sec\b|per second|per sec\b|/min\b|per minute|/h\b|per hour|/day\b|per day)?", after)
+            nm = re.match(r"\s*([a-zA-Z][a-zA-Z_-]*)(?:\s+([a-zA-Z][a-zA-Z_-]*))?\s*(/s\b|/sec\b|per second|per sec\b|/min\b|per minute|/h\b|per hour|/day\b|per day)?", after)
             if nm and nm.group(1).lower() not in STOPWORDS and nm.group(1).lower() not in VERBS and not nm.group(1).lower().startswith("xx"):
                 noun = nm.group(1).lower()
-                if nm.group(2):
-                    kind, unit = "rate", noun + " " + nm.group(2).strip()
+                second = (nm.group(2) or "").lower()
+                if nm.group(3) and second and second not in STOPWORDS:
+                    noun = second                      # "return requests/day": the counted thing is requests
+                if nm.group(3) and (not second or second not in STOPWORDS):
+                    kind, unit = "rate", noun + " " + nm.group(3).strip()
                 else:
                     kind = "count"
         out.append(Quantity(value, unit, kind, m.group(0).strip(), comparator, pct.group(0).lower() if pct else "", noun))
@@ -351,9 +367,14 @@ def verb_of(word: str) -> str:
     return ""
 
 
+_DETERMINERS = {"a", "an", "the", "each", "every", "per", "their", "own", "of", "this", "that", "these", "those", "any", "no", "one", "same",
+                "original", "new", "existing", "current", "delivered", "returned", "first", "last", "next", "all", "its", "his", "her", "our", "my", "your", "another"}
+
+
 def analyse_sentence(index: int, text: str, section: str, is_bullet: bool) -> Sentence:
     words = tokens(text)
-    verbs = [v for v in (verb_of(w) for w in words) if v]
+    # a lexicon verb right after a determiner is a noun ("an order item", "the refund", "each return")
+    verbs = [v for i, w in enumerate(words) for v in [verb_of(w)] if v and not (i > 0 and words[i - 1] in _DETERMINERS)]
     nouns = [w for w in words if w not in STOPWORDS and not verb_of(w) and len(w) > 2
              and not w.replace(".", "").isdigit()]
     low = text.lower()
@@ -372,11 +393,12 @@ def segment(text: str) -> list[Sentence]:
             continue
         if unit.startswith("#"):
             section = _section_of(unit[1:]) or ""
+            section = "" if section == "generic" else section
             assumed = "assumed by the engine" in unit.lower()
             continue
         sec = _section_of(unit) if not is_bullet else ""
         if sec:
-            section = sec
+            section = "" if sec == "generic" else sec
             assumed = "assumed by the engine" in unit.lower()
             continue
         sent = analyse_sentence(n, unit, section, is_bullet)
@@ -393,7 +415,8 @@ def title_of(text: str) -> str:
         if m:
             return re.split(r"\s+[—–-]\s+", m.group(1))[0].strip()
         if line.strip():
-            return re.split(r"\s+[—–-]\s+|[.:]", line.strip())[0].strip()[:60]
+            head = re.split(r"\s+[—–-]\s+|[.:]|\bthat\b|\bwhich\b|\bfor\b", line.strip())[0].strip()
+            return " ".join(head.split()[:7])[:60]
     return "system"
 
 

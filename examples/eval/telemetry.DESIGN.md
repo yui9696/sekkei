@@ -24,7 +24,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-4 | functional | must | When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is notified by SMS. | — |
 | R-5 | functional | must | A nightly job aggregates readings into daily statistics per truck and exports them as CSV to an SFTP server. | — |
 | R-6 | nonfunctional | must | 5,000 trucks, 20,000 readings/s at peak; a reading is visible to managers within 10 s p95. | p95 latency at 5,000, 20,000 <= 10 s |
-| R-7 | nonfunctional | must | Readings are never lost once acknowledged to the truck; duplicates never appear in charts. | records lost across a process crash = 0 records |
+| R-7 | nonfunctional | must | Readings are never lost once acknowledged to the truck; duplicates never appear in charts. | lost or duplicate updates under concurrent writes to one record = 0 updates |
 | R-8 | nonfunctional | should | Raw readings are kept 90 days, daily statistics 5 years. | time at 5 years 90 days |
 | R-9 | constraint | must | Java 21, PostgreSQL with TimescaleDB available, Kafka available. Team of 5. On-prem Kubernetes. | — |
 | R-10 | constraint | must | The MQTT broker already exists and is operated by another team. | — |
@@ -102,7 +102,7 @@ graph LR
 - **responsibility**: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter.
 - **provides**: I-2
 - **requires**: —
-- **satisfies**: R-1, R-7, R-14, R-16, R-17
+- **satisfies**: R-1, R-14, R-16, R-17
 
 ### C-3 — Email provider
 
@@ -142,7 +142,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-7
 - **requires**: I-1, I-9, I-8, I-16
-- **satisfies**: R-3, R-1, R-5, R-9, R-10, R-19, R-20
+- **satisfies**: R-3, R-1, R-5, R-7, R-9, R-10, R-19, R-20
 
 ### C-8 — Notifier
 
@@ -307,18 +307,12 @@ graph LR
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
 | `get_truck` | `truck`: Truck \| id | Truck \| None | ValidationError, NotFound | — |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
-| `notify_manager` | `manager`: Manager \| id | Manager \| None | ValidationError, NotFound | stated values: 5 minutes (R-4) |
+| `notify_sms` | `sms`: Sms \| id | Sms \| None | ValidationError, NotFound | stated values: 5 minutes (R-4) |
 | | from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n | | | |
 | `aggregate_readings` | `readings`: Readings \| id | Readings \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 | `export_sftp` | `sftp`: Sftp \| id | Sftp \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
-| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
-| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
-| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-11) |
-| | from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-8 — Notifier interface
 
@@ -517,8 +511,13 @@ sequenceDiagram
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Email one-time code / magic link (no account needed)**
+  - + no password, no sign-up
+  - + works for occasional customers
+  - − depends on email delivery
+  - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.29; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -531,8 +530,17 @@ _Affects:_ C-10
 - ✔ **PostgreSQL**
   - + transactions
   - + indexes and JSON
-  - + already available
+  - + widely available
   - − operational dependency
+- ✘ **MySQL / MariaDB (the stated database)**
+  - + transactions
+  - + already operated by the team
+  - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
+  - + scales without operations
+  - + flexible records
+  - − no cross-record transactions by default
+  - − query patterns must be designed up front
 - ✘ **SQLite**
   - + zero operations
   - + single file
@@ -547,9 +555,7 @@ _Affects:_ C-10
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.42; In-memory: 1.70; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
-
-**Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -571,7 +577,7 @@ _Affects:_ C-1
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.95; Single process with background threads: 1.51; Separate services per concern: 1.42
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.84; Single process with background threads: 1.45; Separate services per concern: 1.37
 
 **Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
@@ -602,7 +608,7 @@ _Affects:_ C-14, C-12
   - − work is lost on crash
   - − single process only
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.07; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 1.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)
 
 _Affects:_ C-2
 
@@ -624,13 +630,36 @@ _Affects:_ C-2
   - − a second database
   - − eventual consistency
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.42; Plain PostgreSQL tables partitioned by day: 2.19; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.25; Plain PostgreSQL tables partitioned by day: 2.04; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'Plain PostgreSQL tables partitioned by day' gives up: no extension.
 
 _Affects:_ C-1
 
-### D-6 — Redundancy for the availability target (accepted)
+### D-6 — Concurrency control for conflicting writes (accepted)
+
+**Context.** Two callers may change the same record at the same time and the result must be consistent.
+
+- ✔ **Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries**
+  - + no locks held across requests
+  - + works with stateless instances
+  - − callers must handle 409
+- ✘ **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
+  - + simple mental model
+  - + no client retry
+  - − lock waits under contention
+  - − needs a transactional store
+- ✘ **Last write wins**
+  - + nothing to implement
+  - − lost updates
+
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.71; Last write wins: 1.53
+
+**Consequences.** Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.
+
+_Affects:_ C-1, C-7
+
+### D-7 — Redundancy for the availability target (accepted)
 
 **Context.** The availability target must be met through instance failures and deploys.
 
@@ -648,13 +677,13 @@ _Affects:_ C-1
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.58; Single instance with health-based restart: 1.33; Active-active across two regions: 1.26
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.29; Active-active across two regions: 1.22
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.
 
 _Affects:_ C-14
 
-### D-7 — Assumed answer: load (Q-payload) (proposed)
+### D-8 — Assumed answer: load (Q-payload) (proposed)
 
 **Context.** The requirements do not say. Question: Q-payload. No evidence in the text; engine default.
 
@@ -668,7 +697,7 @@ _Affects:_ C-14
 
 _Affects:_ C-14
 
-### D-8 — Assumed answer: quality (Q-availability) (proposed)
+### D-9 — Assumed answer: quality (Q-availability) (proposed)
 
 **Context.** The requirements do not say. Question: Q-availability. No evidence in the text; engine default.
 
@@ -682,7 +711,7 @@ _Affects:_ C-14
 
 _Affects:_ C-2, C-9
 
-### D-9 — Assumed answer: data (Q-retention) (proposed)
+### D-10 — Assumed answer: data (Q-retention) (proposed)
 
 **Context.** The requirements do not say. Question: Q-retention. No evidence in the text; engine default.
 
@@ -696,7 +725,7 @@ _Affects:_ C-2, C-9
 
 _Affects:_ C-13, C-1
 
-### D-10 — Assumed answer: data (Q-backup) (proposed)
+### D-11 — Assumed answer: data (Q-backup) (proposed)
 
 **Context.** The requirements do not say. Question: Q-backup. No evidence in the text; engine default.
 
@@ -710,7 +739,7 @@ _Affects:_ C-13, C-1
 
 _Affects:_ C-1
 
-### D-11 — Assumed answer: security (Q-auth) (proposed)
+### D-12 — Assumed answer: security (Q-auth) (proposed)
 
 **Context.** The requirements do not say. Question: Q-auth. Evidence: staff/employees mentioned.
 
@@ -724,7 +753,7 @@ _Affects:_ C-1
 
 _Affects:_ C-10
 
-### D-12 — Assumed answer: cost (Q-budget) (proposed)
+### D-13 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -736,7 +765,7 @@ _Affects:_ C-10
 
 **Consequences.** If the real answer differs: State the budget; options adding infrastructure become available.
 
-### D-13 — Assumed answer: data (Q-migration) (proposed)
+### D-14 — Assumed answer: data (Q-migration) (proposed)
 
 **Context.** The requirements do not say. Question: Q-migration. No evidence in the text; engine default.
 
@@ -748,7 +777,7 @@ _Affects:_ C-10
 
 **Consequences.** If the real answer differs: Name the existing system; a migration package and risk are added.
 
-### D-14 — Assumed answer: security (Q-authz) (proposed)
+### D-15 — Assumed answer: security (Q-authz) (proposed)
 
 **Context.** The requirements do not say. Question: Q-authz. No evidence in the text; engine default.
 
@@ -762,7 +791,7 @@ _Affects:_ C-10
 
 _Affects:_ C-7, C-10
 
-### D-15 — Assumed answer: resilience (Q-external) (proposed)
+### D-16 — Assumed answer: resilience (Q-external) (proposed)
 
 **Context.** The requirements do not say. Question: Q-external. No evidence in the text; engine default.
 
@@ -776,7 +805,7 @@ _Affects:_ C-7, C-10
 
 _Affects:_ C-12, C-2
 
-### D-16 — Assumed answer: operations (Q-alerting) (proposed)
+### D-17 — Assumed answer: operations (Q-alerting) (proposed)
 
 **Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
 
@@ -864,7 +893,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **write scope**: `src/main/java/app/Store.java`, `src/test/java/app/StoreTest.java`, `src/main/java/app/Queue.java`, `src/test/java/app/QueueTest.java`, `src/main/java/app/Observability.java`, `src/test/java/app/ObservabilityTest.java`
 - **acceptance**:
   - A-1 (test) unit tests of Store, Work queue, Observability pass — `./gradlew test --tests app.StoreTest`
-  - A-2 (metric) R-7: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-7
+  - A-2 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
   - A-3 (metric) R-14: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-14
 - **notes**: family: infra
 
@@ -907,10 +936,11 @@ Implement Readings processor: Computes over readings on behalf of the core. Synt
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-7 · **implements**: I-7
-- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-9, R-10, R-19, R-20
+- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-7, R-9, R-10, R-19, R-20
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
   - A-8 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
+  - A-9 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
 - **notes**: family: mqtt_ingest
 
 ### WP-6 — MQTT consumer (S)
@@ -921,7 +951,7 @@ Implement MQTT consumer: Subscribes to the broker's topics, validates and de-dup
 - **depends on**: WP-1, WP-5 · **satisfies**: R-1
 - **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`
 - **acceptance**:
-  - A-9 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.Mqtt_consumerTest`
+  - A-10 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.Mqtt_consumerTest`
 - **notes**: family: mqtt_ingest
 
 ### WP-7 — Import/export (S)
@@ -932,7 +962,7 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-5 · **satisfies**: R-5
 - **write scope**: `src/main/java/app/Exporter.java`, `src/test/java/app/ExporterTest.java`
 - **acceptance**:
-  - A-10 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
+  - A-11 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
 - **notes**: family: sftp_export
 
 ### WP-8 — Batch job (S)
@@ -943,8 +973,8 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-8, R-11
 - **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`
 - **acceptance**:
-  - A-11 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
-  - A-12 (metric) R-8: time at 5 years 90 days — metric R-8
+  - A-12 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
+  - A-13 (metric) R-8: time at 5 years 90 days — metric R-8
 - **notes**: family: batch_pipeline
 
 ### WP-9 — Public HTTP API (S)
@@ -955,34 +985,34 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-9, R-13, R-15
 - **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
 - **acceptance**:
-  - A-13 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
-  - A-14 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
+  - A-14 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.Surface_apiTest`
+  - A-15 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
 - **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-11, A-12 |
+| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-10, A-12, A-13 |
 | R-2 | must | C-16 | WP-4 | A-7 |
-| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-13, A-14 |
+| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-9, A-14, A-15 |
 | R-4 | must | C-3, C-6, C-8 | WP-3 | A-6 |
-| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-5, A-8, A-10, A-11, A-12 |
-| R-6 | must | C-14 | WP-9 | A-13, A-14 |
-| R-7 | must | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
-| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-11, A-12 |
-| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-8, A-13, A-14 |
-| R-10 | must | C-7 | WP-5 | A-8 |
-| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-11, A-12 |
+| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-5, A-8, A-9, A-11, A-12, A-13 |
+| R-6 | must | C-14 | WP-9 | A-14, A-15 |
+| R-7 | must | C-1, C-7 | WP-1, WP-5 | A-1, A-2, A-3, A-8, A-9 |
+| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-12, A-13 |
+| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-8, A-9, A-14, A-15 |
+| R-10 | must | C-7 | WP-5 | A-8, A-9 |
+| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-12, A-13 |
 | R-12 | could | C-10 | WP-2 | A-4, A-5 |
-| R-13 | must | C-14 | WP-9 | A-13, A-14 |
+| R-13 | must | C-14 | WP-9 | A-14, A-15 |
 | R-14 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
-| R-15 | should | C-14 | WP-9 | A-13, A-14 |
+| R-15 | should | C-14 | WP-9 | A-14, A-15 |
 | R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
 | R-17 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
 | R-18 | must | C-10 | WP-2 | A-4, A-5 |
-| R-19 | must | C-7 | WP-5 | A-8 |
-| R-20 | must | C-7 | WP-5 | A-8 |
+| R-19 | must | C-7 | WP-5 | A-8, A-9 |
+| R-20 | must | C-7 | WP-5 | A-8, A-9 |
 
 ## Conventions
 

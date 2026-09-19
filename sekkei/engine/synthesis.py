@@ -24,6 +24,7 @@ CONSUMERS: dict[str, list[str]] = {
     "observability": ["surface_api", "admin_api", "ingest_api", "worker", "scheduler", "policy", "core", "cli", "batch", "push", "notifier", "dispatcher", "mqtt_consumer", "geo"],
     "geo": ["core"],
     "sms": ["notifier"],
+    "chat": ["notifier"],
     "sftp_target": ["exporter", "batch"],
     "dispatcher": ["worker"],
     "signer": ["worker"],
@@ -248,27 +249,40 @@ def _object_after(verb: str, sentence: T.Sentence) -> str:
     """The noun that follows a verb ('rotate the signing secret' -> 'secret'); else the nearest noun before it."""
     # punctuation kept as tokens so that a parenthesis or a comma ends a noun run:
     # "create an application (amount, term)" -> application, not amount
-    words = [w.rstrip(".-") for w in re.findall(r"[a-zA-Z][a-zA-Z0-9_.-]*|[(),;:]", sentence.text.lower())]
+    words: list[str] = []
+    for m in re.finditer(r"([a-zA-Z][a-zA-Z0-9_-]*)(\.(?=\s|$))?|\d[\d,.:]*|[(),;:]", sentence.text.lower()):
+        if m.group(1):
+            words.append(m.group(1).rstrip("-"))
+            if m.group(2):
+                words.append(".")          # a sentence end stops a noun run
+        else:
+            words.append(m.group(0) if m.group(0) in "(),;:" else "#")   # a number stops a noun run too
+    actor_words = {t for a in sentence.actors for t in a.split()} | {a + "s" for a in sentence.actors} | {a.rstrip("s") for a in sentence.actors}
     for i, w in enumerate(words):
-        if T.verb_of(w) == verb:
+        if T.verb_of(w) == verb and not (i > 0 and words[i - 1] in T._DETERMINERS):
             # forward: the head of the first noun run after the verb ("add stock items" -> "items");
             # verbs and fillers before the run are skipped, the run is at most two tokens long
             run: list[str] = []
+            prev = w
             for w2 in words[i + 1: i + 7]:
-                if w2 in "(),;:":
+                if w2 in ("(", ")", ",", ";", ":", ".", "#"):
                     if run:
                         break
-                    if w2 == "(":
+                    if w2 in ("(", ".", "#"):
                         break
+                    prev = w2
                     continue
-                if _is_object(w2):
+                after_det = prev in T._DETERMINERS
+                prev = w2
+                # "an offer", "the order": a lexicon verb after a determiner is the object
+                if _is_object(w2) or (after_det and T.verb_of(w2) and w2 not in T.STOPWORDS and len(w2) > 2):
                     run.append(w2)
                     if len(run) == 2:
                         break
                 elif run:
                     break
             forward = [run[-1]] if run else []
-            backward = [w2 for w2 in reversed(words[max(0, i - 6): i]) if _is_object(w2)]
+            backward = [w2 for w2 in reversed(words[max(0, i - 6): i]) if _is_object(w2) and w2 not in actor_words and w2 not in ("(", ")", ".", "#")]
             passive = w.endswith("ed") and i > 0 and words[i - 1] in T._PASSIVE_AUX
             order = (backward + forward) if passive else (forward + backward)
             if order:
@@ -291,12 +305,34 @@ def _plural(noun: str) -> str:
     return noun + "s"
 
 
+def _actor_is_subject(s: T.Sentence) -> bool:
+    """True when an actor word comes before the first verb of the sentence (it is the subject)."""
+    words = s.words
+    first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))
+    for a in s.actors:
+        toks = a.split()
+        for i in range(min(first_verb, len(words))):
+            if words[i: i + len(toks)] == toks or (len(toks) == 1 and words[i].rstrip("s") == toks[0].rstrip("s")):
+                # everything before the actor must be a determiner or a plain modifier — not an imperative
+                # ("Email the customer …", "Notify operators …") and not a lexicon verb
+                before = words[:i]
+                if any(T.verb_of(w) or w in _IMPERATIVES for w in before):
+                    return False
+                return True
+    return False
+
+
+_IMPERATIVES = {"email", "notify", "alert", "slack", "page", "text", "message", "ping", "sms", "call", "tell", "inform", "remind", "warn", "escalate", "show", "give", "let", "allow", "ask"}
+
+
 def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
     """Operations for a surface/core from the verbs and objects of its functional sentences."""
     seen: dict[str, Operation] = {}
     for u in units:
         if not u.sentence.actors:
             continue  # behaviour statements ("each event is delivered ...") are contracts, not use cases
+        if not _actor_is_subject(u.sentence):
+            continue  # "Email the customer …": the actor is the object; a notification, not a use case
         for v in dict.fromkeys(u.sentence.verbs):
             method, iverb = T.VERBS.get(v, ("", v))
             obj = _object_after(v, u.sentence)
@@ -310,7 +346,10 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
                 if not method:
                     continue
                 coll = _plural(obj)
-                if iverb in ("create", "register", "add", "publish", "submit", "upload", "send"):
+                plural_obj = obj.endswith("s") and not obj.endswith(("ss", "us", "is")) and len(obj) > 3
+                if iverb in ("get", "view", "check") and plural_obj:
+                    iverb = "list"          # "see all returns", "view their orders": a listing, not one resource
+                if iverb in ("create", "register", "add", "publish", "submit", "upload", "send", "request", "book", "order", "reserve", "invite"):
                     name, inputs, out = f"POST /{coll}", [("body", f"{obj} fields")], f"201 {{{obj} id}}"
                     errs = ["400 invalid body", "401 unauthenticated", "409 conflict"]
                 elif iverb in ("list", "search", "query", "export"):
@@ -422,6 +461,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         rationale = "assumed by the engine; confirm or override" if u.sentence.assumed else ""
         if not u.recognised:
             rationale = (rationale + "; " if rationale else "") + "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+        if an.structure and u.sentence.text in an.structure.rationales:
+            rationale = (rationale + "; " if rationale else "") + "so that " + an.structure.rationales[u.sentence.text]
         if an.normalisation and u.sentence.text in an.normalisation.sources:
             rationale = (rationale + "; " if rationale else "") + "source (ja): " + an.normalisation.sources[u.sentence.text]
         d.requirements.append(Requirement(u.id, u.sentence.text, u.kind, u.priority, _metric_of(u), rationale=rationale))
@@ -574,7 +615,9 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         for a, b, desc in ft.steps:
             steps.append(Step(cid[a], cid[b], iid[b], desc))
             comp = d.component(cid[a])
-            if iid[b] not in comp.requires and a != b:
+            # a reply (the reverse of an earlier step in the same flow) is a response, not a call
+            is_reply = any(x == b and y == a for x, y, _ in ft.steps[:len(steps) - 1])
+            if iid[b] not in comp.requires and a != b and not is_reply:
                 comp.requires.append(iid[b])
         d.flows.append(Flow(f"F-{n}", ft.name, ft.trigger, steps))
         trace[f"F-{n}"] = {"sentences": [], "rules": [f"flow:{fk}"]}

@@ -1,6 +1,6 @@
 # outside-bookings-system — design
 
-Patients during outside mobile app from so that bookings.
+Patients during outside mobile app from so that bookings. Accept.
 
 _version 0.1.0 · schema sekkei/1_
 
@@ -30,26 +30,25 @@ _version 0.1.0 · schema sekkei/1_
 | R-1 | functional | must | Patients departments choose doctors. The system can register, change and cancel available slots from appointments. | — |
 | R-2 | functional | must | Staff can accept and register bookings patients. Staff can view bookings list the same day departments each. | — |
 | R-3 | functional | must | Patients bookings the day before email or SMS receive reminders. | — |
-| R-4 | functional | must | Doctors can view basic information name date of birth insurance number their own appointments schedule patients. | — |
+| R-4 | functional | must | Doctors can view basic information (name, date of birth, insurance number) their own appointments schedule patients. | — |
 | R-5 | functional | must | The system must generate slots departments each opening hours doctors shifts from weekly. | — |
 | R-6 | functional | must | The system must change and record audit log bookings cancel who when rows. | — |
-| R-7 | functional | must | The system must integrate confirmed bookings existing electronic health record system external services nightly. | — |
-| R-8 | nonfunctional | must | The system must respond available slots search within 500 ms p95. | p95 latency <= 500 ms |
+| R-7 | functional | must | The system must integrate confirmed bookings existing electronic health record system (external services) nightly. | — |
+| R-8 | nonfunctional | must | The system must respond available slots search within 500 ms (p95). | p95 latency <= 500 ms |
 | R-9 | nonfunctional | must | Same must never be slots double-applied bookings. | lost or duplicate updates under concurrent writes to one record = 0 updates |
 | R-10 | nonfunctional | must | The system must save patient records encrypted. The system can delete appi in accordance with on request. | retention/deletion rules exercised = all |
 | R-11 | nonfunctional | must | Monthly availability at least 99.5 %. | ratio >= 99.5 % |
-| R-12 | nonfunctional | must | 3000 requests/day bookings 20 requests/s peak. | sustained rate at 20 3000 requests /day |
+| R-12 | nonfunctional | must | 3000 requests/day bookings month end 20 requests/s peak. | sustained rate at 20 3000 requests /day |
 | R-13 | constraint | must | The system can use Python 3.12 PostgreSQL. Team of 3. Containers single region. | — |
-| R-14 | constraint | must | Patients authenticate existing patient portal OIDC. | — |
+| R-14 | constraint | must | Patients authenticate existing patient portal (OIDC). | — |
 | R-15 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-16 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
-| R-17 | functional | must | Personal data is deleted on request and access to it is logged, under the regime the requirements name (assumed by the engine: regime named). | — |
-| R-18 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
-| R-19 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
-| R-20 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
-| R-21 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
-| R-22 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
-| R-23 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
+| R-17 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
+| R-18 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
+| R-19 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
+| R-20 | nonfunctional | must | An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine). | ratio at 5 minutes, 10 minutes 1 % |
+| R-21 | constraint | must | The existing system named in the requirements stays in place; integration, not migration (assumed by the engine). | — |
+| R-22 | constraint | must | Use existing infrastructure only; no new managed services (assumed by the engine). | — |
 
 ## Components
 
@@ -100,7 +99,7 @@ graph LR
 - **responsibility**: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.
 - **provides**: I-1
 - **requires**: —
-- **satisfies**: R-9, R-10, R-13, R-20
+- **satisfies**: R-9, R-10, R-13, R-19
 
 ### C-2 — Email provider
 
@@ -124,7 +123,7 @@ graph LR
 - **responsibility**: Append-only record of who did what to which resource, queryable by resource and actor.
 - **provides**: I-4
 - **requires**: —
-- **satisfies**: R-6, R-10, R-17
+- **satisfies**: R-6, R-10
 
 ### C-5 — Existing system
 
@@ -140,7 +139,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-6
 - **requires**: I-1, I-8, I-4, I-7
-- **satisfies**: R-1, R-2, R-7, R-9, R-13, R-22, R-23
+- **satisfies**: R-1, R-2, R-7, R-9, R-13, R-21, R-22
 
 ### C-7 — Notifier
 
@@ -156,7 +155,7 @@ graph LR
 - **responsibility**: Metrics registry and exposition, structured logging, health/readiness endpoints.
 - **provides**: I-8
 - **requires**: —
-- **satisfies**: R-11, R-21
+- **satisfies**: R-11, R-20
 
 ### C-9 — Authentication
 
@@ -204,7 +203,7 @@ graph LR
 - **responsibility**: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 - **provides**: I-14
 - **requires**: I-1, I-4
-- **satisfies**: R-10, R-17
+- **satisfies**: R-10
 
 ### C-15 — Public HTTP API
 
@@ -212,7 +211,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
 - **requires**: I-6, I-8, I-9, I-10
-- **satisfies**: R-1, R-2, R-8, R-12, R-13, R-18, R-19
+- **satisfies**: R-1, R-2, R-8, R-12, R-13, R-17, R-18
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -298,12 +297,10 @@ graph LR
 | `receive_reminders` | `reminders`: Reminders \| id | Reminders \| None | ValidationError, NotFound | — |
 | | from R-3: Patients bookings the day before email or SMS receive reminders. | | | |
 | `get_information` | `information`: Information \| id | Information \| None | ValidationError, NotFound | — |
-| | from R-4: Doctors can view basic information name date of birth insurance number their own appointme | | | |
+| | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 | `schedule_patients` | `patients`: Patients \| id | Patients \| None | ValidationError, NotFound | — |
-| | from R-4: Doctors can view basic information name date of birth insurance number their own appointme | | | |
+| | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 | `generate_departments` | `departments`: Departments \| id | Departments \| None | ValidationError, NotFound | — |
-| | from R-5: The system must generate slots departments each opening hours doctors shifts from weekly. | | | |
-| `open_shifts` | `shifts`: Shifts \| id | Shifts \| None | ValidationError, NotFound | — |
 | | from R-5: The system must generate slots departments each opening hours doctors shifts from weekly. | | | |
 | `update_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
@@ -313,14 +310,8 @@ graph LR
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `cancel_rows` | `rows`: Rows \| id | Rows \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
-| `record_external` | `external`: External \| id | External \| None | ValidationError, NotFound | — |
-| | from R-7: The system must integrate confirmed bookings existing electronic health record system exte | | | |
-| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
-| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
-| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-15) |
-| | from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
+| `record_health` | `health`: Health \| id | Health \| None | ValidationError, NotFound | — |
+| | from R-7: The system must integrate confirmed bookings existing electronic health record system (ext | | | |
 
 ### I-7 — Notifier interface
 
@@ -427,12 +418,12 @@ graph LR
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
 | `POST /patients` | `body`: patients fields | 201 {patients id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
-| `GET /bookings/{id}` | `id`: str | 200 bookings | 401 unauthenticated, 404 unknown id | — |
+| `GET /bookings` | `filter`: query, `page`: cursor | 200 [bookings], next cursor | 401 unauthenticated | — |
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
 | `GET /departments` | `filter`: query, `page`: cursor | 200 [departments], next cursor | 401 unauthenticated | — |
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
 | `GET /informations/{id}` | `id`: str | 200 information | 401 unauthenticated, 404 unknown id | — |
-| | from R-4: Doctors can view basic information name date of birth insurance number their own appointme | | | |
+| | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 
 ## Entities
 
@@ -522,9 +513,9 @@ Domain entity named in the requirements ('appointment'); confirm the fields.
 | `id` | uuid | primary key |
 | `created_at` | timestamp |  |
 
-### E-10 — External (owner C-1)
+### E-10 — Health (owner C-1)
 
-Domain entity named in the requirements ('external'); confirm the fields.
+Domain entity named in the requirements ('health'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|
@@ -605,7 +596,7 @@ sequenceDiagram
   - + flexible queries
   - − complexity budget for a small team
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). REST/JSON over HTTP: 1.41; gRPC: 1.29; GraphQL: 1.15
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). REST/JSON over HTTP: 1.40; gRPC: 1.29; GraphQL: 1.15
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
@@ -618,8 +609,17 @@ _Affects:_ C-15
 - ✔ **PostgreSQL**
   - + transactions
   - + indexes and JSON
-  - + already available
+  - + widely available
   - − operational dependency
+- ✘ **MySQL / MariaDB (the stated database)**
+  - + transactions
+  - + already operated by the team
+  - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
+  - + scales without operations
+  - + flexible records
+  - − no cross-record transactions by default
+  - − query patterns must be designed up front
 - ✘ **SQLite**
   - + zero operations
   - + single file
@@ -634,9 +634,7 @@ _Affects:_ C-15
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.13; In-memory: 1.49; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
-
-**Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.15; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -656,8 +654,13 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Email one-time code / magic link (no account needed)**
+  - + no password, no sign-up
+  - + works for occasional customers
+  - − depends on email delivery
+  - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.37; Mutual TLS: 1.09. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -681,7 +684,7 @@ _Affects:_ C-9
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.72; Single process with background threads: 1.41; Separate services per concern: 1.29
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.71; Single process with background threads: 1.40; Separate services per concern: 1.29
 
 **Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
@@ -706,7 +709,7 @@ _Affects:_ C-15, C-11
   - − joins across two stores
   - − a second store
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Encryption at rest by the platform plus strict a: 1.78; Field-level encryption for identifiers and sensi: 1.59; Separate personal-data store with tokenised refe: 1.45
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Encryption at rest by the platform plus strict a: 1.78; Field-level encryption for identifiers and sensi: 1.62; Separate personal-data store with tokenised refe: 1.47
 
 **Consequences.** Not choosing 'Field-level encryption for identifiers and sensi' gives up: a dump does not expose people, deletion = key destruction where fields are only encrypted. Not choosing 'Separate personal-data store with tokenised refe' gives up: blast radius contained, deletion in one place.
 
@@ -731,7 +734,7 @@ _Affects:_ C-14, C-1
   - − coupled to the legacy schema
   - − capture tooling to operate
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.59; API façade: 1.63; Change data capture from the legacy database: 1.41. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.58; API façade: 1.62; Change data capture from the legacy database: 1.41. stated in the constraints
 
 **Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
@@ -754,7 +757,7 @@ _Affects:_ C-13
   - + nothing to implement
   - − lost updates
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Optimistic concurrency: version column checked o: 1.65; Row locks inside a short transaction: 1.63; Last write wins: 1.44
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Optimistic concurrency: version column checked o: 1.64; Row locks inside a short transaction: 1.62; Last write wins: 1.43
 
 **Consequences.** Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.
 
@@ -778,7 +781,7 @@ _Affects:_ C-1, C-6
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.26; Active-active across two regions: unavailable (ruled out by single_region)
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.25; Active-active across two regions: unavailable (ruled out by single_region)
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 
@@ -868,21 +871,7 @@ _Affects:_ C-6, C-9
 
 _Affects:_ C-11
 
-### D-15 — Assumed answer: compliance (Q-compliance) (proposed)
-
-**Context.** The requirements do not say. Question: Q-compliance. Evidence: compliance_data pattern.
-
-- ✔ **named regime + deletion + audit**
-- ✘ **no regime**
-- ✘ **HIPAA/PCI controls**
-
-**Rationale.** The requirements name a data-protection regime or a deletion right.
-
-**Consequences.** If the real answer differs: State the statutory deadline; the deletion job's deadline changes.
-
-_Affects:_ C-14, C-4
-
-### D-16 — Assumed answer: operations (Q-alerting) (proposed)
+### D-15 — Assumed answer: operations (Q-alerting) (proposed)
 
 **Context.** The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.
 
@@ -896,7 +885,7 @@ _Affects:_ C-14, C-4
 
 _Affects:_ C-8
 
-### D-17 — Assumed answer: cost (Q-budget) (proposed)
+### D-16 — Assumed answer: cost (Q-budget) (proposed)
 
 **Context.** The requirements do not say. Question: Q-budget. No evidence in the text; engine default.
 
@@ -980,7 +969,7 @@ _Critical path (12 person-days):_ WP-2 → WP-4 → WP-9
 Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: — · **satisfies**: R-6, R-10, R-17
+- **depends on**: — · **satisfies**: R-6, R-10
 - **write scope**: `app/audit.py`, `tests/test_audit.py`
 - **acceptance**:
   - A-1 (test) unit tests of Audit log pass — `python -m pytest -q tests/test_audit.py`
@@ -992,7 +981,7 @@ Implement Audit log: Append-only record of who did what to which resource, query
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
 - **components**: C-1, C-8 · **implements**: I-1, I-8
-- **depends on**: — · **satisfies**: R-9, R-10, R-11, R-13, R-20, R-21
+- **depends on**: — · **satisfies**: R-9, R-10, R-11, R-13, R-19, R-20
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
 - **acceptance**:
   - A-3 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
@@ -1006,7 +995,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 Implement Data protection: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 
 - **components**: C-14 · **implements**: I-14
-- **depends on**: WP-1, WP-2 · **satisfies**: R-10, R-17
+- **depends on**: WP-1, WP-2 · **satisfies**: R-10
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
   - A-7 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
@@ -1053,7 +1042,7 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-6 · **implements**: I-6
-- **depends on**: WP-1, WP-2, WP-5 · **satisfies**: R-1, R-2, R-7, R-9, R-13, R-22, R-23
+- **depends on**: WP-1, WP-2, WP-5 · **satisfies**: R-1, R-2, R-7, R-9, R-13, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-14 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
@@ -1076,7 +1065,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-4, WP-6, WP-7 · **satisfies**: R-1, R-2, R-8, R-12, R-13, R-18, R-19
+- **depends on**: WP-2, WP-4, WP-6, WP-7 · **satisfies**: R-1, R-2, R-8, R-12, R-13, R-17, R-18
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
@@ -1115,13 +1104,12 @@ Implement Legacy system adapter: Anti-corruption layer in front of the existing 
 | R-14 | must | C-9 | WP-4 | A-9 |
 | R-15 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
 | R-16 | could | C-9 | WP-4 | A-9 |
-| R-17 | must | C-4, C-14 | WP-1, WP-3 | A-1, A-2, A-7, A-8 |
-| R-18 | must | C-15 | WP-9 | A-17, A-18, A-19 |
-| R-19 | should | C-15 | WP-9 | A-17, A-18, A-19 |
-| R-20 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |
-| R-21 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
+| R-17 | must | C-15 | WP-9 | A-17, A-18, A-19 |
+| R-18 | should | C-15 | WP-9 | A-17, A-18, A-19 |
+| R-19 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |
+| R-20 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
+| R-21 | must | C-6 | WP-7 | A-14, A-15 |
 | R-22 | must | C-6 | WP-7 | A-14, A-15 |
-| R-23 | must | C-6 | WP-7 | A-14, A-15 |
 
 ## Conventions
 

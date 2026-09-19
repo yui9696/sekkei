@@ -69,7 +69,7 @@ def test_synthesised_contracts_use_the_entity_types_when_known():
 def test_timing_rules_of_a_use_case_reach_its_operation():
     r = design((EVAL / "ride.md").read_text(encoding="utf-8"))
     api = next(i for i in r.design.interfaces if i.name.startswith("Public HTTP API"))
-    accept = next(o for o in api.operations if o.name == "POST /drivers/{id}/accept")
+    accept = next(o for o in api.operations if o.name == "POST /offers/{id}/accept")
     assert "15 seconds" in accept.pre and "R-2" in accept.pre
 
 

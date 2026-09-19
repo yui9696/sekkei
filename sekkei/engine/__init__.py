@@ -13,7 +13,7 @@ from typing import Any
 
 from .. import rules as R
 from ..model import Decision, Design, Option
-from . import ja
+from . import ja, structure
 from .analysis import Analysis, analyse
 from .answers import Answer, augment
 from .answers import answers as _answers
@@ -78,16 +78,29 @@ def _assumed_decisions(d: Design, ans: list[Answer]) -> None:
             [Option(o, [], []) for o in a.options], a.options[0], a.rationale, "If the real answer differs: " + a.if_wrong, affects, "proposed"))
 
 
+def _alternatives(d: Design, can: structure.Canonical) -> None:
+    """'Alternatives considered' in the input become rejected decisions, so the record survives the rewrite."""
+    n = len(d.decisions)
+    for alt in can.alternatives:
+        n += 1
+        head = alt.split(":")[0].strip()[:60]
+        d.decisions.append(Decision(f"D-{n}", f"Alternative considered: {head}", alt, [Option(head, [], [])], head,
+                                    "Rejected in the requirements text: " + alt, "", [], "rejected"))
+
+
 def design(text: str, assume: bool = True, overrides: Overrides | None = None) -> EngineResult:
     """Design from a requirements text. With ``assume`` the engine answers its own open questions first;
     ``overrides`` carries owners and options a human chose in the interview."""
     overrides = overrides or Overrides()
-    # the language is decided once, on the original text: the augmented text (original + English
-    # assumed bullets) may fall under the Japanese-detection threshold and must not be re-read raw
-    norm = ja.normalise(text) if ja.is_japanese(text) else None
+    # document structure first (tables, numbered headings, stories, labels), then the language is
+    # decided once, on the original text: the augmented text (original + English assumed bullets)
+    # may fall under the Japanese-detection threshold and must not be re-read raw
+    can = structure.canonicalise(text)
+    text = can.text
+    norm = ja.normalise(text) if ja.is_japanese(text, document=True) else None
     if norm:
         text = norm.text
-    an = analyse(text)
+    an = analyse(text, structure=can)
     an.normalisation = norm
     ans: list[Answer] = []
     full = text
@@ -105,7 +118,7 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
                 break
             ans += new
             full = augment(text, ans)
-            an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets})
+            an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets}, structure=can)
             an.normalisation = norm
     syn = synthesise(an, overrides.decisions, overrides.owners)
     _assumed_decisions(syn.design, ans)
@@ -115,6 +128,7 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
     for k in syn.design.risks[len(syn.design.risks) - added:]:
         syn.trace[k.id] = {"sentences": [], "rules": ["threat:" + k.description.split("]")[0].strip("[")]}
     d, diags, log = repair(syn.design)
+    _alternatives(d, can)
     rv = review(d, an, syn.generic)
     nt = notes(d, an, rv, ans, syn.placements)
     return EngineResult(d, an, rv, nt, diags, syn.trace, syn.log + log, ans, syn.placements, full, syn.close_calls)
@@ -122,7 +136,8 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
 
 def ask(text: str) -> list[Question]:
     """Only the questions an architect would ask about this text."""
-    return questions(analyse(text))
+    can = structure.canonicalise(text)
+    return questions(analyse(can.text, structure=can))
 
 
 __all__ = ["EngineResult", "Overrides", "REQUIREMENTS_TEMPLATE", "ask", "design", "analyse", "synthesise", "review", "repair"]

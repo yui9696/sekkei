@@ -124,6 +124,35 @@ which decisions flip when every rate is doubled or a constraint is dropped. On t
 document-search evaluation spec it finds the gap the evaluation had found by hand
 (per-team visibility is recorded and ignored) in 19 engine runs.
 
+## Specifications as engineers actually write them
+
+The template above is the easiest shape, not the only one. A structure pass
+(`engine/structure.py`) reads what teams really hand over and folds it into that shape,
+reporting every fold in the notes:
+
+| you write | the engine reads |
+|---|---|
+| a 要件定義書 with `2. 機能要件` numbered headings and a `\| No \| 機能 \| 内容 \| 優先度 \|` table | sections; one requirement per row, priority from the 優先度 column (必須/推奨/任意 → must/should/could), row ids kept |
+| a Jira/GitHub epic: `### RET-101 — As a customer, I want … so that …` + Given/When/Then | `Customers can …` with the *so that* as rationale; `I` in the criteria becomes the story's actor |
+| meeting notes: `Ana: …`, `DECIDED: Postgres`, `TODO Ana: ask …`, `out of scope: …`, `team: Bo + Chen`, `maybe alerts?` | speaker labels dropped; decisions become constraints; TODOs and questions are lifted into the notes (not designed); inline out-of-scope becomes a section; the team is counted; tentative sentences get priority *could* |
+| an RFC with Motivation / Goals / Non-goals / Requirements / Alternatives considered | background is not a requirement; a generic *Requirements* heading lets content decide functional vs non-functional; rejected alternatives become rejected decisions |
+| checkboxes, nested bullets, `3.1 性能: …` labels, front matter (author, date, version), one sentence with no structure at all | stripped / kept as their own requirement / label dropped / skipped / every sentence taken as a requirement |
+| a stated deadline (`MVP in 6 weeks`, `2027 年 3 月リリース`) | compared with the engine's own calendar estimate in the notes |
+
+Eleven such specifications (Japanese RFP, Jira export, Slack notes, RFC, a monolith split,
+an ETL pipeline, a field app, IoT cold chain, an engineer's TODO list, a one-liner) live in
+[`examples/real/`](examples/real/); each must design lint-clean and deterministically, and a
+fuzz test mutates them (deleted, duplicated, truncated, nested and junk lines) and requires
+the same. The battery is what found most of what the structure pass now handles.
+
+## Into the tools the team already uses
+
+| command | what you get |
+|---|---|
+| `sekkei issues -o .` | one Markdown issue body per work package (goal, requirements verbatim, components, interfaces, write scope, acceptance checklist, blockers), `issues/create_issues.sh` for the GitHub CLI in dependency order, `issues/issues.csv` for Jira/Linear import |
+| `sekkei openapi -o openapi.json` | an OpenAPI 3.0 skeleton from the design's HTTP interfaces: stated `POST /orders/{id}/cancel` operations become path items, other operations get conventional paths, inputs become bodies or query parameters, listed error codes become responses, entities become schemas (field names only) |
+| CI | `sekkei lint` and `sekkei check --root .` on every pull request; `sekkei diff old.json design.json` names the packages whose briefs a design change invalidates. See [docs/CI.md](docs/CI.md) |
+
 ## Japanese input
 
 Requirements may be written in Japanese. A glossary (actors, verbs, domain nouns,
@@ -199,7 +228,7 @@ Hand-authoring is also possible: JSON (`sekkei schema`) or a Python DSL (`sekkei
 ## Dogfood and numbers
 
 sekkei's own architecture is [`examples/self/design.json`](examples/self/design.json)
-(29 components including the engine's twelve, Japanese input, deliverables and the red team; prose in [DESIGN.md](DESIGN.md)). The
+(31 components including the engine's twelve, Japanese input, deliverables and the red team; prose in [DESIGN.md](DESIGN.md)). The
 test-suite lints it in strict mode and runs `sekkei check` against this repository, so an
 import that violates the declared dependency direction fails the build.
 
@@ -207,11 +236,11 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 230 |
+| tests | 253 (incl. 11 real-world specs and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 40 patterns, 52 archetypes, 26 decision points / 76 options, 12 quality tactics, 25 risks, 9 language layouts, 44 threats |
+| catalogue | 43 patterns, 56 archetypes, 28 decision points / 84 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
 | `sekkei deliver` on the SaaS fixture | 32 files (18 ADRs) in about 0.5 s |
 | `sekkei redteam` on the SaaS fixture | 18 engine runs in 1–3 s (one engine run per stated sentence, capped at 80) |
 

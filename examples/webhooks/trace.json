@@ -4,6 +4,7 @@
     "admin_api": 7,
     "event_ingest": 6,
     "async_delivery": 13,
+    "webhook_delivery": 8,
     "signing": 6,
     "notification": 4,
     "health_policy": 7,
@@ -18,7 +19,7 @@
     "isolation": 0.82,
     "availability": 0.63,
     "security": 0.54,
-    "operability": 0.82,
+    "operability": 0.77,
     "scalability": 0.63,
     "simplicity": 0.8,
     "compliance": 0.54
@@ -43,6 +44,7 @@
         "pattern:crud_api",
         "pattern:admin_api",
         "pattern:async_delivery",
+        "pattern:webhook_delivery",
         "pattern:signing",
         "quality:security"
       ]
@@ -73,6 +75,7 @@
       ],
       "rules": [
         "pattern:async_delivery",
+        "pattern:webhook_delivery",
         "quality:durability"
       ]
     },
@@ -333,25 +336,19 @@
     "C-5": {
       "sentences": [
         1,
-        4,
-        5,
-        6,
-        8,
-        11
+        4
       ],
       "rules": [
-        "pattern:async_delivery"
+        "pattern:webhook_delivery"
       ]
     },
     "I-5": {
       "sentences": [
         1,
-        4,
-        5,
-        6
+        4
       ],
       "rules": [
-        "pattern:async_delivery"
+        "pattern:webhook_delivery"
       ]
     },
     "C-6": {
@@ -419,7 +416,8 @@
         11
       ],
       "rules": [
-        "pattern:async_delivery"
+        "pattern:async_delivery",
+        "pattern:webhook_delivery"
       ]
     },
     "I-8": {
@@ -430,7 +428,8 @@
         6
       ],
       "rules": [
-        "pattern:async_delivery"
+        "pattern:async_delivery",
+        "pattern:webhook_delivery"
       ]
     },
     "C-9": {
@@ -1296,7 +1295,7 @@
     },
     {
       "index": 11,
-      "text": "Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
+      "text": "metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
       "section": "nonfunctional",
       "modality": ""
     },

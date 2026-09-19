@@ -218,19 +218,15 @@ graph LR
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
 | `offer_location` | `location`: Location \| id | Location \| None | ValidationError, NotFound | — |
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
-| `accept_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
+| `accept_offer` | `offer`: Offer \| id | Offer \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `decline_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
+| `decline_offer` | `offer`: Offer \| id | Offer \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `offer_drivers` | `drivers`: Drivers \| id | Drivers \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
-| | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `request_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
+| `offer_batch` | `batch`: Batch \| id | Batch \| None | ValidationError, NotFound | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
 | `send_position` | `position`: Position \| id | Position \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `get_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
-| | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `assign_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `compute_fare` | `fare`: Fare \| id | Fare \| None | ValidationError, NotFound | — |
 | | from R-4: The system computes the fare from distance and time at the end of the trip and charges the | | | |
@@ -244,16 +240,8 @@ graph LR
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `receive_alert` | `alert`: Alert \| id | Alert \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `accept_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
+| `accept_request` | `request`: Request \| id | Request \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `request_driver` | `driver`: Driver \| id | Driver \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
-| | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `record_kept` | `kept`: Kept \| id | Kept \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
-| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `log_history` | `history`: History \| id | History \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
-| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
-| `delete_job` | `job`: Job \| id | Job \| None | ValidationError, NotFound | stated values: 1 year (R-12) |
-| | from R-12: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte | | | |
 
 ### I-4 — Observability interface
 
@@ -336,25 +324,21 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `POST /rides/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| `POST /rides` | `body`: ride fields | 201 {ride id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque | | | |
-| `POST /drivers/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
+| `POST /offers/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `POST /drivers/{id}/decline` | `id`: str | 202 decline accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
-| | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
-| `POST /batchs/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
+| `POST /offers/{id}/decline` | `id`: str | 202 decline accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 15 seconds (R-2) |
 | | from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is | | | |
 | `GET /drivers/{id}` | `id`: str | 200 driver | 401 unauthenticated, 404 unknown id | stated values: 5 seconds (R-3) |
-| | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
-| `POST /drivers/{id}/assign` | `id`: str | 202 assign accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 5 seconds (R-3) |
 | | from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv | | | |
 | `POST /trips/{id}/rate` | `id`: str | 202 rate accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `GET /histories/{id}` | `id`: str | 200 history | 401 unauthenticated, 404 unknown id | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
-| `GET /trips/{id}` | `id`: str | 200 trips | 401 unauthenticated, 404 unknown id | — |
+| `GET /trips` | `filter`: query, `page`: cursor | 200 [trips], next cursor | 401 unauthenticated | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
-| `POST /drivers/{id}/request` | `id`: str | 202 request accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 2 minutes (R-6) |
+| `POST /requests/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 
 ### I-12 — Push gateway interface
@@ -387,18 +371,18 @@ graph LR
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-3 — Ride (owner C-1)
+### E-3 — Trip (owner C-1)
 
-Domain entity named in the requirements ('ride'); confirm the fields.
+Domain entity named in the requirements ('trip'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
 | `created_at` | timestamp |  |
 
-### E-4 — Trip (owner C-1)
+### E-4 — Ride (owner C-1)
 
-Domain entity named in the requirements ('trip'); confirm the fields.
+Domain entity named in the requirements ('ride'); confirm the fields.
 
 | field | type | constraints |
 |---|---|---|
@@ -450,8 +434,13 @@ sequenceDiagram
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Email one-time code / magic link (no account needed)**
+  - + no password, no sign-up
+  - + works for occasional customers
+  - − depends on email delivery
+  - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -464,8 +453,17 @@ _Affects:_ C-5
 - ✔ **PostgreSQL**
   - + transactions
   - + indexes and JSON
-  - + already available
+  - + widely available
   - − operational dependency
+- ✘ **MySQL / MariaDB (the stated database)**
+  - + transactions
+  - + already operated by the team
+  - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
+  - + scales without operations
+  - + flexible records
+  - − no cross-record transactions by default
+  - − query patterns must be designed up front
 - ✘ **SQLite**
   - + zero operations
   - + single file
@@ -480,9 +478,7 @@ _Affects:_ C-5
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.26; In-memory: 1.64; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints
-
-**Consequences.** Not choosing 'In-memory' gives up: fastest, trivial.
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
 
 _Affects:_ C-1
 
@@ -504,7 +500,7 @@ _Affects:_ C-1
   - − three deployables for a team of three
   - − shared schema anyway
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.85; Single process with background threads: 1.50; Separate services per concern: 1.34
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.83; Single process with background threads: 1.49; Separate services per concern: 1.35
 
 **Consequences.** Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.
 
@@ -527,7 +523,7 @@ _Affects:_ C-11, C-9
   - + nothing to implement
   - − lost updates
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.74; Row locks inside a short transaction: 1.74; Last write wins: 1.55
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.75; Last write wins: 1.56
 
 **Consequences.** Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.
 
@@ -551,7 +547,7 @@ _Affects:_ C-1, C-3
   - − data replication and conflict handling
   - − cost
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.52; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)
 
 **Consequences.** Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.
 

@@ -1,29 +1,31 @@
 {
   "sekkei": "1",
-  "name": "ride-dispatch-backend",
+  "name": "warehouses-stock-management-service",
   "version": "0.1.0",
-  "summary": "A city taxi cooperative needs a backend that matches ride requests to nearby drivers and tracks each trip.",
+  "summary": "Staff can record stock movements warehouses stock.",
   "goals": [
+    "Clients read and write domain resources over HTTP.",
+    "The system notifies people through an external channel.",
     "Metrics, structured logs and health endpoints for operations.",
     "Callers are authenticated and authorized.",
+    "Users search and filter records.",
     "Scheduled jobs process stored records in windows.",
-    "Positions are indexed and nearest matches are found.",
-    "Connected clients receive events as they happen.",
-    "Charges and invoices through a payment provider."
+    "Changes are recorded append-only with the actor.",
+    "Records move in and out as files."
   ],
   "non_goals": [
-    "Route navigation and maps rendering (handled by the mobile apps)."
+    "Purchasing suppliers manage."
   ],
   "conventions": {
-    "language": "go",
-    "test_command": "go test ./...",
-    "lint_command": "go vet ./...",
+    "language": "typescript",
+    "test_command": "npx vitest run",
+    "lint_command": "npx eslint .",
     "rules": [
-      "Errors are values; wrap with context.",
-      "Interfaces are declared by the consumer.",
+      "strict TypeScript; no `any` in exported signatures.",
+      "No business logic in route handlers.",
       "Every component logs one structured line per unit of work with the correlation id.",
       "Prefer the boring option; a new piece of infrastructure needs a decision record.",
-      "Go 1.22 as stated in the constraints.",
+      "Node 20 as stated in the constraints.",
       "Stateless processes: configuration from the environment, no local files that a second instance would not see."
     ],
     "definition_of_done": [
@@ -35,117 +37,129 @@
   "requirements": [
     {
       "id": "R-1",
-      "statement": "Riders request a ride from the mobile app with a pickup and a drop-off location; the request is offered to the nearest available drivers.",
+      "statement": "Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): スタッフは在庫品目(SKU、数量、倉庫、棚)を REST API で追加・移動・削除できる。"
     },
     {
       "id": "R-2",
-      "statement": "Drivers accept or decline an offer within 15 seconds; after three declines the request is offered to the next batch of drivers.",
+      "statement": "Managers are notified reorder level stock falls below email.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): マネージャーは在庫が発注点を下回るとメールで通知される。"
     },
     {
       "id": "R-3",
-      "statement": "Drivers send their GPS position every 5 seconds while online; riders see the assigned driver's position in real time.",
+      "statement": "Managers can export stock list CSV.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): マネージャーは在庫一覧を CSV でエクスポートできる。"
     },
     {
       "id": "R-4",
-      "statement": "The system computes the fare from distance and time at the end of the trip and charges the rider's card through Stripe.",
+      "statement": "Users can search stock SKU warehouses.",
       "kind": "functional",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): 利用者は SKU と倉庫で在庫を検索できる。"
     },
     {
       "id": "R-5",
-      "statement": "Riders can rate a trip and see their trip history; operators can view all active trips on a dashboard.",
-      "kind": "functional",
+      "statement": "The system must respond search 200000 items for within 300 ms (p95).",
+      "kind": "nonfunctional",
       "priority": "must",
-      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+      "metric": {
+        "name": "p95 latency at 200000",
+        "target": "<= 300 ms",
+        "unit": "ms"
+      },
+      "rationale": "source (ja): 検索は 20万件の品目に対して 300ms以内(p95)に応答すること。"
     },
     {
       "id": "R-6",
-      "statement": "Operators receive an alert when no driver accepts a request within 2 minutes.",
-      "kind": "functional",
+      "statement": "The system must update stock counts concurrent not lost. The system must not apply double-applied.",
+      "kind": "nonfunctional",
       "priority": "must",
-      "rationale": "no catalogue pattern matched; owner chosen by the engine (see the notes)"
+      "metric": {
+        "name": "lost or duplicate updates under concurrent writes to one record",
+        "target": "= 0",
+        "unit": "updates"
+      },
+      "rationale": "source (ja): 在庫数は同時更新でも失われず、二重に適用されない。"
     },
     {
       "id": "R-7",
-      "statement": "300 concurrent trips and 2,000 online drivers at peak; position updates must be visible to the rider within 2 s p95.",
+      "statement": "Monthly availability at least 99.9 %.",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "p95 latency at 300, 2,000",
-        "target": "<= 2 s",
-        "unit": "s"
+        "name": "ratio",
+        "target": ">= 99.9 %",
+        "unit": "%"
       },
-      "rationale": ""
+      "rationale": "source (ja): 月間稼働率 99.9% 以上。"
     },
     {
       "id": "R-8",
-      "statement": "No accepted ride request or completed trip is lost on a crash.",
+      "statement": "The system must export structured logs Prometheus for metrics.",
       "kind": "nonfunctional",
-      "priority": "should",
+      "priority": "must",
       "metric": {
-        "name": "records lost across a process crash",
-        "target": "= 0",
-        "unit": "records"
+        "name": "required metrics exposed",
+        "target": "= all listed",
+        "unit": ""
       },
-      "rationale": ""
+      "rationale": "source (ja): Prometheus 向けメトリクスと構造化ログを出力する。"
     },
     {
       "id": "R-9",
-      "statement": "A driver's position history is kept 30 days for dispute handling, then deleted.",
-      "kind": "nonfunctional",
-      "priority": "should",
-      "metric": {
-        "name": "time",
-        "target": "30 days",
-        "unit": "days"
-      },
-      "rationale": ""
+      "statement": "TypeScript(Node 20). The system can use PostgreSQL. Team of 2.",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "source (ja): TypeScript(Node 20)。PostgreSQL を利用可能。チームは 2 名。"
     },
     {
       "id": "R-10",
-      "statement": "Go 1.22, PostgreSQL with PostGIS available, Redis available. Team of 4. Kubernetes cluster in a single region.",
+      "statement": "Containers existing ingress behind run.",
       "kind": "constraint",
       "priority": "must",
-      "rationale": ""
+      "rationale": "source (ja): コンテナで既存のイングレスの背後で動かす。"
     },
     {
       "id": "R-11",
-      "statement": "Riders and drivers authenticate with the company's OIDC provider; operators use the same provider with an operator role.",
-      "kind": "constraint",
-      "priority": "must",
-      "rationale": ""
-    },
-    {
-      "id": "R-12",
       "statement": "Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine).",
       "kind": "functional",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-13",
-      "statement": "The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)).",
-      "kind": "nonfunctional",
+      "id": "R-12",
+      "statement": "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).",
+      "kind": "functional",
       "priority": "must",
-      "metric": {
-        "name": "sustained rate at 2,000, 5 s",
-        "target": "4000 updates /s",
-        "unit": "updates /s"
-      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-13",
+      "statement": "Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine).",
+      "kind": "functional",
+      "priority": "could",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
       "id": "R-14",
+      "statement": "The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "sustained rate at 1,000",
+        "target": "100 requests /s",
+        "unit": "requests /s"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-15",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -153,18 +167,6 @@
         "name": "size at 2 KB",
         "target": "<= 256 kb",
         "unit": "kb"
-      },
-      "rationale": "assumed by the engine; confirm or override"
-    },
-    {
-      "id": "R-15",
-      "statement": "Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine).",
-      "kind": "nonfunctional",
-      "priority": "must",
-      "metric": {
-        "name": "ratio",
-        "target": "99.9 %",
-        "unit": "%"
       },
       "rationale": "assumed by the engine; confirm or override"
     },
@@ -182,6 +184,18 @@
     },
     {
       "id": "R-17",
+      "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
+      "kind": "nonfunctional",
+      "priority": "must",
+      "metric": {
+        "name": "ratio at 5 minutes, 10 minutes",
+        "target": "1 %",
+        "unit": "%"
+      },
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-18",
       "statement": "External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -193,15 +207,22 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-18",
-      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
+      "id": "R-19",
+      "statement": "No existing data or system to migrate from (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-19",
-      "statement": "No existing data or system to migrate from (assumed by the engine).",
+      "id": "R-20",
+      "statement": "Authentication via an OIDC identity provider (assumed by the engine: internal users).",
+      "kind": "constraint",
+      "priority": "must",
+      "rationale": "assumed by the engine; confirm or override"
+    },
+    {
+      "id": "R-21",
+      "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
@@ -213,12 +234,12 @@
       "name": "Store",
       "responsibility": "Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations.",
       "kind": "datastore",
-      "path": "internal/store/store.go",
+      "path": "src/store.ts",
       "requires": [],
       "satisfies": [
-        "R-8",
-        "R-10",
-        "R-17"
+        "R-6",
+        "R-9",
+        "R-18"
       ],
       "tags": [
         "layer:0",
@@ -227,40 +248,53 @@
     },
     {
       "id": "C-2",
-      "name": "Payment provider",
-      "responsibility": "External payment service provider.",
+      "name": "Email provider",
+      "responsibility": "External email delivery service.",
       "kind": "external",
       "path": "",
       "requires": [],
       "satisfies": [
-        "R-4"
+        "R-2"
       ],
       "tags": [
         "layer:0",
-        "archetype:psp"
+        "archetype:email"
       ]
     },
     {
       "id": "C-3",
+      "name": "Audit log",
+      "responsibility": "Append-only record of who did what to which resource, queryable by resource and actor.",
+      "kind": "datastore",
+      "path": "src/audit.ts",
+      "requires": [],
+      "satisfies": [
+        "R-12"
+      ],
+      "tags": [
+        "layer:0",
+        "archetype:audit"
+      ]
+    },
+    {
+      "id": "C-4",
       "name": "Domain core",
       "responsibility": "Business rules and validation for the domain entities; the only module that changes state through the store.",
       "kind": "module",
-      "path": "internal/core/core.go",
+      "path": "src/core.ts",
       "requires": [
         "I-1",
-        "I-4",
         "I-6",
-        "I-8",
-        "I-7"
+        "I-3",
+        "I-5"
       ],
       "satisfies": [
-        "R-5",
-        "R-6",
         "R-1",
         "R-3",
-        "R-10",
-        "R-18",
-        "R-19"
+        "R-6",
+        "R-9",
+        "R-19",
+        "R-21"
       ],
       "tags": [
         "layer:1",
@@ -268,14 +302,34 @@
       ]
     },
     {
-      "id": "C-4",
+      "id": "C-5",
+      "name": "Notifier",
+      "responsibility": "Sends operator/customer notifications through the configured channel with templating and rate limiting.",
+      "kind": "module",
+      "path": "src/notifier.ts",
+      "requires": [
+        "I-2",
+        "I-6"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:notifier"
+      ]
+    },
+    {
+      "id": "C-6",
       "name": "Observability",
       "responsibility": "Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "kind": "module",
-      "path": "internal/observability/observability.go",
+      "path": "src/observability.ts",
       "requires": [],
       "satisfies": [
-        "R-15"
+        "R-7",
+        "R-8",
+        "R-17"
       ],
       "tags": [
         "layer:1",
@@ -283,16 +337,17 @@
       ]
     },
     {
-      "id": "C-5",
+      "id": "C-7",
       "name": "Authentication",
       "responsibility": "Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations.",
       "kind": "module",
-      "path": "internal/auth/auth.go",
+      "path": "src/auth.ts",
       "requires": [
         "I-1"
       ],
       "satisfies": [
-        "R-11"
+        "R-13",
+        "R-20"
       ],
       "tags": [
         "layer:1",
@@ -300,68 +355,53 @@
       ]
     },
     {
-      "id": "C-6",
-      "name": "Geospatial index",
-      "responsibility": "Keeps current positions and answers nearest-neighbour queries within a radius.",
+      "id": "C-8",
+      "name": "Search index",
+      "responsibility": "Full-text and filtered queries over the indexed entities.",
       "kind": "module",
-      "path": "internal/geo/geo.go",
+      "path": "src/search.ts",
       "requires": [
-        "I-1",
-        "I-4"
-      ],
-      "satisfies": [
-        "R-1"
-      ],
-      "tags": [
-        "layer:1",
-        "archetype:geo"
-      ]
-    },
-    {
-      "id": "C-7",
-      "name": "Payments",
-      "responsibility": "Creates charges/invoices through the payment provider and reconciles their webhooks.",
-      "kind": "module",
-      "path": "internal/payments/payments.go",
-      "requires": [
-        "I-2",
         "I-1"
       ],
       "satisfies": [
-        "R-4"
+        "R-4",
+        "R-5",
+        "R-14"
       ],
       "tags": [
         "layer:1",
-        "archetype:payments"
-      ]
-    },
-    {
-      "id": "C-8",
-      "name": "Event bus",
-      "responsibility": "Publishes domain events to subscribers inside the system.",
-      "kind": "module",
-      "path": "internal/bus/bus.go",
-      "requires": [],
-      "satisfies": [
-        "R-3"
-      ],
-      "tags": [
-        "layer:1",
-        "archetype:bus"
+        "archetype:search"
       ]
     },
     {
       "id": "C-9",
-      "name": "Scheduler",
-      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
-      "kind": "job",
-      "path": "internal/scheduler/scheduler.go",
+      "name": "Import/export",
+      "responsibility": "Streams records to and from CSV/JSON with validation and partial-failure reporting.",
+      "kind": "module",
+      "path": "src/exporter.ts",
       "requires": [
         "I-4"
       ],
       "satisfies": [
-        "R-2",
-        "R-12"
+        "R-3",
+        "R-8"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:exporter"
+      ]
+    },
+    {
+      "id": "C-10",
+      "name": "Scheduler",
+      "responsibility": "Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
+      "kind": "job",
+      "path": "src/scheduler.ts",
+      "requires": [
+        "I-6"
+      ],
+      "satisfies": [
+        "R-11"
       ],
       "tags": [
         "layer:2",
@@ -369,20 +409,20 @@
       ]
     },
     {
-      "id": "C-10",
+      "id": "C-11",
       "name": "Batch job",
       "responsibility": "Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "kind": "job",
-      "path": "internal/batch/batch.go",
+      "path": "src/batch.ts",
       "requires": [
         "I-1",
+        "I-10",
+        "I-6",
         "I-9",
-        "I-4",
-        "I-3"
+        "I-4"
       ],
       "satisfies": [
-        "R-2",
-        "R-12"
+        "R-11"
       ],
       "tags": [
         "layer:2",
@@ -390,50 +430,29 @@
       ]
     },
     {
-      "id": "C-11",
+      "id": "C-12",
       "name": "Public HTTP API",
       "responsibility": "Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "kind": "service",
-      "path": "internal/surface_api/surface_api.go",
+      "path": "src/surface_api.ts",
       "requires": [
-        "I-3",
         "I-4",
-        "I-5"
+        "I-6",
+        "I-7",
+        "I-8",
+        "I-9"
       ],
       "satisfies": [
+        "R-1",
         "R-5",
-        "R-6",
-        "R-7",
-        "R-9",
         "R-10",
-        "R-13",
         "R-14",
+        "R-15",
         "R-16"
       ],
       "tags": [
         "layer:3",
         "archetype:surface_api"
-      ]
-    },
-    {
-      "id": "C-12",
-      "name": "Push gateway",
-      "responsibility": "Long-lived connections (WebSocket/SSE) that fan out events to connected clients.",
-      "kind": "service",
-      "path": "internal/push/push.go",
-      "requires": [
-        "I-3",
-        "I-4",
-        "I-5",
-        "I-8"
-      ],
-      "satisfies": [
-        "R-3",
-        "R-10"
-      ],
-      "tags": [
-        "layer:3",
-        "archetype:push"
       ]
     }
   ],
@@ -537,14 +556,30 @@
     },
     {
       "id": "I-2",
-      "name": "Payment provider interface",
+      "name": "Email provider interface",
       "owner": "C-2",
       "kind": "http",
       "operations": [
         {
-          "name": "POST /charges",
-          "inputs": [],
-          "output": "charge",
+          "name": "send",
+          "inputs": [
+            {
+              "name": "to",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "subject",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "body",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "provider message id",
           "errors": [],
           "pre": "",
           "post": "",
@@ -552,274 +587,250 @@
         }
       ],
       "stability": "stable",
-      "description": "Provided by Payment provider. External; contract is theirs."
+      "description": "Provided by Email provider. External; contract is theirs."
     },
     {
       "id": "I-3",
-      "name": "Domain core interface",
+      "name": "Audit log interface",
       "owner": "C-3",
+      "kind": "class",
+      "operations": [
+        {
+          "name": "append",
+          "inputs": [
+            {
+              "name": "actor",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "resource",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "details",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "query",
+          "inputs": [
+            {
+              "name": "resource",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "actor",
+              "type": "str | None",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "Page",
+              "description": ""
+            }
+          ],
+          "output": "entries",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "stable",
+      "description": "Provided by Audit log. "
+    },
+    {
+      "id": "I-4",
+      "name": "Domain core interface",
+      "owner": "C-4",
       "kind": "module",
       "operations": [
         {
-          "name": "request_ride",
+          "name": "add_items",
           "inputs": [
             {
-              "name": "ride",
-              "type": "Ride | id",
+              "name": "items",
+              "type": "Items | id",
               "description": ""
             }
           ],
-          "output": "Ride | None",
+          "output": "Items | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "offer_location",
+          "name": "move_items",
           "inputs": [
             {
-              "name": "location",
-              "type": "Location | id",
+              "name": "items",
+              "type": "Items | id",
               "description": ""
             }
           ],
-          "output": "Location | None",
+          "output": "Items | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "accept_offer",
+          "name": "delete_items",
           "inputs": [
             {
-              "name": "offer",
-              "type": "Offer | id",
+              "name": "items",
+              "type": "Items | id",
               "description": ""
             }
           ],
-          "output": "Offer | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "decline_offer",
-          "inputs": [
-            {
-              "name": "offer",
-              "type": "Offer | id",
-              "description": ""
-            }
-          ],
-          "output": "Offer | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "offer_batch",
-          "inputs": [
-            {
-              "name": "batch",
-              "type": "Batch | id",
-              "description": ""
-            }
-          ],
-          "output": "Batch | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "send_position",
-          "inputs": [
-            {
-              "name": "position",
-              "type": "Position | id",
-              "description": ""
-            }
-          ],
-          "output": "Position | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 5 seconds (R-3)",
-          "post": "",
-          "description": "from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv"
-        },
-        {
-          "name": "get_driver",
-          "inputs": [
-            {
-              "name": "driver",
-              "type": "Driver | id",
-              "description": ""
-            }
-          ],
-          "output": "Driver | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 5 seconds (R-3)",
-          "post": "",
-          "description": "from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv"
-        },
-        {
-          "name": "compute_fare",
-          "inputs": [
-            {
-              "name": "fare",
-              "type": "Fare | id",
-              "description": ""
-            }
-          ],
-          "output": "Fare | None",
+          "output": "Items | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: The system computes the fare from distance and time at the end of the trip and charges the"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "charge_rider",
+          "name": "notify_level",
           "inputs": [
             {
-              "name": "rider",
-              "type": "Rider | id",
+              "name": "level",
+              "type": "Level | id",
               "description": ""
             }
           ],
-          "output": "Rider | None",
+          "output": "Level | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: The system computes the fare from distance and time at the end of the trip and charges the"
+          "description": "from R-2: Managers are notified reorder level stock falls below email."
         },
         {
-          "name": "rate_trip",
+          "name": "export_stock",
           "inputs": [
             {
-              "name": "trip",
-              "type": "Trip | id",
+              "name": "stock",
+              "type": "Stock | id",
               "description": ""
             }
           ],
-          "output": "Trip | None",
+          "output": "Stock | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
+          "description": "from R-3: Managers can export stock list CSV."
         },
         {
-          "name": "get_history",
+          "name": "list_stock",
           "inputs": [
             {
-              "name": "history",
-              "type": "History | id",
+              "name": "stock",
+              "type": "Stock | id",
               "description": ""
             }
           ],
-          "output": "History | None",
+          "output": "Stock | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
+          "description": "from R-3: Managers can export stock list CSV."
         },
         {
-          "name": "get_trips",
+          "name": "search_sku",
           "inputs": [
             {
-              "name": "trips",
-              "type": "Trips | id",
+              "name": "sku",
+              "type": "Sku | id",
               "description": ""
             }
           ],
-          "output": "Trips | None",
+          "output": "Sku | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
-        },
-        {
-          "name": "receive_alert",
-          "inputs": [
-            {
-              "name": "alert",
-              "type": "Alert | id",
-              "description": ""
-            }
-          ],
-          "output": "Alert | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 2 minutes (R-6)",
-          "post": "",
-          "description": "from R-6: Operators receive an alert when no driver accepts a request within 2 minutes."
-        },
-        {
-          "name": "accept_request",
-          "inputs": [
-            {
-              "name": "request",
-              "type": "Request | id",
-              "description": ""
-            }
-          ],
-          "output": "Request | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 2 minutes (R-6)",
-          "post": "",
-          "description": "from R-6: Operators receive an alert when no driver accepts a request within 2 minutes."
+          "description": "from R-4: Users can search stock SKU warehouses."
         }
       ],
       "stability": "draft",
       "description": "Provided by Domain core. "
     },
     {
-      "id": "I-4",
+      "id": "I-5",
+      "name": "Notifier interface",
+      "owner": "C-5",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "notify",
+          "inputs": [
+            {
+              "name": "recipient",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "template",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "context",
+              "type": "dict",
+              "description": ""
+            }
+          ],
+          "output": "message id",
+          "errors": [
+            "NotifyError"
+          ],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Notifier. "
+    },
+    {
+      "id": "I-6",
       "name": "Observability interface",
-      "owner": "C-4",
+      "owner": "C-6",
       "kind": "module",
       "operations": [
         {
@@ -925,9 +936,9 @@
       "description": "Provided by Observability. "
     },
     {
-      "id": "I-5",
+      "id": "I-7",
       "name": "Authentication interface",
-      "owner": "C-5",
+      "owner": "C-7",
       "kind": "module",
       "operations": [
         {
@@ -979,32 +990,22 @@
       "description": "Provided by Authentication. "
     },
     {
-      "id": "I-6",
-      "name": "Geospatial index interface",
-      "owner": "C-6",
+      "id": "I-8",
+      "name": "Search index interface",
+      "owner": "C-8",
       "kind": "module",
       "operations": [
         {
-          "name": "update_position",
+          "name": "index",
           "inputs": [
             {
-              "name": "subject_id",
-              "type": "str",
+              "name": "entity",
+              "type": "Entity",
               "description": ""
             },
             {
-              "name": "lat",
-              "type": "float",
-              "description": ""
-            },
-            {
-              "name": "lon",
-              "type": "float",
-              "description": ""
-            },
-            {
-              "name": "at",
-              "type": "datetime",
+              "name": "record",
+              "type": "dict",
               "description": ""
             }
           ],
@@ -1015,117 +1016,85 @@
           "description": ""
         },
         {
-          "name": "nearest",
+          "name": "query",
           "inputs": [
             {
-              "name": "lat",
-              "type": "float",
+              "name": "text",
+              "type": "str",
               "description": ""
             },
             {
-              "name": "lon",
-              "type": "float",
+              "name": "filters",
+              "type": "dict",
               "description": ""
             },
             {
-              "name": "radius_m",
-              "type": "int",
+              "name": "page",
+              "type": "Page",
               "description": ""
-            },
+            }
+          ],
+          "output": "hits",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Search index. "
+    },
+    {
+      "id": "I-9",
+      "name": "Import/export interface",
+      "owner": "C-9",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "export",
+          "inputs": [
             {
-              "name": "limit",
-              "type": "int",
+              "name": "entity",
+              "type": "Entity",
               "description": ""
             },
             {
               "name": "filter",
               "type": "dict",
               "description": ""
-            }
-          ],
-          "output": "list[(subject_id, distance_m)]",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Geospatial index. "
-    },
-    {
-      "id": "I-7",
-      "name": "Payments interface",
-      "owner": "C-7",
-      "kind": "module",
-      "operations": [
-        {
-          "name": "charge",
-          "inputs": [
-            {
-              "name": "customer",
-              "type": "str",
-              "description": ""
             },
             {
-              "name": "amount",
-              "type": "Money",
-              "description": ""
-            },
-            {
-              "name": "idempotency_key",
-              "type": "str",
+              "name": "format",
+              "type": "csv|json",
               "description": ""
             }
           ],
-          "output": "Charge",
-          "errors": [
-            "PaymentDeclined"
-          ],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Payments. "
-    },
-    {
-      "id": "I-8",
-      "name": "Event bus interface",
-      "owner": "C-8",
-      "kind": "event",
-      "operations": [
-        {
-          "name": "publish",
-          "inputs": [
-            {
-              "name": "event",
-              "type": "Event",
-              "description": ""
-            }
-          ],
-          "output": "None",
+          "output": "byte stream",
           "errors": [],
           "pre": "",
           "post": "",
           "description": ""
         },
         {
-          "name": "subscribe",
+          "name": "import_",
           "inputs": [
             {
-              "name": "type",
-              "type": "str",
+              "name": "entity",
+              "type": "Entity",
               "description": ""
             },
             {
-              "name": "handler",
-              "type": "callable",
+              "name": "stream",
+              "type": "bytes",
+              "description": ""
+            },
+            {
+              "name": "format",
+              "type": "csv|json",
               "description": ""
             }
           ],
-          "output": "None",
+          "output": "ImportReport with per-row errors",
           "errors": [],
           "pre": "",
           "post": "",
@@ -1133,12 +1102,12 @@
         }
       ],
       "stability": "draft",
-      "description": "Provided by Event bus. "
+      "description": "Provided by Import/export. "
     },
     {
-      "id": "I-9",
+      "id": "I-10",
       "name": "Scheduler interface",
-      "owner": "C-9",
+      "owner": "C-10",
       "kind": "module",
       "operations": [
         {
@@ -1181,9 +1150,9 @@
       "description": "Provided by Scheduler. "
     },
     {
-      "id": "I-10",
+      "id": "I-11",
       "name": "Batch job interface",
-      "owner": "C-10",
+      "owner": "C-11",
       "kind": "module",
       "operations": [
         {
@@ -1199,7 +1168,7 @@
           "errors": [
             "JobError"
           ],
-          "pre": "stated values: 15 seconds (R-2); 1 year (R-12)",
+          "pre": "stated values: 1 year (R-11)",
           "post": "",
           "description": ""
         }
@@ -1208,21 +1177,21 @@
       "description": "Provided by Batch job. "
     },
     {
-      "id": "I-11",
+      "id": "I-12",
       "name": "Public HTTP API interface",
-      "owner": "C-11",
+      "owner": "C-12",
       "kind": "http",
       "operations": [
         {
-          "name": "POST /rides",
+          "name": "POST /items",
           "inputs": [
             {
               "name": "body",
-              "type": "ride fields",
+              "type": "items fields",
               "description": ""
             }
           ],
-          "output": "201 {ride id}",
+          "output": "201 {items id}",
           "errors": [
             "400 invalid body",
             "401 unauthenticated",
@@ -1230,10 +1199,10 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Riders request a ride from the mobile app with a pickup and a drop-off location; the reque"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "POST /offers/{id}/accept",
+          "name": "POST /items/{id}/move",
           "inputs": [
             {
               "name": "id",
@@ -1241,63 +1210,7 @@
               "description": ""
             }
           ],
-          "output": "202 accept accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "POST /offers/{id}/decline",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 decline accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
-          ],
-          "pre": "stated values: 15 seconds (R-2)",
-          "post": "",
-          "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
-        },
-        {
-          "name": "GET /drivers/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "200 driver",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
-          "pre": "stated values: 5 seconds (R-3)",
-          "post": "",
-          "description": "from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv"
-        },
-        {
-          "name": "POST /trips/{id}/rate",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 rate accepted",
+          "output": "202 move accepted",
           "errors": [
             "401 unauthenticated",
             "404 unknown id",
@@ -1305,10 +1218,10 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "GET /histories/{id}",
+          "name": "DELETE /items/{id}",
           "inputs": [
             {
               "name": "id",
@@ -1316,17 +1229,17 @@
               "description": ""
             }
           ],
-          "output": "200 history",
+          "output": "204",
           "errors": [
             "401 unauthenticated",
             "404 unknown id"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
+          "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
         },
         {
-          "name": "GET /trips",
+          "name": "GET /stocks",
           "inputs": [
             {
               "name": "filter",
@@ -1339,66 +1252,70 @@
               "description": ""
             }
           ],
-          "output": "200 [trips], next cursor",
+          "output": "200 [stock], next cursor",
           "errors": [
             "401 unauthenticated"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
+          "description": "from R-3: Managers can export stock list CSV."
         },
         {
-          "name": "POST /requests/{id}/accept",
+          "name": "GET /skus",
           "inputs": [
             {
-              "name": "id",
-              "type": "str",
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
               "description": ""
             }
           ],
-          "output": "202 accept accepted",
+          "output": "200 [sku], next cursor",
           "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
+            "401 unauthenticated"
           ],
-          "pre": "stated values: 2 minutes (R-6)",
+          "pre": "",
           "post": "",
-          "description": "from R-6: Operators receive an alert when no driver accepts a request within 2 minutes."
+          "description": "from R-4: Users can search stock SKU warehouses."
         }
       ],
       "stability": "draft",
       "description": "Provided by Public HTTP API. "
-    },
-    {
-      "id": "I-12",
-      "name": "Push gateway interface",
-      "owner": "C-12",
-      "kind": "http",
-      "operations": [
-        {
-          "name": "subscribe",
-          "inputs": [
-            {
-              "name": "topic",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "stream of events",
-          "errors": [],
-          "pre": "",
-          "post": "",
-          "description": ""
-        }
-      ],
-      "stability": "draft",
-      "description": "Provided by Push gateway. "
     }
   ],
   "entities": [
     {
       "id": "E-1",
+      "name": "Record",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Generic domain record; refine per entity found in the requirements."
+    },
+    {
+      "id": "E-2",
       "name": "Principal",
       "owner": "C-1",
       "fields": [
@@ -1424,7 +1341,7 @@
       "description": ""
     },
     {
-      "id": "E-2",
+      "id": "E-3",
       "name": "JobRun",
       "owner": "C-1",
       "fields": [
@@ -1468,29 +1385,9 @@
       "description": ""
     },
     {
-      "id": "E-3",
-      "name": "Trip",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('trip'); confirm the fields."
-    },
-    {
       "id": "E-4",
-      "name": "Ride",
-      "owner": "C-1",
+      "name": "AuditEntry",
+      "owner": "C-3",
       "fields": [
         {
           "name": "id",
@@ -1499,17 +1396,79 @@
           "description": ""
         },
         {
-          "name": "created_at",
+          "name": "actor",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "action",
+          "type": "str",
+          "constraints": "",
+          "description": ""
+        },
+        {
+          "name": "resource",
+          "type": "str",
+          "constraints": "indexed",
+          "description": ""
+        },
+        {
+          "name": "at",
           "type": "timestamp",
           "constraints": "",
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('ride'); confirm the fields."
+      "description": ""
     },
     {
       "id": "E-5",
-      "name": "Location",
+      "name": "Item",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "sku",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "quantity",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "warehouses",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "bins",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity named in the requirements ('item'); confirm the fields."
+    },
+    {
+      "id": "E-6",
+      "name": "Warehouse",
       "owner": "C-1",
       "fields": [
         {
@@ -1525,23 +1484,42 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('location'); confirm the fields."
+      "description": "Domain entity named in the requirements ('warehouse'); confirm the fields."
     }
   ],
   "flows": [
     {
       "id": "F-1",
+      "name": "Serve a request",
+      "trigger": "client calls the API",
+      "steps": [
+        {
+          "from": "C-12",
+          "to": "C-4",
+          "via": "I-4",
+          "description": "validate and apply"
+        },
+        {
+          "from": "C-4",
+          "to": "C-1",
+          "via": "I-1",
+          "description": "read/write"
+        }
+      ]
+    },
+    {
+      "id": "F-2",
       "name": "Run the batch job",
       "trigger": "schedule fires",
       "steps": [
         {
-          "from": "C-10",
+          "from": "C-11",
           "to": "C-1",
           "via": "I-1",
           "description": "read the window of records"
         },
         {
-          "from": "C-10",
+          "from": "C-11",
           "to": "C-1",
           "via": "I-1",
           "description": "write results and the job report"
@@ -1552,56 +1530,44 @@
   "decisions": [
     {
       "id": "D-1",
-      "title": "Caller authentication",
-      "context": "Management operations must be attributable to a customer or operator.",
+      "title": "API style",
+      "context": "Clients need a programmable surface.",
       "options": [
         {
-          "name": "API keys per customer, hashed at rest, sent as a bearer token",
+          "name": "REST/JSON over HTTP",
           "pros": [
-            "simple",
-            "scriptable"
+            "universal tooling",
+            "cacheable reads"
           ],
           "cons": [
-            "no delegation or expiry unless added"
+            "over-fetching on nested data"
           ]
         },
         {
-          "name": "OAuth2 / OIDC with the platform's identity provider",
+          "name": "gRPC",
           "pros": [
-            "single sign-on",
-            "expiry and scopes"
+            "typed contracts",
+            "streaming"
           ],
           "cons": [
-            "integration effort"
+            "browser and debugging friction"
           ]
         },
         {
-          "name": "Mutual TLS",
+          "name": "GraphQL",
           "pros": [
-            "strong",
-            "no secrets in headers"
+            "flexible queries"
           ],
           "cons": [
-            "certificate lifecycle for every customer"
-          ]
-        },
-        {
-          "name": "Email one-time code / magic link (no account needed)",
-          "pros": [
-            "no password, no sign-up",
-            "works for occasional customers"
-          ],
-          "cons": [
-            "depends on email delivery",
-            "weak against mailbox compromise"
+            "complexity budget for a small team"
           ]
         }
       ],
-      "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
-      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "choice": "REST/JSON over HTTP",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). REST/JSON over HTTP: 1.43; gRPC: 1.28; GraphQL: 1.14",
+      "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
-        "C-5"
+        "C-12"
       ],
       "status": "accepted"
     },
@@ -1675,7 +1641,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). PostgreSQL: 3.29; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
       "consequences": "",
       "affects": [
         "C-1"
@@ -1684,6 +1650,61 @@
     },
     {
       "id": "D-3",
+      "title": "Caller authentication",
+      "context": "Management operations must be attributable to a customer or operator.",
+      "options": [
+        {
+          "name": "API keys per customer, hashed at rest, sent as a bearer token",
+          "pros": [
+            "simple",
+            "scriptable"
+          ],
+          "cons": [
+            "no delegation or expiry unless added"
+          ]
+        },
+        {
+          "name": "OAuth2 / OIDC with the platform's identity provider",
+          "pros": [
+            "single sign-on",
+            "expiry and scopes"
+          ],
+          "cons": [
+            "integration effort"
+          ]
+        },
+        {
+          "name": "Mutual TLS",
+          "pros": [
+            "strong",
+            "no secrets in headers"
+          ],
+          "cons": [
+            "certificate lifecycle for every customer"
+          ]
+        },
+        {
+          "name": "Email one-time code / magic link (no account needed)",
+          "pros": [
+            "no password, no sign-up",
+            "works for occasional customers"
+          ],
+          "cons": [
+            "depends on email delivery",
+            "weak against mailbox compromise"
+          ]
+        }
+      ],
+      "choice": "OAuth2 / OIDC with the platform's identity provider",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.29; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "affects": [
+        "C-7"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-4",
       "title": "Process topology",
       "context": "The same code base serves requests and performs background work.",
       "options": [
@@ -1720,16 +1741,16 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). One image, role by flag: `api` and `worker` proc: 1.83; Single process with background threads: 1.49; Separate services per concern: 1.35",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). One image, role by flag: `api` and `worker` proc: 1.79; Single process with background threads: 1.47; Separate services per concern: 1.28",
       "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
-        "C-11",
-        "C-9"
+        "C-12",
+        "C-10"
       ],
       "status": "accepted"
     },
     {
-      "id": "D-4",
+      "id": "D-5",
       "title": "Concurrency control for conflicting writes",
       "context": "Two callers may change the same record at the same time and the result must be consistent.",
       "options": [
@@ -1764,17 +1785,17 @@
           ]
         }
       ],
-      "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.75; Last write wins: 1.56",
-      "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
+      "choice": "Row locks inside a short transaction (SELECT ... FOR UPDATE)",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). Row locks inside a short transaction: 1.71; Optimistic concurrency: version column checked o: 1.71; Last write wins: 1.43",
+      "consequences": "Not choosing 'Optimistic concurrency: version column checked o' gives up: no locks held across requests, works with stateless instances. Not choosing 'Last write wins' gives up: nothing to implement.",
       "affects": [
         "C-1",
-        "C-3"
+        "C-4"
       ],
       "status": "accepted"
     },
     {
-      "id": "D-5",
+      "id": "D-6",
       "title": "Redundancy for the availability target",
       "context": "The availability target must be met through instance failures and deploys.",
       "options": [
@@ -1811,45 +1832,44 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). Two or more interchangeable instances per role b: 1.52; Single instance with health-based restart: 1.33; Active-active across two regions: unavailable (ruled out by single_region)",
-      "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). Two or more interchangeable instances per role b: 1.43; Single instance with health-based restart: 1.29; Active-active across two regions: 1.14",
+      "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.",
       "affects": [
-        "C-11",
         "C-12"
       ],
       "status": "accepted"
     },
     {
-      "id": "D-6",
+      "id": "D-7",
       "title": "Assumed answer: load (Q-rate)",
-      "context": "The requirements do not say. Question: Q-rate. Evidence: 2,000 online (R-7) ÷ every 5 s (R-3).",
+      "context": "The requirements do not say. Question: Q-rate. No evidence in the text; engine default.",
       "options": [
         {
-          "name": "400 updates/s",
+          "name": "100 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "4,000 updates/s",
+          "name": "10 requests/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "40 updates/s",
+          "name": "1,000 requests/s",
           "pros": [],
           "cons": []
         }
       ],
-      "choice": "400 updates/s",
-      "rationale": "Derived from the text: 2,000 online (R-7) ÷ every 5 s (R-3).",
-      "consequences": "If the real answer differs: State the measured rate; capacity estimates and the queue decision change.",
+      "choice": "100 requests/s",
+      "rationale": "No rate stated and none derivable (a count is a size, not a rate); 100 requests/s is a modest default for a first release — every capacity figure below inherits this assumption.",
+      "consequences": "If the real answer differs: State the measured or expected rate; capacity estimates and the queue decision change.",
       "affects": [
-        "C-11"
+        "C-12"
       ],
       "status": "proposed"
     },
     {
-      "id": "D-7",
+      "id": "D-8",
       "title": "Assumed answer: load (Q-payload)",
       "context": "The requirements do not say. Question: Q-payload. No evidence in the text; engine default.",
       "options": [
@@ -1873,36 +1893,7 @@
       "rationale": "Typical JSON record sizes; the maximum bounds request bodies.",
       "consequences": "If the real answer differs: State the sizes; storage growth and body limits change.",
       "affects": [
-        "C-11"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-8",
-      "title": "Assumed answer: quality (Q-availability)",
-      "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
-      "options": [
-        {
-          "name": "99.9 %",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "99.5 %",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "99.99 %",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "99.9 %",
-      "rationale": "Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region.",
-      "consequences": "If the real answer differs: State the target and what may be lost; topology and queue durability change.",
-      "affects": [
-        "C-4"
+        "C-12"
       ],
       "status": "proposed"
     },
@@ -1931,7 +1922,7 @@
       "rationale": "Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules.",
       "consequences": "If the real answer differs: State the retention per record class; the deletion job and capacity change.",
       "affects": [
-        "C-10",
+        "C-11",
         "C-1"
       ],
       "status": "proposed"
@@ -1967,35 +1958,121 @@
     },
     {
       "id": "D-11",
-      "title": "Assumed answer: resilience (Q-external)",
-      "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
+      "title": "Assumed answer: data (Q-migration)",
+      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
       "options": [
         {
-          "name": "10 s / 5 retries / queue",
+          "name": "greenfield",
           "pros": [],
           "cons": []
         },
         {
-          "name": "fail fast, no retry",
+          "name": "one-shot import",
           "pros": [],
           "cons": []
         },
         {
-          "name": "30 s / unlimited retries",
+          "name": "gradual cut-over",
           "pros": [],
           "cons": []
         }
       ],
-      "choice": "10 s / 5 retries / queue",
-      "rationale": "Bounded retries with a durable queue keep the system responsive during a one-hour outage.",
-      "consequences": "If the real answer differs: State the policy; the outbound client and scheduler contracts change.",
-      "affects": [
-        "C-9"
-      ],
+      "choice": "greenfield",
+      "rationale": "Nothing in the text names an existing system.",
+      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
+      "affects": [],
       "status": "proposed"
     },
     {
       "id": "D-12",
+      "title": "Assumed answer: security (Q-auth)",
+      "context": "The requirements do not say. Question: Q-auth. Evidence: staff/employees mentioned.",
+      "options": [
+        {
+          "name": "OIDC",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "API keys",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "mTLS",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "OIDC",
+      "rationale": "Internal staff systems normally sit behind the company's SSO.",
+      "consequences": "If the real answer differs: State the scheme; the authentication decision is rescored.",
+      "affects": [
+        "C-7"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-13",
+      "title": "Assumed answer: compliance (Q-compliance)",
+      "context": "The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.",
+      "options": [
+        {
+          "name": "GDPR-style deletion + audit",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "no regime",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "HIPAA/PCI controls",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "GDPR-style deletion + audit",
+      "rationale": "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.",
+      "consequences": "If the real answer differs: State the regime; audit and deletion paths change.",
+      "affects": [
+        "C-3",
+        "C-1"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-14",
+      "title": "Assumed answer: operations (Q-alerting)",
+      "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "error rate + queue growth",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "none",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "per-endpoint SLO alerts",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "error rate + queue growth",
+      "rationale": "Two alerts catch most incidents without paging on noise.",
+      "consequences": "If the real answer differs: State the rules and the on-call; observability conventions change.",
+      "affects": [
+        "C-6"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-15",
       "title": "Assumed answer: cost (Q-budget)",
       "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
       "options": [
@@ -2022,56 +2099,78 @@
       "status": "proposed"
     },
     {
-      "id": "D-13",
-      "title": "Assumed answer: data (Q-migration)",
-      "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
+      "id": "D-16",
+      "title": "Assumed answer: security (Q-authz)",
+      "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
       "options": [
         {
-          "name": "greenfield",
+          "name": "owner-scoped + admin role",
           "pros": [],
           "cons": []
         },
         {
-          "name": "one-shot import",
+          "name": "flat (everyone sees everything)",
           "pros": [],
           "cons": []
         },
         {
-          "name": "gradual cut-over",
+          "name": "role matrix per resource",
           "pros": [],
           "cons": []
         }
       ],
-      "choice": "greenfield",
-      "rationale": "Nothing in the text names an existing system.",
-      "consequences": "If the real answer differs: Name the existing system; a migration package and risk are added.",
-      "affects": [],
+      "choice": "owner-scoped + admin role",
+      "rationale": "Ownership scoping is the minimum that prevents cross-tenant access.",
+      "consequences": "If the real answer differs: State the roles; core operations and acceptance checks change.",
+      "affects": [
+        "C-4",
+        "C-7"
+      ],
+      "status": "proposed"
+    },
+    {
+      "id": "D-17",
+      "title": "Assumed answer: resilience (Q-external)",
+      "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
+      "options": [
+        {
+          "name": "10 s / 5 retries / queue",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "fail fast, no retry",
+          "pros": [],
+          "cons": []
+        },
+        {
+          "name": "30 s / unlimited retries",
+          "pros": [],
+          "cons": []
+        }
+      ],
+      "choice": "10 s / 5 retries / queue",
+      "rationale": "Bounded retries with a durable queue keep the system responsive during a one-hour outage.",
+      "consequences": "If the real answer differs: State the policy; the outbound client and scheduler contracts change.",
+      "affects": [
+        "C-10"
+      ],
       "status": "proposed"
     }
   ],
   "risks": [
     {
       "id": "K-1",
-      "description": "Per-target labels on metrics explode cardinality.",
+      "description": "Payloads or uploads without size limits exhaust memory or disk.",
       "likelihood": "medium",
-      "impact": "low",
-      "mitigation": "Label by outcome and partition class, not by target id; expose per-target detail through the API instead.",
+      "impact": "medium",
+      "mitigation": "Enforce size limits at the surface; reject early with a clear error.",
       "affects": [
-        "C-4"
+        "C-12"
       ]
     },
     {
       "id": "K-2",
-      "description": "A management operation reachable without authentication.",
-      "likelihood": "low",
-      "impact": "high",
-      "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
-      "affects": [
-        "C-5"
-      ]
-    },
-    {
-      "id": "K-3",
       "description": "Entities evolve; migrations run against live data.",
       "likelihood": "medium",
       "impact": "medium",
@@ -2081,17 +2180,37 @@
       ]
     },
     {
-      "id": "K-4",
-      "description": "Parts of the requirements were not recognised by the catalogue and received a generic decomposition.",
-      "likelihood": "medium",
+      "id": "K-3",
+      "description": "A widespread failure disables many targets and emails every owner at once.",
+      "likelihood": "low",
       "impact": "medium",
-      "mitigation": "Review the components marked generic; refine responsibilities and interfaces before briefing.",
+      "mitigation": "Rate-limit notifications per owner and batch them.",
       "affects": [
-        "C-3"
+        "C-5"
+      ]
+    },
+    {
+      "id": "K-4",
+      "description": "Per-target labels on metrics explode cardinality.",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Label by outcome and partition class, not by target id; expose per-target detail through the API instead.",
+      "affects": [
+        "C-6"
       ]
     },
     {
       "id": "K-5",
+      "description": "A management operation reachable without authentication.",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Authenticate in one middleware for every management route; test every route unauthenticated.",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-6",
       "description": "[tampering] Store: Injection through query construction.",
       "likelihood": "medium",
       "impact": "medium",
@@ -2101,7 +2220,7 @@
       ]
     },
     {
-      "id": "K-6",
+      "id": "K-7",
       "description": "[information_disclosure] Store: Backups and dumps contain everything.",
       "likelihood": "medium",
       "impact": "high",
@@ -2111,81 +2230,71 @@
       ]
     },
     {
-      "id": "K-7",
-      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
+      "id": "K-8",
+      "description": "[denial_of_service] Notifier: Notification storms and template injection.",
       "likelihood": "medium",
       "impact": "medium",
-      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
-      "affects": [
-        "C-5"
-      ]
-    },
-    {
-      "id": "K-8",
-      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
-      "likelihood": "medium",
-      "impact": "high",
-      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
+      "mitigation": "Rate-limit per recipient; escape template context. Check: 1,000 failures produce one digest per owner",
       "affects": [
         "C-5"
       ]
     },
     {
       "id": "K-9",
-      "description": "[tampering] Payments: Double charge on retry.",
+      "description": "[spoofing] Authentication: Credential stuffing or leaked keys.",
       "likelihood": "medium",
       "impact": "medium",
-      "mitigation": "Idempotency keys on every charge; reconcile provider webhooks. Check: retrying a charge with the same key charges once",
+      "mitigation": "Hash keys at rest; allow revocation; rate-limit failures. Check: revoked key is rejected within seconds; brute force is throttled",
       "affects": [
         "C-7"
       ]
     },
     {
       "id": "K-10",
+      "description": "[elevation] Authentication: A caller acts on another tenant's resources.",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Every core operation takes the principal and checks ownership. Check: cross-tenant request returns 404/403 for every operation",
+      "affects": [
+        "C-7"
+      ]
+    },
+    {
+      "id": "K-11",
       "description": "[spoofing] Public HTTP API: Requests without a verified caller identity reach domain operations.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Authenticate every route in one middleware; deny by default. Check: every route returns 401 without credentials",
       "affects": [
-        "C-11"
+        "C-12"
       ]
     },
     {
-      "id": "K-11",
+      "id": "K-12",
       "description": "[tampering] Public HTTP API: Malformed or oversized bodies reach the core.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Schema-validate and size-limit at the surface; reject before parsing fully. Check: fuzz the body; oversize returns 413",
       "affects": [
-        "C-11"
+        "C-12"
       ]
     },
     {
-      "id": "K-12",
+      "id": "K-13",
       "description": "[denial_of_service] Public HTTP API: A single caller saturates the service.",
       "likelihood": "medium",
       "impact": "medium",
       "mitigation": "Per-caller rate limit and request timeouts. Check: burst from one key returns 429; others unaffected",
       "affects": [
-        "C-11"
-      ]
-    },
-    {
-      "id": "K-13",
-      "description": "[information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses.",
-      "likelihood": "medium",
-      "impact": "high",
-      "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
-      "affects": [
-        "C-11"
+        "C-12"
       ]
     },
     {
       "id": "K-14",
-      "description": "[denial_of_service] Push gateway: Unbounded connections.",
+      "description": "[information_disclosure] Public HTTP API: Stack traces or internal ids leak in error responses.",
       "likelihood": "medium",
-      "impact": "medium",
-      "mitigation": "Cap connections per principal; idle timeouts. Check: connection cap enforced",
+      "impact": "high",
+      "mitigation": "Map exceptions to fixed error shapes; log details server-side only. Check: no traceback text in any 4xx/5xx body",
       "affects": [
         "C-12"
       ]
@@ -2194,142 +2303,119 @@
   "work_packages": [
     {
       "id": "WP-1",
+      "title": "Audit log",
+      "goal": "Implement Audit log: Append-only record of who did what to which resource, queryable by resource and actor.",
+      "components": [
+        "C-3"
+      ],
+      "implements": [
+        "I-3"
+      ],
+      "depends_on": [],
+      "satisfies": [
+        "R-12"
+      ],
+      "files": [
+        "src/audit.ts",
+        "tests/audit.test.ts"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-1",
+          "description": "unit tests of Audit log pass",
+          "kind": "test",
+          "command": "npx vitest run tests/audit.test.ts",
+          "metric": ""
+        }
+      ],
+      "notes": "family: audit_log"
+    },
+    {
+      "id": "WP-2",
       "title": "Store + Observability",
       "goal": "Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.",
       "components": [
         "C-1",
-        "C-4"
+        "C-6"
       ],
       "implements": [
         "I-1",
-        "I-4"
+        "I-6"
       ],
       "depends_on": [],
       "satisfies": [
+        "R-6",
+        "R-7",
         "R-8",
-        "R-10",
-        "R-15",
-        "R-17"
+        "R-9",
+        "R-17",
+        "R-18"
       ],
       "files": [
-        "internal/store/store.go",
-        "internal/store/store_test.go",
-        "internal/observability/observability.go",
-        "internal/observability/observability_test.go"
+        "src/store.ts",
+        "tests/store.test.ts",
+        "src/observability.ts",
+        "tests/observability.test.ts"
       ],
       "size": "M",
       "acceptance": [
         {
-          "id": "A-1",
+          "id": "A-2",
           "description": "unit tests of Store, Observability pass",
           "kind": "test",
-          "command": "go test ./internal/store/",
+          "command": "npx vitest run tests/store.test.ts tests/observability.test.ts",
           "metric": ""
         },
         {
-          "id": "A-2",
-          "description": "R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "id": "A-3",
+          "description": "R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-6"
+        },
+        {
+          "id": "A-4",
+          "description": "R-7: ratio >= 99.9 % — kill one instance under load; error rate stays within the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-7"
+        },
+        {
+          "id": "A-5",
+          "description": "R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
-        },
-        {
-          "id": "A-3",
-          "description": "R-15: ratio 99.9 % — kill one instance under load; error rate stays within the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-15"
         }
       ],
       "notes": "family: infra"
     },
     {
-      "id": "WP-2",
-      "title": "Event bus",
-      "goal": "Implement Event bus: Publishes domain events to subscribers inside the system.",
-      "components": [
-        "C-8"
-      ],
-      "implements": [
-        "I-8"
-      ],
-      "depends_on": [],
-      "satisfies": [
-        "R-3"
-      ],
-      "files": [
-        "internal/bus/bus.go",
-        "internal/bus/bus_test.go"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-4",
-          "description": "unit tests of Event bus pass",
-          "kind": "test",
-          "command": "go test ./internal/bus/",
-          "metric": ""
-        }
-      ],
-      "notes": "family: realtime"
-    },
-    {
       "id": "WP-3",
-      "title": "Geospatial index",
-      "goal": "Implement Geospatial index: Keeps current positions and answers nearest-neighbour queries within a radius.",
-      "components": [
-        "C-6"
-      ],
-      "implements": [
-        "I-6"
-      ],
-      "depends_on": [
-        "WP-1"
-      ],
-      "satisfies": [
-        "R-1"
-      ],
-      "files": [
-        "internal/geo/geo.go",
-        "internal/geo/geo_test.go"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-5",
-          "description": "unit tests of Geospatial index pass",
-          "kind": "test",
-          "command": "go test ./internal/geo/",
-          "metric": ""
-        }
-      ],
-      "notes": "family: geo"
-    },
-    {
-      "id": "WP-4",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
-        "C-5",
-        "C-9"
+        "C-7",
+        "C-10"
       ],
       "implements": [
-        "I-5",
-        "I-9"
+        "I-7",
+        "I-10"
       ],
       "depends_on": [
-        "WP-1"
+        "WP-2"
       ],
       "satisfies": [
-        "R-2",
         "R-11",
-        "R-12"
+        "R-13",
+        "R-20"
       ],
       "files": [
-        "internal/auth/auth.go",
-        "internal/auth/auth_test.go",
-        "internal/scheduler/scheduler.go",
-        "internal/scheduler/scheduler_test.go"
+        "src/auth.ts",
+        "tests/auth.test.ts",
+        "src/scheduler.ts",
+        "tests/scheduler.test.ts"
       ],
       "size": "M",
       "acceptance": [
@@ -2337,124 +2423,175 @@
           "id": "A-6",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
-          "command": "go test ./internal/auth/",
+          "command": "npx vitest run tests/auth.test.ts tests/scheduler.test.ts",
           "metric": ""
         }
       ],
       "notes": "family: infra"
     },
     {
-      "id": "WP-5",
-      "title": "Payments",
-      "goal": "Implement Payments: Creates charges/invoices through the payment provider and reconciles their webhooks.",
+      "id": "WP-4",
+      "title": "Notifier",
+      "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
-        "C-7"
+        "C-5"
       ],
       "implements": [
-        "I-7"
+        "I-5"
       ],
       "depends_on": [
-        "WP-1"
+        "WP-2"
       ],
       "satisfies": [
-        "R-4"
+        "R-2"
       ],
       "files": [
-        "internal/payments/payments.go",
-        "internal/payments/payments_test.go"
+        "src/notifier.ts",
+        "tests/notifier.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
           "id": "A-7",
-          "description": "unit tests of Payments pass",
+          "description": "unit tests of Notifier pass",
           "kind": "test",
-          "command": "go test ./internal/payments/",
+          "command": "npx vitest run tests/notifier.test.ts",
           "metric": ""
         }
       ],
-      "notes": "family: payments"
+      "notes": "family: notification"
+    },
+    {
+      "id": "WP-5",
+      "title": "Search index",
+      "goal": "Implement Search index: Full-text and filtered queries over the indexed entities.",
+      "components": [
+        "C-8"
+      ],
+      "implements": [
+        "I-8"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-4",
+        "R-5",
+        "R-14"
+      ],
+      "files": [
+        "src/search.ts",
+        "tests/search.test.ts"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "unit tests of Search index pass",
+          "kind": "test",
+          "command": "npx vitest run tests/search.test.ts",
+          "metric": ""
+        },
+        {
+          "id": "A-9",
+          "description": "R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-5"
+        }
+      ],
+      "notes": "family: search"
     },
     {
       "id": "WP-6",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
-        "C-3"
+        "C-4"
       ],
       "implements": [
-        "I-3"
+        "I-4"
       ],
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-3",
-        "WP-5"
+        "WP-4"
       ],
       "satisfies": [
         "R-1",
         "R-3",
-        "R-5",
         "R-6",
-        "R-10",
-        "R-18",
-        "R-19"
+        "R-9",
+        "R-19",
+        "R-21"
       ],
       "files": [
-        "internal/core/core.go",
-        "internal/core/core_test.go"
+        "src/core.ts",
+        "tests/core.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-10",
           "description": "unit tests of Domain core pass",
           "kind": "test",
-          "command": "go test ./internal/core/",
+          "command": "npx vitest run tests/core.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-11",
+          "description": "R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-6"
         }
       ],
-      "notes": "family: geo"
+      "notes": "family: crud_api"
     },
     {
       "id": "WP-7",
-      "title": "Batch job",
-      "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
+      "title": "Import/export",
+      "goal": "Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
       "components": [
-        "C-10"
+        "C-9"
       ],
       "implements": [
-        "I-10"
+        "I-9"
       ],
       "depends_on": [
-        "WP-1",
-        "WP-4",
         "WP-6"
       ],
       "satisfies": [
-        "R-2",
-        "R-12"
+        "R-3",
+        "R-8"
       ],
       "files": [
-        "internal/batch/batch.go",
-        "internal/batch/batch_test.go"
+        "src/exporter.ts",
+        "tests/exporter.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
-          "description": "unit tests of Batch job pass",
+          "id": "A-12",
+          "description": "unit tests of Import/export pass",
           "kind": "test",
-          "command": "go test ./internal/batch/",
+          "command": "npx vitest run tests/exporter.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-13",
+          "description": "R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
         }
       ],
-      "notes": "family: batch_pipeline"
+      "notes": "family: import_export"
     },
     {
       "id": "WP-8",
-      "title": "Public HTTP API",
-      "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
+      "title": "Batch job",
+      "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
         "C-11"
       ],
@@ -2462,54 +2599,34 @@
         "I-11"
       ],
       "depends_on": [
-        "WP-1",
-        "WP-4",
-        "WP-6"
+        "WP-2",
+        "WP-3",
+        "WP-6",
+        "WP-7"
       ],
       "satisfies": [
-        "R-5",
-        "R-6",
-        "R-7",
-        "R-9",
-        "R-10",
-        "R-13",
-        "R-14",
-        "R-16"
+        "R-11"
       ],
       "files": [
-        "internal/surface_api/surface_api.go",
-        "internal/surface_api/surface_api_test.go"
+        "src/batch.ts",
+        "tests/batch.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
-          "description": "unit tests of Public HTTP API pass",
+          "id": "A-14",
+          "description": "unit tests of Batch job pass",
           "kind": "test",
-          "command": "go test ./internal/surface_api/",
+          "command": "npx vitest run tests/batch.test.ts",
           "metric": ""
-        },
-        {
-          "id": "A-11",
-          "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-7"
-        },
-        {
-          "id": "A-12",
-          "description": "R-9: time 30 days",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-9"
         }
       ],
-      "notes": "family: infra"
+      "notes": "family: batch_pipeline"
     },
     {
       "id": "WP-9",
-      "title": "Push gateway",
-      "goal": "Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.",
+      "title": "Public HTTP API",
+      "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
         "C-12"
       ],
@@ -2517,30 +2634,42 @@
         "I-12"
       ],
       "depends_on": [
-        "WP-1",
         "WP-2",
-        "WP-4",
-        "WP-6"
+        "WP-3",
+        "WP-5",
+        "WP-6",
+        "WP-7"
       ],
       "satisfies": [
-        "R-3",
-        "R-10"
+        "R-1",
+        "R-5",
+        "R-10",
+        "R-14",
+        "R-15",
+        "R-16"
       ],
       "files": [
-        "internal/push/push.go",
-        "internal/push/push_test.go"
+        "src/surface_api.ts",
+        "tests/surface_api.test.ts"
       ],
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
-          "description": "unit tests of Push gateway pass",
+          "id": "A-15",
+          "description": "unit tests of Public HTTP API pass",
           "kind": "test",
-          "command": "go test ./internal/push/",
+          "command": "npx vitest run tests/surface_api.test.ts",
           "metric": ""
+        },
+        {
+          "id": "A-16",
+          "description": "R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-5"
         }
       ],
-      "notes": "family: realtime"
+      "notes": "family: crud_api"
     }
   ]
 }

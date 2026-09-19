@@ -2,7 +2,7 @@
   "sekkei": "1",
   "name": "outside-bookings-system",
   "version": "0.1.0",
-  "summary": "Patients during outside mobile app from so that bookings.",
+  "summary": "Patients during outside mobile app from so that bookings. Accept.",
   "goals": [
     "Clients read and write domain resources over HTTP.",
     "The system notifies people through an external channel.",
@@ -63,7 +63,7 @@
     },
     {
       "id": "R-4",
-      "statement": "Doctors can view basic information name date of birth insurance number their own appointments schedule patients.",
+      "statement": "Doctors can view basic information (name, date of birth, insurance number) their own appointments schedule patients.",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 医師は自分の診察予定と患者の基本情報(氏名、生年月日、保険証番号)を閲覧できる。"
@@ -84,14 +84,14 @@
     },
     {
       "id": "R-7",
-      "statement": "The system must integrate confirmed bookings existing electronic health record system external services nightly.",
+      "statement": "The system must integrate confirmed bookings existing electronic health record system (external services) nightly.",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 既存の電子カルテシステム(基幹システム)へ、確定した予約を夜間に連携する。"
     },
     {
       "id": "R-8",
-      "statement": "The system must respond available slots search within 500 ms p95.",
+      "statement": "The system must respond available slots search within 500 ms (p95).",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
@@ -139,7 +139,7 @@
     },
     {
       "id": "R-12",
-      "statement": "3000 requests/day bookings 20 requests/s peak.",
+      "statement": "3000 requests/day bookings month end 20 requests/s peak.",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
@@ -158,7 +158,7 @@
     },
     {
       "id": "R-14",
-      "statement": "Patients authenticate existing patient portal OIDC.",
+      "statement": "Patients authenticate existing patient portal (OIDC).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "source (ja): 患者の認証は既存の患者ポータル(OIDC)を使う。"
@@ -179,13 +179,6 @@
     },
     {
       "id": "R-17",
-      "statement": "Personal data is deleted on request and access to it is logged, under the regime the requirements name (assumed by the engine: regime named).",
-      "kind": "functional",
-      "priority": "must",
-      "rationale": "assumed by the engine; confirm or override"
-    },
-    {
-      "id": "R-18",
       "statement": "Records are 2 KB on average and at most 256 KB (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -197,7 +190,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-19",
+      "id": "R-18",
       "statement": "Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -209,7 +202,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-20",
+      "id": "R-19",
       "statement": "External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "should",
@@ -221,7 +214,7 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-21",
+      "id": "R-20",
       "statement": "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).",
       "kind": "nonfunctional",
       "priority": "must",
@@ -233,14 +226,14 @@
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-22",
+      "id": "R-21",
       "statement": "The existing system named in the requirements stays in place; integration, not migration (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
-      "id": "R-23",
+      "id": "R-22",
       "statement": "Use existing infrastructure only; no new managed services (assumed by the engine).",
       "kind": "constraint",
       "priority": "must",
@@ -259,7 +252,7 @@
         "R-9",
         "R-10",
         "R-13",
-        "R-20"
+        "R-19"
       ],
       "tags": [
         "layer:0",
@@ -305,8 +298,7 @@
       "requires": [],
       "satisfies": [
         "R-6",
-        "R-10",
-        "R-17"
+        "R-10"
       ],
       "tags": [
         "layer:0",
@@ -346,8 +338,8 @@
         "R-7",
         "R-9",
         "R-13",
-        "R-22",
-        "R-23"
+        "R-21",
+        "R-22"
       ],
       "tags": [
         "layer:1",
@@ -382,7 +374,7 @@
       "requires": [],
       "satisfies": [
         "R-11",
-        "R-21"
+        "R-20"
       ],
       "tags": [
         "layer:1",
@@ -497,8 +489,7 @@
         "I-4"
       ],
       "satisfies": [
-        "R-10",
-        "R-17"
+        "R-10"
       ],
       "tags": [
         "layer:2",
@@ -523,8 +514,8 @@
         "R-8",
         "R-12",
         "R-13",
-        "R-18",
-        "R-19"
+        "R-17",
+        "R-18"
       ],
       "tags": [
         "layer:3",
@@ -965,7 +956,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Doctors can view basic information name date of birth insurance number their own appointme"
+          "description": "from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi"
         },
         {
           "name": "schedule_patients",
@@ -983,7 +974,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Doctors can view basic information name date of birth insurance number their own appointme"
+          "description": "from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi"
         },
         {
           "name": "generate_departments",
@@ -995,24 +986,6 @@
             }
           ],
           "output": "Departments | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-5: The system must generate slots departments each opening hours doctors shifts from weekly."
-        },
-        {
-          "name": "open_shifts",
-          "inputs": [
-            {
-              "name": "shifts",
-              "type": "Shifts | id",
-              "description": ""
-            }
-          ],
-          "output": "Shifts | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1094,76 +1067,22 @@
           "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
-          "name": "record_external",
+          "name": "record_health",
           "inputs": [
             {
-              "name": "external",
-              "type": "External | id",
+              "name": "health",
+              "type": "Health | id",
               "description": ""
             }
           ],
-          "output": "External | None",
+          "output": "Health | None",
           "errors": [
             "ValidationError",
             "NotFound"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-7: The system must integrate confirmed bookings existing electronic health record system exte"
-        },
-        {
-          "name": "record_kept",
-          "inputs": [
-            {
-              "name": "kept",
-              "type": "Kept | id",
-              "description": ""
-            }
-          ],
-          "output": "Kept | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-15)",
-          "post": "",
-          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "log_history",
-          "inputs": [
-            {
-              "name": "history",
-              "type": "History | id",
-              "description": ""
-            }
-          ],
-          "output": "History | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-15)",
-          "post": "",
-          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "delete_job",
-          "inputs": [
-            {
-              "name": "job",
-              "type": "Job | id",
-              "description": ""
-            }
-          ],
-          "output": "Job | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-15)",
-          "post": "",
-          "description": "from R-15: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
+          "description": "from R-7: The system must integrate confirmed bookings existing electronic health record system (ext"
         }
       ],
       "stability": "draft",
@@ -1706,18 +1625,22 @@
           "description": "from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day"
         },
         {
-          "name": "GET /bookings/{id}",
+          "name": "GET /bookings",
           "inputs": [
             {
-              "name": "id",
-              "type": "str",
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
               "description": ""
             }
           ],
-          "output": "200 bookings",
+          "output": "200 [bookings], next cursor",
           "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
+            "401 unauthenticated"
           ],
           "pre": "",
           "post": "",
@@ -1761,7 +1684,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Doctors can view basic information name date of birth insurance number their own appointme"
+          "description": "from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi"
         }
       ],
       "stability": "draft",
@@ -2029,7 +1952,7 @@
     },
     {
       "id": "E-10",
-      "name": "External",
+      "name": "Health",
       "owner": "C-1",
       "fields": [
         {
@@ -2045,7 +1968,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('external'); confirm the fields."
+      "description": "Domain entity named in the requirements ('health'); confirm the fields."
     }
   ],
   "flows": [
@@ -2156,7 +2079,7 @@
         }
       ],
       "choice": "REST/JSON over HTTP",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). REST/JSON over HTTP: 1.41; gRPC: 1.29; GraphQL: 1.15",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). REST/JSON over HTTP: 1.40; gRPC: 1.29; GraphQL: 1.15",
       "consequences": "Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.",
       "affects": [
         "C-15"
@@ -2173,10 +2096,31 @@
           "pros": [
             "transactions",
             "indexes and JSON",
-            "already available"
+            "widely available"
           ],
           "cons": [
             "operational dependency"
+          ]
+        },
+        {
+          "name": "MySQL / MariaDB (the stated database)",
+          "pros": [
+            "transactions",
+            "already operated by the team"
+          ],
+          "cons": [
+            "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Managed document store (DynamoDB/MongoDB, as stated)",
+          "pros": [
+            "scales without operations",
+            "flexible records"
+          ],
+          "cons": [
+            "no cross-record transactions by default",
+            "query patterns must be designed up front"
           ]
         },
         {
@@ -2212,8 +2156,8 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.13; In-memory: 1.49; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
-      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.15; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "consequences": "",
       "affects": [
         "C-1"
       ],
@@ -2253,10 +2197,21 @@
           "cons": [
             "certificate lifecycle for every customer"
           ]
+        },
+        {
+          "name": "Email one-time code / magic link (no account needed)",
+          "pros": [
+            "no password, no sign-up",
+            "works for occasional customers"
+          ],
+          "cons": [
+            "depends on email delivery",
+            "weak against mailbox compromise"
+          ]
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.37; Mutual TLS: 1.09. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-9"
@@ -2301,7 +2256,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.72; Single process with background threads: 1.41; Separate services per concern: 1.29",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). One image, role by flag: `api` and `worker` proc: 1.71; Single process with background threads: 1.40; Separate services per concern: 1.29",
       "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
         "C-15",
@@ -2348,7 +2303,7 @@
         }
       ],
       "choice": "Encryption at rest by the platform plus strict access control and audit",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Encryption at rest by the platform plus strict a: 1.78; Field-level encryption for identifiers and sensi: 1.59; Separate personal-data store with tokenised refe: 1.45",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Encryption at rest by the platform plus strict a: 1.78; Field-level encryption for identifiers and sensi: 1.62; Separate personal-data store with tokenised refe: 1.47",
       "consequences": "Not choosing 'Field-level encryption for identifiers and sensi' gives up: a dump does not expose people, deletion = key destruction where fields are only encrypted. Not choosing 'Separate personal-data store with tokenised refe' gives up: blast radius contained, deletion in one place.",
       "affects": [
         "C-14",
@@ -2395,7 +2350,7 @@
         }
       ],
       "choice": "Scheduled batch file exchange (CSV/fixed format) through a shared drop",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.59; API façade: 1.63; Change data capture from the legacy database: 1.41. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.58; API façade: 1.62; Change data capture from the legacy database: 1.41. stated in the constraints",
       "consequences": "Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
       "affects": [
         "C-13"
@@ -2439,7 +2394,7 @@
         }
       ],
       "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Optimistic concurrency: version column checked o: 1.65; Row locks inside a short transaction: 1.63; Last write wins: 1.44",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Optimistic concurrency: version column checked o: 1.64; Row locks inside a short transaction: 1.62; Last write wins: 1.43",
       "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
       "affects": [
         "C-1",
@@ -2485,7 +2440,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.26; Active-active across two regions: unavailable (ruled out by single_region)",
+      "rationale": "Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Two or more interchangeable instances per role b: 1.42; Single instance with health-based restart: 1.25; Active-active across two regions: unavailable (ruled out by single_region)",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-15"
@@ -2670,36 +2625,6 @@
     },
     {
       "id": "D-15",
-      "title": "Assumed answer: compliance (Q-compliance)",
-      "context": "The requirements do not say. Question: Q-compliance. Evidence: compliance_data pattern.",
-      "options": [
-        {
-          "name": "named regime + deletion + audit",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "no regime",
-          "pros": [],
-          "cons": []
-        },
-        {
-          "name": "HIPAA/PCI controls",
-          "pros": [],
-          "cons": []
-        }
-      ],
-      "choice": "named regime + deletion + audit",
-      "rationale": "The requirements name a data-protection regime or a deletion right.",
-      "consequences": "If the real answer differs: State the statutory deadline; the deletion job's deadline changes.",
-      "affects": [
-        "C-14",
-        "C-4"
-      ],
-      "status": "proposed"
-    },
-    {
-      "id": "D-16",
       "title": "Assumed answer: operations (Q-alerting)",
       "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
       "options": [
@@ -2728,7 +2653,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-17",
+      "id": "D-16",
       "title": "Assumed answer: cost (Q-budget)",
       "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
       "options": [
@@ -2982,8 +2907,7 @@
       "depends_on": [],
       "satisfies": [
         "R-6",
-        "R-10",
-        "R-17"
+        "R-10"
       ],
       "files": [
         "app/audit.py",
@@ -3026,8 +2950,8 @@
         "R-10",
         "R-11",
         "R-13",
-        "R-20",
-        "R-21"
+        "R-19",
+        "R-20"
       ],
       "files": [
         "app/store.py",
@@ -3083,8 +3007,7 @@
         "WP-2"
       ],
       "satisfies": [
-        "R-10",
-        "R-17"
+        "R-10"
       ],
       "files": [
         "app/data_protection.py",
@@ -3251,8 +3174,8 @@
         "R-7",
         "R-9",
         "R-13",
-        "R-22",
-        "R-23"
+        "R-21",
+        "R-22"
       ],
       "files": [
         "app/core.py",
@@ -3335,8 +3258,8 @@
         "R-8",
         "R-12",
         "R-13",
-        "R-18",
-        "R-19"
+        "R-17",
+        "R-18"
       ],
       "files": [
         "app/surface_api.py",

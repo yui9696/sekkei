@@ -25,12 +25,17 @@ from dataclasses import dataclass, field
 _JA_CHAR = re.compile(r"[぀-ヿ㐀-䶿一-鿿]")
 
 
-def is_japanese(text: str) -> bool:
-    """True when at least a tenth of the letters are kana or kanji."""
+def is_japanese(text: str, document: bool = False) -> bool:
+    """A sentence is Japanese when it contains any kana or kanji (a tech-heavy line like
+    「Rails / PostgreSQL、開発 2 名」 is still Japanese); a document when a twentieth of its
+    letters are, or at least twenty of them."""
     letters = [c for c in text if c.isalpha()]
     if not letters:
         return False
-    return sum(1 for c in letters if _JA_CHAR.match(c)) >= max(1, len(letters) // 10)
+    n = sum(1 for c in letters if _JA_CHAR.match(c))
+    if document:
+        return n >= 20 or n >= max(1, len(letters) // 20)
+    return n >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +55,8 @@ ACTORS = {
     "教師": "teachers", "講師": "teachers", "学生": "students", "生徒": "students", "受講者": "learners", "保護者": "guests",
     "ドライバー": "drivers", "運転手": "drivers", "乗客": "passengers", "配送員": "drivers", "配達員": "drivers",
     "訪問者": "visitors", "ゲスト": "guests", "閲覧者": "readers", "読者": "readers", "編集者": "editors", "著者": "authors",
-    "審査者": "reviewers", "承認者": "managers", "申請者": "users", "市民": "citizens", "住民": "citizens",
+    "審査者": "reviewers", "承認者": "managers", "申請者": "requesters", "市民": "citizens", "住民": "citizens", "経理": "accounting staff",
+    "経理担当": "accounting staff", "情シス": "it staff", "総務": "staff", "人事": "hr staff", "営業": "sales staff", "店舗オーナー": "store owners", "オーナー": "owners",
     "外部サービス": "external services", "外部システム": "external services", "内部サービス": "internal services",
     "他システム": "external services", "連携先": "external services", "基幹システム": "external services",
     "デバイス": "devices", "端末": "devices", "機器": "devices", "センサー": "sensors", "センサ": "sensors",
@@ -130,6 +136,14 @@ NOUNS = {
     "状態": "state", "ステータス": "status", "進捗": "progress", "タスク": "tasks", "プロジェクト": "projects", "マイルストーン": "milestones",
     "モデル": "model", "埋め込み": "embeddings", "要約": "summaries", "翻訳": "translations", "言語": "language",
     "顧客": "customers", "利用者": "users", "ユーザー": "users", "管理者": "admins",   # as objects: 「利用者を招待できる」
+    "経費": "expenses", "交通費": "travel expenses", "立替経費": "reimbursable expenses", "立替": "reimbursement", "費目": "expense category",
+    "領収書": "receipts", "領収書画像": "receipt images", "申請": "requests", "申請一覧": "requests list", "承認済み": "approved", "会計システム": "accounting system",
+    "部長承認": "department head approval", "部長": "department head", "月次": "monthly", "月ごと": "per month", "平日": "weekdays", "月末": "month end",
+    "必要": "required", "リリース": "release", "稼働開始": "go-live", "納期": "deadline", "新規に": "newly", "採用予定": "to be adopted", "採用": "adopted", "使わず": "not used", "使わない": "not used", "自動読み取り": "automatic reading",
+    "読み取り": "reading", "確定": "confirmed", "確定時": "on confirmation", "時に": "when", "前日": "the day before", "当日": "same day",
+    "会員登録": "sign-up", "なしでも": "without", "可": "allowed", "現地払い": "pay on site", "当面": "for now", "のみ": "only",
+    "ダブルブッキング": "double-booking", "二重予約": "double-booking", "絶対に": "never", "起こして": "occur", "起こ": "occur", "起きて": "occur",
+    "業務委託": "contractors", "スマホ": "mobile app", "空き枠": "available slots", "所要時間": "duration", "メニュー": "services",
     "倉庫": "warehouses", "入出庫": "stock movements", "入庫": "receipts", "出庫": "issues", "品目": "items", "数量": "quantity",
     "棚": "bins", "在庫管理": "stock management", "在庫品目": "stock items", "発注": "purchase orders", "納品": "deliveries",
     "従業員": "employees", "部署": "departments", "組織": "organisations", "拠点": "sites", "支店": "branches", "本部": "head office",
@@ -293,6 +307,29 @@ def _num(m: re.Match) -> str:
 
 def numbers(s: str) -> str:
     """Rewrite Japanese quantities into the engine's number grammar. Comparators move in front."""
+    # clock times and ranges stay as they are ("8:00〜20:00" → "08:00-20:00"), never quantities
+    s = re.sub(r"(\d{1,2}):(\d{2})\s*[〜~～-]\s*(\d{1,2}):(\d{2})", lambda m: f"{int(m.group(1)):02d}:{m.group(2)}-{int(m.group(3)):02d}:{m.group(4)}", s)
+    s = re.sub(r"(\d{1,2}):(\d{2})(?:-(\d{1,2}):(\d{2}))?", lambda m: " TIME_" + "_".join(x for x in m.groups() if x) + " ", s)
+    # dates: 「2027 年 3 月」→ March 2027; 「毎月1日」→ on day 1 of every month; 「3月31日」→ 3/31
+    _MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    s = re.sub(r"(\d{4})\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*日)?", lambda m: f"{_MON[int(m.group(2)) - 1]}{' ' + m.group(3) if m.group(3) else ''} {m.group(1)}" if 1 <= int(m.group(2)) <= 12 else m.group(0), s)
+    s = re.sub(r"毎月\s*(\d{1,2})\s*日", r"on day \1 of every month", s)
+    s = re.sub(r"(?<!\d)(\d{1,2})\s*月\s*(\d{1,2})\s*日", r"\1/\2", s)
+    # currency: 「5万円」→ 50000 JPY
+    s = re.sub(_JA_NUM + r"\s*円", lambda m: f"{_num(m)} JPY", s)
+    # team sums: 「開発ベンダー 4 名+社内 1 名」→ Team of 5
+    s = re.sub(r"(?:開発ベンダー|ベンダー|外部|社外|開発)\s*(\d+)\s*(?:名|人)\s*[+＋]\s*(?:社内|内部)?\s*(\d+)\s*(?:名|人)", lambda m: f"Team of {int(m.group(1)) + int(m.group(2))}", s)
+    s = re.sub(r"(?:開発ベンダー|ベンダー|開発要員|要員|開発)\s*(\d+)\s*(?:名|人)", r"Team of \1", s)
+    s = re.sub(r"1\s*(?P<what>" + "|".join(sorted(map(re.escape, _COUNTER), key=len, reverse=True)) + r")\s*(?:あたり|につき|当たり|ごと)",
+               lambda m: f"per {_COUNTER.get(m.group('what'), 'item').rstrip('s')}", s)
+    return _numbers_core(s)
+
+
+def _restore_times(en: str) -> str:
+    return re.sub(r"TIME_(\d{1,2})_(\d{2})(?:_(\d{1,2})_(\d{2}))?", lambda m: f"{int(m.group(1)):02d}:{m.group(2)}" + (f"–{int(m.group(3)):02d}:{m.group(4)}" if m.group(3) else ""), en)
+
+
+def _numbers_core(s: str) -> str:
     s = re.sub(r"チーム\s*(?:は|が|:|：)?\s*(\d+)\s*(?:名|人)", r"Team of \1", s)
     s = re.sub(r"(?:開発者|エンジニア|メンバー|開発メンバー)\s*(?:は|が|:|：)?\s*(\d+)\s*(?:名|人)", r"Team of \1", s)
     s = re.sub(r"(\d+)\s*(?:名|人)\s*(?:の|で)?\s*(?:チーム|体制|開発体制|開発)", r"Team of \1", s)
@@ -371,6 +408,8 @@ def _pick(alts: dict[str, str], following: str) -> tuple[str, str]:
         return alts["noun"], "noun"
     if "verb" in alts and "noun" not in alts and following[:1] in "をはがの":
         return alts["verb"], "noun"       # 「検索は」: the verb's name used as a thing
+    if "verb" in alts and (following[:2] in ("時に", "の際", "後に", "前に") or following[:1] == "時" or re.match(r"[・、][^\s]{1,6}時", following)):
+        return alts["verb"], "noun"       # 「承認・差し戻し時に」: events, not the predicate
     if "verb" in alts and (following[:1] in "すしでさ" or following[:2] in ("でき", "され", "した", "する") or not following
                            or following[:1] in "、,。.：:）)"):
         return alts["verb"], "verb"
@@ -403,7 +442,7 @@ def _tokenise_list(s: str) -> list[Token]:
         if m and (len(m.group(0)) > 1 or m.group(0) not in _PARTICLES):
             word = m.group(0)
             i = m.end()
-            en, role = _pick(GLOSSARY[word], s[i:i + 4])
+            en, role = _pick(GLOSSARY[word], s[i:i + 8])
             tok = Token(en, role, word, GLOSSARY[word])
             if role in ("verb", "quality", "noun", "other") and i < n:
                 tm = _TAIL_RE.match(s, i)
@@ -474,7 +513,49 @@ def rewrite_sentence(src: str) -> Rewrite:
         clean = unicodedata.normalize("NFKC", src).strip().rstrip("。")
         return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
     s0 = unicodedata.normalize("NFKC", src).strip().rstrip("。.")
+    # "F-1 …" row ids from a requirements table: not words
+    s0 = re.sub(r"^[A-Za-z]{1,4}-?\d{1,4}\s+", "", s0)
+    # "(must)" / "(should)" / "(could)" appended by the structure pass → the sentence's modality
+    forced = ""
+    fm = re.search(r"\s*\((must|should|could)\)\s*$", s0)
+    if fm:
+        forced = fm.group(1)
+        s0 = s0[:fm.start()].rstrip("。.")
+    # parentheticals: translated on their own and re-attached as "(a, b, c)" so attributes survive
+    parens: list[str] = []
+
+    def _paren(m: re.Match) -> str:
+        inner = m.group(1)
+        if not is_japanese(inner):
+            parens.append(inner.strip())
+        else:
+            words = [t.text for t in _tokenise_list(numbers(inner)) if t.role not in ("particle", "modal", "unknown")]
+            parens.append(", ".join(words) if "、" in inner or "," in inner else " ".join(words))
+        return f" PAREN{len(parens) - 1} "
+    s0 = re.sub(r"[（(]([^（）()]{1,80})[)）]", _paren, s0)
     clauses = _clauses(s0)
+    rw = _rewrite_all(clauses, src, s0)
+    if forced:
+        rw.english = _force_modal(rw.english, forced)
+    for i, inner in enumerate(parens):
+        rw.english = re.sub(rf"\s*PAREN{i}\b\s*", f" ({inner}) ", rw.english)
+    rw.english = _restore_times(re.sub(r"\s+([.,])", r"\1", re.sub(r"\s{2,}", " ", rw.english)).strip())
+    if rw.english and not rw.english.endswith("."):
+        rw.english += "."
+    return rw
+
+
+def _force_modal(en: str, modal: str) -> str:
+    """Replace the auxiliary of a rewritten sentence with the table's priority word (or append it)."""
+    m = re.match(r"^(\w[\w ]*?) (can|must|should|may|must not|are) ", en)
+    if m and m.group(2) != "are":
+        return en[:m.start(2)] + modal + en[m.end(2):]
+    if m:
+        return en
+    return en.rstrip(".") + f" ({modal})."
+
+
+def _rewrite_all(clauses: list[str], src: str, s0: str) -> Rewrite:
     if len(clauses) > 1:
         head = _rewrite_clause(clauses[0])
         actor_m = re.match(r"^(\w[\w ]*?) (?:can|must|should|may|are)\b", head.english)
@@ -649,12 +730,19 @@ def normalise(text: str) -> Normalised:
             out.append("## " + sec)
             continue
         ens = []
-        for sent in _split_sentences(body):
+        forced = ""
+        fm = re.search(r"\s*\((must|should|could)\)\s*$", body)
+        body_core = body[:fm.start()] if fm else body
+        if fm:
+            forced = fm.group(1)
+        for sent in _split_sentences(body_core):
             rw = rewrite_sentence(sent)
             rewrites.append(rw)
             unknown += rw.untranslated
             if rw.english:
                 ens.append(rw.english)
+        if forced and ens:
+            ens[0] = _force_modal(ens[0], forced)
         en = " ".join(ens)
         if en:
             sources[en] = body

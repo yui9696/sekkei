@@ -106,16 +106,16 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 6. How the text was read
 
-- Patterns recognised: crud_api, admin_api, event_ingest, async_delivery, signing, notification, health_policy, observability, batch_pipeline, auth, audit_log
-- Quality attributes (weight): durability 1.0, performance 0.82, isolation 0.82, availability 0.63, security 0.54, operability 0.82, scalability 0.63, simplicity 0.8, compliance 0.54
+- Patterns recognised: crud_api, admin_api, event_ingest, async_delivery, webhook_delivery, signing, notification, health_policy, observability, batch_pipeline, auth, audit_log
+- Quality attributes (weight): durability 1.0, performance 0.82, isolation 0.82, availability 0.63, security 0.54, operability 0.77, scalability 0.63, simplicity 0.8, compliance 0.54
 - Constraint tokens: containers, multi_instance, nightly_batch, postgres, redis, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
-| R-1 | functional | must | crud_api, admin_api, async_delivery, signing | security | — |
+| R-1 | functional | must | crud_api, admin_api, async_delivery, webhook_delivery, signing | security | — |
 | R-2 | functional | must | crud_api, admin_api, signing | security | — |
 | R-3 | functional | must | crud_api, event_ingest | — | — |
-| R-4 | functional | must | async_delivery | durability | — |
+| R-4 | functional | must | async_delivery, webhook_delivery | durability | — |
 | R-5 | functional | must | async_delivery, signing | security | — |
 | R-6 | functional | must | admin_api, async_delivery | — | — |
 | R-7 | functional | must | notification, health_policy | — | — |
@@ -134,3 +134,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-20 | constraint | must | — | — | — |
 | R-21 | constraint | must | auth | isolation, security | — |
 | R-22 | constraint | must | — | — | — |
+
+## 6b. What the structure pass found
+
+- **Structure folded by the engine**: speaker label dropped: Ops

@@ -47,6 +47,7 @@ class Notes:
     threats_md: str
     analysis_md: str = ""
     normalisation_md: str = ""
+    structure_md: str = ""
     sections: list[str] = field(default_factory=list)
     answers: list[Answer] = field(default_factory=list)
     placements_md: str = ""
@@ -96,9 +97,43 @@ class Notes:
         if self.analysis_md:
             s.append("## 6. How the text was read\n")
             s.append(self.analysis_md)
+        if self.structure_md:
+            s.append(self.structure_md)
         if self.normalisation_md:
             s.append(self.normalisation_md.replace("## ", "### ", 1).replace("### Input", "## 7. Input", 1))
         return "\n".join(s).rstrip() + "\n"
+
+
+def structure_markdown(an: Analysis, eff: Effort) -> str:
+    """What the structure pass lifted out of the text: TODOs, tentative items, alternatives, the stated deadline against the estimate."""
+    st = an.structure
+    if not st:
+        return ""
+    s: list[str] = []
+    if st.deadline:
+        s.append(f"- **Stated deadline**: {st.deadline}. Engine estimate: {eff.calendar_days} working days ({-(-eff.calendar_days // 5)} weeks) with the stated team"
+                 + (" — **the estimate exceeds the stated horizon**; cut scope or add people." if _deadline_weeks(st.deadline) and eff.calendar_days > _deadline_weeks(st.deadline) * 5 else "."))
+    if st.todos:
+        s.append("- **Open items lifted out of the requirements** (not designed, decide first): " + "; ".join(st.todos))
+    if st.tentative:
+        s.append("- **Tentative sentences** (kept at priority *could*): " + "; ".join(t[:70] for t in st.tentative))
+    if st.alternatives:
+        s.append("- **Alternatives the text already rejected** (recorded as rejected decisions): " + "; ".join(a[:70] for a in st.alternatives))
+    folded = [n for n in st.notes if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without", "front matter", "metadata", "list intro", "speaker", "checked", "nested"))]
+    if folded:
+        s.append("- **Structure folded by the engine**: " + "; ".join(folded))
+    if not s:
+        return ""
+    return "## 6b. What the structure pass found\n\n" + "\n".join(s) + "\n"
+
+
+def _deadline_weeks(text: str) -> int:
+    import re as _re
+    m = _re.search(r"(\d+)\s*(weeks?|months?|週間|ヶ月|か月)", text)
+    if not m:
+        return 0
+    n = int(m.group(1))
+    return n if m.group(2).startswith(("week", "週")) else n * 4
 
 
 def analysis_markdown(an: Analysis) -> str:
@@ -114,6 +149,8 @@ def analysis_markdown(an: Analysis) -> str:
 
 def notes(design: Design, an: Analysis, review: Review, answers: list[Answer] | None = None,
           placements: list[Placement] | None = None) -> Notes:
-    return Notes(review, questions(an), capacity(an), effort(design, an), threats_markdown(design), analysis_markdown(an),
+    eff = effort(design, an)
+    return Notes(review, questions(an), capacity(an), eff, threats_markdown(design), analysis_markdown(an),
                  normalisation_md=an.normalisation.to_markdown() if an.normalisation else "",
+                 structure_md=structure_markdown(an, eff),
                  answers=list(answers or []), placements_md=placements_markdown(placements, design) if placements else "")

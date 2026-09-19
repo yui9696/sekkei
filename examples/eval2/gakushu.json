@@ -17,8 +17,8 @@
     "Users work in several languages and locales."
   ],
   "non_goals": [
-    "Videos transcoding existing service delegated to.",
-    "Outside learners external."
+    "Videos transcoding (existing service delegated to).",
+    "Outside learners (external)."
   ],
   "conventions": {
     "language": "typescript",
@@ -42,7 +42,7 @@
   "requirements": [
     {
       "id": "R-1",
-      "statement": "Admins can create, publish and unpublish courses videos files tests.",
+      "statement": "Admins can create, publish and unpublish courses (videos, files, tests).",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 管理者は講座(タイトル、説明、動画ファイル、確認テスト)を作成・公開・非公開にできる。"
@@ -84,7 +84,7 @@
     },
     {
       "id": "R-7",
-      "statement": "The system must view pages email employees locale Japanese English.",
+      "statement": "The system must view pages email employees locale (Japanese English).",
       "kind": "functional",
       "priority": "must",
       "rationale": "source (ja): 画面とメールは社員のロケール(日本語・英語)で表示する。"
@@ -115,7 +115,7 @@
     },
     {
       "id": "R-10",
-      "statement": "The system must respond courses list within 300 ms p95.",
+      "statement": "The system must respond courses list within 300 ms (p95).",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
@@ -151,14 +151,14 @@
     },
     {
       "id": "R-13",
-      "statement": "The system can use object storage TypeScript Node 20 PostgreSQL S3. Team of 4.",
+      "statement": "The system can use object storage TypeScript (Node 20) PostgreSQL S3. Team of 4.",
       "kind": "constraint",
       "priority": "must",
       "rationale": "source (ja): TypeScript(Node 20)、PostgreSQL、S3 互換のオブジェクトストレージを利用可能。チームは 4 名。"
     },
     {
       "id": "R-14",
-      "statement": "Employees authenticate internal SSO OIDC. Containers existing ingress behind.",
+      "statement": "Employees authenticate internal SSO (OIDC). Containers existing ingress behind.",
       "kind": "constraint",
       "priority": "must",
       "rationale": "source (ja): 社員の認証は社内 SSO(OIDC)。コンテナで既存のイングレスの背後に配置する。"
@@ -786,7 +786,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
+          "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
         },
         {
           "name": "publish_courses",
@@ -804,7 +804,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
+          "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
         },
         {
           "name": "search_courses",
@@ -879,15 +879,15 @@
           "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
         },
         {
-          "name": "export_managers",
+          "name": "export_progress",
           "inputs": [
             {
-              "name": "managers",
-              "type": "Managers | id",
+              "name": "progress",
+              "type": "Progress | id",
               "description": ""
             }
           ],
-          "output": "Managers | None",
+          "output": "Progress | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -930,7 +930,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-7: The system must view pages email employees locale Japanese English."
+          "description": "from R-7: The system must view pages email employees locale (Japanese English)."
         }
       ],
       "stability": "draft",
@@ -1378,7 +1378,7 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-1: Admins can create, publish and unpublish courses videos files tests."
+          "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
         },
         {
           "name": "GET /courses",
@@ -1422,24 +1422,6 @@
           "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "GET /grades/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "200 grades",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-3: Employees can take tests. Employees can view explanations grades immediately."
-        },
-        {
           "name": "GET /grades",
           "inputs": [
             {
@@ -1459,10 +1441,10 @@
           ],
           "pre": "",
           "post": "",
-          "description": "from R-4: Managers can list and view grades their reports progress. Managers can export CSV."
+          "description": "from R-3: Employees can take tests. Employees can view explanations grades immediately."
         },
         {
-          "name": "GET /managers",
+          "name": "GET /progress",
           "inputs": [
             {
               "name": "filter",
@@ -1475,7 +1457,7 @@
               "description": ""
             }
           ],
-          "output": "200 [managers], next cursor",
+          "output": "200 [progress], next cursor",
           "errors": [
             "401 unauthenticated"
           ],
@@ -1623,6 +1605,24 @@
           "description": ""
         },
         {
+          "name": "videos",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "files",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
+          "name": "tests",
+          "type": "…",
+          "constraints": "from the text",
+          "description": ""
+        },
+        {
           "name": "created_at",
           "type": "timestamp",
           "constraints": "",
@@ -1767,10 +1767,31 @@
           "pros": [
             "transactions",
             "indexes and JSON",
-            "already available"
+            "widely available"
           ],
           "cons": [
             "operational dependency"
+          ]
+        },
+        {
+          "name": "MySQL / MariaDB (the stated database)",
+          "pros": [
+            "transactions",
+            "already operated by the team"
+          ],
+          "cons": [
+            "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Managed document store (DynamoDB/MongoDB, as stated)",
+          "pros": [
+            "scales without operations",
+            "flexible records"
+          ],
+          "cons": [
+            "no cross-record transactions by default",
+            "query patterns must be designed up front"
           ]
         },
         {
@@ -1806,8 +1827,8 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; In-memory: 1.31; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
-      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "consequences": "",
       "affects": [
         "C-1"
       ],
@@ -1847,10 +1868,21 @@
           "cons": [
             "certificate lifecycle for every customer"
           ]
+        },
+        {
+          "name": "Email one-time code / magic link (no account needed)",
+          "pros": [
+            "no password, no sign-up",
+            "works for occasional customers"
+          ],
+          "cons": [
+            "depends on email delivery",
+            "weak against mailbox compromise"
+          ]
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-9"

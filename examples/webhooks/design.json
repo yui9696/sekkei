@@ -8,6 +8,7 @@
     "Customers or operators manage resources through an authenticated API.",
     "Producers hand events to the system, which persists them before acknowledging.",
     "Work is queued durably and performed by workers with a retry schedule.",
+    "Events are delivered to endpoints customers registered.",
     "Outbound requests carry an HMAC signature; secrets rotate with a grace window.",
     "The system notifies people through an external channel.",
     "Targets that keep failing are disabled by policy and the owner is told.",
@@ -125,7 +126,7 @@
     },
     {
       "id": "R-11",
-      "statement": "Ops: metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
+      "statement": "metrics (queue depth, delivery success rate, attempt latency) exposed for Prometheus; structured logs.",
       "kind": "nonfunctional",
       "priority": "should",
       "metric": {
@@ -315,11 +316,7 @@
       "requires": [],
       "satisfies": [
         "R-1",
-        "R-4",
-        "R-5",
-        "R-6",
-        "R-8",
-        "R-11"
+        "R-4"
       ],
       "tags": [
         "layer:0",
@@ -1018,33 +1015,15 @@
           "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
         },
         {
-          "name": "deliver_event",
+          "name": "deliver_signed",
           "inputs": [
             {
-              "name": "event",
-              "type": "Event | id",
+              "name": "signed",
+              "type": "Signed | id",
               "description": ""
             }
           ],
-          "output": "Event | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
-        },
-        {
-          "name": "sign_event",
-          "inputs": [
-            {
-              "name": "event",
-              "type": "Event | id",
-              "description": ""
-            }
-          ],
-          "output": "Event | None",
+          "output": "Signed | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1162,24 +1141,6 @@
           "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
         },
         {
-          "name": "sign_secret",
-          "inputs": [
-            {
-              "name": "secret",
-              "type": "Secret | id",
-              "description": ""
-            }
-          ],
-          "output": "Secret | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve"
-        },
-        {
           "name": "publish_events",
           "inputs": [
             {
@@ -1232,96 +1193,6 @@
           "pre": "",
           "post": "",
           "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
-        },
-        {
-          "name": "disable_fail",
-          "inputs": [
-            {
-              "name": "fail",
-              "type": "Fail | id",
-              "description": ""
-            }
-          ],
-          "output": "Fail | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 3 days (R-7)",
-          "post": "",
-          "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
-        },
-        {
-          "name": "notify_customer",
-          "inputs": [
-            {
-              "name": "customer",
-              "type": "Customer | id",
-              "description": ""
-            }
-          ],
-          "output": "Customer | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 3 days (R-7)",
-          "post": "",
-          "description": "from R-7: Endpoints that fail continuously for 3 days are disabled automatically and the customer is"
-        },
-        {
-          "name": "record_kept",
-          "inputs": [
-            {
-              "name": "kept",
-              "type": "Kept | id",
-              "description": ""
-            }
-          ],
-          "output": "Kept | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-14)",
-          "post": "",
-          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "log_history",
-          "inputs": [
-            {
-              "name": "history",
-              "type": "History | id",
-              "description": ""
-            }
-          ],
-          "output": "History | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-14)",
-          "post": "",
-          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "delete_job",
-          "inputs": [
-            {
-              "name": "job",
-              "type": "Job | id",
-              "description": ""
-            }
-          ],
-          "output": "Job | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-14)",
-          "post": "",
-          "description": "from R-14: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1868,18 +1739,22 @@
           "description": "from R-3: Internal services publish events through an internal API (HTTP or in-process call)."
         },
         {
-          "name": "GET /attempts/{id}",
+          "name": "GET /attempts",
           "inputs": [
             {
-              "name": "id",
-              "type": "str",
+              "name": "filter",
+              "type": "query",
+              "description": ""
+            },
+            {
+              "name": "page",
+              "type": "cursor",
               "description": ""
             }
           ],
-          "output": "200 attempts",
+          "output": "200 [attempts], next cursor",
           "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
+            "401 unauthenticated"
           ],
           "pre": "",
           "post": "",
@@ -2511,10 +2386,31 @@
           "pros": [
             "transactions",
             "indexes and JSON",
-            "already available"
+            "widely available"
           ],
           "cons": [
             "operational dependency"
+          ]
+        },
+        {
+          "name": "MySQL / MariaDB (the stated database)",
+          "pros": [
+            "transactions",
+            "already operated by the team"
+          ],
+          "cons": [
+            "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Managed document store (DynamoDB/MongoDB, as stated)",
+          "pros": [
+            "scales without operations",
+            "flexible records"
+          ],
+          "cons": [
+            "no cross-record transactions by default",
+            "query patterns must be designed up front"
           ]
         },
         {
@@ -2550,8 +2446,8 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.28; In-memory: 1.29; SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance). stated in the constraints",
-      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.27; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints",
+      "consequences": "",
       "affects": [
         "C-1"
       ],
@@ -2591,10 +2487,21 @@
           "cons": [
             "certificate lifecycle for every customer"
           ]
+        },
+        {
+          "name": "Email one-time code / magic link (no account needed)",
+          "pros": [
+            "no password, no sign-up",
+            "works for occasional customers"
+          ],
+          "cons": [
+            "depends on email delivery",
+            "weak against mailbox compromise"
+          ]
         }
       ],
       "choice": "API keys per customer, hashed at rest, sent as a bearer token",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.32; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)",
       "consequences": "Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-12",
@@ -2638,7 +2545,7 @@
         }
       ],
       "choice": "HTTP publish endpoint with idempotency keys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.80; In-process client library that writes the outbox: 1.55; Message bus topic: unavailable (needs broker, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). HTTP publish endpoint with idempotency keys: 1.79; In-process client library that writes the outbox: 1.56; Message bus topic: unavailable (needs broker, not in the constraints)",
       "consequences": "Not choosing 'In-process client library that writes the outbox' gives up: no lost events at the source.",
       "affects": [
         "C-18"
@@ -2696,7 +2603,7 @@
         }
       ],
       "choice": "PostgreSQL table with SELECT ... FOR UPDATE SKIP LOCKED",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.14; Redis Streams with consumer groups: 1.81; In-memory queue: 1.37; Managed broker: unavailable (needs broker, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL table with SELECT ... FOR UPDATE SKIP: 2.13; Redis Streams with consumer groups: 1.81; In-memory queue: 1.36; Managed broker: unavailable (needs broker, not in the constraints)",
       "consequences": "Not choosing 'Redis Streams with consumer groups' gives up: high throughput, built-in consumer groups and pending lists. Not choosing 'In-memory queue' gives up: simplest possible.",
       "affects": [
         "C-2",
@@ -2740,7 +2647,7 @@
         }
       ],
       "choice": "not_before column on the work item; the scheduler promotes due rows",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.92; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). not_before column on the work item: 1.91; Redis sorted set keyed by due time: 1.49; In-process timers: 1.34",
       "consequences": "Not choosing 'Redis sorted set keyed by due time' gives up: cheap due-time queries. Not choosing 'In-process timers' gives up: no store.",
       "affects": [
         "C-14",
@@ -2786,7 +2693,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.88; Separate services per concern: 1.63; Single process with background threads: 1.37",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). One image, role by flag: `api` and `worker` proc: 1.87; Separate services per concern: 1.64; Single process with background threads: 1.36",
       "consequences": "Not choosing 'Separate services per concern' gives up: clear ownership. Not choosing 'Single process with background threads' gives up: one deployable.",
       "affects": [
         "C-17",
@@ -2866,7 +2773,7 @@
         }
       ],
       "choice": "Encrypted column (AES-GCM) with a key from the environment/KMS",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.33; External secrets manager: unavailable (needs vault, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Encrypted column: 1.53; Plaintext column: 1.31; External secrets manager: unavailable (needs vault, not in the constraints)",
       "consequences": "Not choosing 'Plaintext column' gives up: simplest.",
       "affects": [
         "C-3",
@@ -2910,7 +2817,7 @@
         }
       ],
       "choice": "Partition the queue by target; each lease takes one partition with a per-partition concurrency cap",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.75; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Partition the queue by target: 1.76; Hash targets to N shards, one worker pool per sh: 1.56; Single FIFO queue with a global worker pool: 1.34",
       "consequences": "Not choosing 'Hash targets to N shards, one worker pool per sh' gives up: bounded blast radius without per-target state. Not choosing 'Single FIFO queue with a global worker pool' gives up: simplest.",
       "affects": [
         "C-2",
@@ -2956,7 +2863,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.50; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.24; Active-active across two regions: unavailable (ruled out by single_region)",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest.",
       "affects": [
         "C-17",

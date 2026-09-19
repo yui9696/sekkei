@@ -110,15 +110,25 @@ def summary(diags: Iterable[Diagnostic]) -> dict[str, int]:
     return counts
 
 
+PER_RULE_SHOWN = 25   # after this many diagnostics of one rule the rest are counted, not printed
+
+
 def format_text(diags: list[Diagnostic], hints: bool = True) -> str:
     if not diags:
         return "OK: no diagnostics\n"
     lines = []
+    shown: dict[str, int] = {}
     for d in diags:
+        shown[d.rule] = shown.get(d.rule, 0) + 1
+        if shown[d.rule] > PER_RULE_SHOWN:
+            continue
         loc = f" [{d.where}]" if d.where else ""
         lines.append(f"{d.severity.upper():7} {d.rule}{loc}: {d.message}")
         if hints and d.hint:
             lines.append(f"        hint: {d.hint}")
+    for rule, n in shown.items():
+        if n > PER_RULE_SHOWN:
+            lines.append(f"        … {n - PER_RULE_SHOWN} more {rule} not shown")
     c = summary(diags)
     lines.append(f"{c['error']} error(s), {c['warning']} warning(s), {c['info']} info")
     return "\n".join(lines) + "\n"
@@ -332,8 +342,12 @@ def _c004(d: Design) -> Iterator[_Yield]:
     for f in d.flows:
         for n, s in enumerate(f.steps):
             comp = d.component(s.from_)
-            if comp is not None and d.interface(s.via) is not None and s.via not in comp.requires:
-                yield f"{f.id}.steps[{n}]", f"{s.from_} calls {s.via} but does not require it"
+            if comp is None or d.interface(s.via) is None or s.via in comp.requires:
+                continue
+            # a reply: the callee answers the caller over the caller's own request (the previous step went the other way)
+            if any(p.from_ == s.to and p.to == s.from_ for p in f.steps[:n]):
+                continue
+            yield f"{f.id}.steps[{n}]", f"{s.from_} calls {s.via} but does not require it"
 
 
 @rule("C005", "error", "work-package dependency cycle", "Packages must form a DAG; split or reorder them.")

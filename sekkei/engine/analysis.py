@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from . import catalog as K
 from . import ja
+from . import structure as ST
 from . import text as T
 
 
@@ -54,6 +55,7 @@ class Analysis:
     unrecognised: list[ReqUnit]
     assumptions: list[str]
     normalisation: ja.Normalised | None = None   # set when the input was Japanese
+    structure: ST.Canonical | None = None        # what the structure pass folded (tables, stories, labels, TODOs, deadline)
 
 
 _TEAM_RE = re.compile(r"team of (\d+)|(\d+)[- ]person team|(\d+) (?:engineers|developers)", re.I)
@@ -102,8 +104,10 @@ def _metric(sentence: T.Sentence) -> tuple[str, str, str] | None:
     qs = [q for q in sentence.quantities if q.kind != "code"]
     if not qs:
         return None
-    for q in qs:  # "under 5 s" / "p95 ... 300 ms": a bounded duration is a latency target
-        if q.kind == "duration" and (q.comparator or q.percentile or any(o.percentile for o in qs)):
+    for q in qs:  # "under 5 s" / "p95 ... 300 ms": a bounded *short* duration is a latency target; "up to 3 days" is not
+        short = q.unit.lower() in ("s", "sec", "secs", "second", "seconds", "min", "mins", "minute", "minutes", "ms")
+        bounding = q.comparator.lower() in ("under", "below", "less than", "at most", "within", "<", "<=", "no more than") or q.comparator.lower().startswith("not ")
+        if q.kind == "duration" and short and (bounding or q.percentile or any(o.percentile for o in qs)):
             q.kind = "latency"
     ranked = sorted(qs, key=lambda q: ({"latency": 0, "rate": 1, "percent": 2, "duration": 3, "size": 4, "count": 5, "factor": 6, "number": 7}[q.kind], -bool(q.comparator)))
     q = ranked[0]
@@ -123,12 +127,17 @@ def _summary(sentences: list[T.Sentence]) -> str:
     return prose[0].text if prose else (sentences[0].text if sentences else "")
 
 
-def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
+def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.Canonical | None = None) -> Analysis:
     """``hints`` maps the text of an engine-assumed bullet to the patterns it legitimately activates;
-    assumed bullets never activate patterns by their wording (they are policy, not capability)."""
+    assumed bullets never activate patterns by their wording (they are policy, not capability).
+    ``structure`` is the result of the structure pass when the caller already ran it (design() does)."""
     hints = hints or {}
+    if structure is None:
+        structure = ST.canonicalise(text)
+        text = structure.text
+    tentative = set(structure.tentative)
     norm = None
-    if ja.is_japanese(text):
+    if ja.is_japanese(text, document=True):
         norm = ja.normalise(text)
         text = norm.text
     sentences = T.segment(text)
@@ -147,8 +156,14 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
     qualities = {q: round(min(1.0, 0.4 + 0.6 * w / top), 2) for q, w in qw.items()}
     constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low)}
     languages = [tok for rx, tok in K.LANGUAGE_TOKENS if re.search(rx, low)]
+    if "go" not in languages and re.search(r"(?<![A-Za-z])Go(?=[,./)]|\s+(?:\d|backend|service|binary|module|\+|and\b|for the\b|on\b|$))", text, re.M) \
+            and not re.search(r"\bGo (?:to|for|through|live|back|ahead|down|up|into|out|over|with|the|a|an)\b", text):
+        languages.append("go")
     m = _TEAM_RE.search(text)
     team = int(next(g for g in m.groups() if g)) if m else None
+    team_bad = None
+    if team is not None and not (1 <= team <= 500):
+        team_bad, team = team, None
     if team and team <= 4:
         qualities["simplicity"] = max(qualities.get("simplicity", 0), 0.8)
     actors = sorted({a for s in sentences for a in s.actors})
@@ -156,11 +171,15 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
     reqs: list[ReqUnit] = []
     unrec: list[ReqUnit] = []
     non_goals = [s.text for s in sentences if s.section == "nongoal"]
+    candidates = [s for s in sentences if s.section != "nongoal" and not s.assumed]
+    structured = any(s.is_bullet or s.modality or s.section in ("functional", "nonfunctional", "constraint") for s in candidates)
+    # a one-liner or a paragraph with no bullets and no modal words: every sentence is a requirement
+    prose_only = not structured and bool(candidates)
     n = 0
     for s in sentences:
         if s.section == "nongoal":
             continue
-        is_req = s.is_bullet or bool(s.modality) or s.section in ("functional", "nonfunctional", "constraint")
+        is_req = s.is_bullet or bool(s.modality) or s.section in ("functional", "nonfunctional", "constraint") or (prose_only and not s.assumed) or s.assumed
         if not is_req:
             continue
         sq = _sentence_qualities(s)
@@ -170,6 +189,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
         prio = s.modality or ("should" if kind == "nonfunctional" and not any(q.comparator or q.kind in ("latency", "percent", "rate") for q in s.quantities) else "must")
         if kind == "constraint":
             prio = "must"
+        if s.text in tentative or (norm and norm.sources.get(s.text, "") in tentative):
+            prio = "could"       # "maybe", "TBD", "later maybe", a trailing question mark
         n += 1
         pats = hints.get(s.text, []) if s.assumed else _sentence_patterns(s, active)
         # a latency/percentage target keeps its metric even when the author filed the sentence under "functional"
@@ -185,6 +206,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
         reqs.append(unit)
 
     assumptions: list[str] = []
+    if team_bad is not None:
+        assumptions.append(f"Stated team size {team_bad} is not usable (must be 1–500); the effort estimate assumes 2.")
     if not languages:
         assumptions.append(f"No implementation language stated; assumed {K.DEFAULT_LANGUAGE}.")
     if "postgres" not in constraints and "mysql" not in constraints and "sqlite" not in constraints:
@@ -193,5 +216,10 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None) -> Analysis:
         assumptions.append("No non-functional requirements found; performance and availability targets are unset.")
     if norm and norm.untranslated:
         assumptions.append("Japanese words the glossary does not know were dropped: " + ", ".join(f"「{w}」" for w in sorted(set(norm.untranslated))) + ".")
+    if prose_only:
+        assumptions.append("No bullets, headings or modal words: every sentence of the text was taken as a requirement.")
+    for n in structure.notes:
+        if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without")):
+            assumptions.append("Structure: " + n + ".")
     return Analysis(T.title_of(text), _summary(sentences), non_goals, sentences, reqs, active, qualities, constraints,
-                    languages, team, actors, unrec, assumptions, norm)
+                    languages, team, actors, unrec, assumptions, norm, structure)

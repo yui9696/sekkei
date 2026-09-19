@@ -19,7 +19,7 @@ def test_ride_dispatch_gets_an_api_a_geo_index_entities_and_the_implied_rate():
     assert {"Public HTTP API", "Geospatial index", "Payments", "Payment provider", "Push gateway"} <= names
     api = next(i for i in r.design.interfaces if i.name.startswith("Public HTTP API"))
     ops = {o.name for o in api.operations}
-    assert {"POST /drivers/{id}/accept", "POST /drivers/{id}/decline", "POST /trips/{id}/rate"} <= ops
+    assert {"POST /offers/{id}/accept", "POST /offers/{id}/decline", "POST /trips/{id}/rate"} <= ops
     assert {"Ride", "Trip"} <= {e.name for e in r.design.entities}
     assert not any("History processor" in c.name for c in r.design.components)
     cap = {e.name: e for e in r.notes.capacity.estimates}

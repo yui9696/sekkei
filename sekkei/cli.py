@@ -406,7 +406,11 @@ def cmd_deliver(args: argparse.Namespace) -> int:
         return 1
     pk = DV.package(result, prices)
     out = Path(args.output)
-    written = pk.write(out)
+    try:
+        written = pk.write(out)
+    except OSError as exc:
+        print(f"error: cannot write to {out}: {exc}", file=sys.stderr)
+        return 1
     print(f"wrote {len(written)} files to {out}/ ({len(result.design.components)} components, {len(result.design.decisions)} decisions, "
           f"{sum(1 for n in pk.files if n.startswith('adr/'))} ADRs, {len(result.design.risks)} risks)")
     if not result.ok:
@@ -429,6 +433,40 @@ def cmd_redteam(args: argparse.Namespace) -> int:
     if args.output:
         _write(args.output, rt.to_markdown())
     return 1 if rt.high else 0
+
+
+def cmd_issues(args: argparse.Namespace) -> int:
+    """one tracker issue per work package, in dependency order, with a gh script and a CSV."""
+    from . import export as X
+
+    design = _load(args.design)
+    _gate(design, args)
+    files = X.issues(design)
+    out = Path(args.output)
+    try:
+        for name, body in files.items():
+            _write(str(out / name), body)
+    except OSError as exc:
+        print(f"error: cannot write to {out}: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {len(files) - 2} issue bodies, create_issues.sh and issues.csv to {out / 'issues'}/")
+    return 0
+
+
+def cmd_openapi(args: argparse.Namespace) -> int:
+    """OpenAPI 3.0 skeleton from the HTTP interfaces of the design."""
+    from . import export as X
+
+    design = _load(args.design)
+    _gate(design, args)
+    doc = X.openapi(design)
+    text = X.openapi_json(design)
+    if args.output:
+        _write(args.output, text)
+        print(f"wrote {args.output}: {len(doc['paths'])} paths, {sum(len(v) for v in doc['paths'].values())} operations, {len(doc['components']['schemas'])} schemas")
+    else:
+        sys.stdout.write(text)
+    return 0
 
 
 def cmd_template(args: argparse.Namespace) -> int:
@@ -586,6 +624,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("input", help="requirements text file")
     sp.add_argument("-o", "--output", metavar="REDTEAM.md", help="also write the report")
     sp.add_argument("--json", action="store_true")
+
+    sp = add("issues", cmd_issues, "export work packages as tracker issues (Markdown bodies + gh script + CSV)")
+    sp.add_argument("-o", "--output", default=".", help="directory; files go to <dir>/issues/")
+    sp.add_argument("--force", action="store_true", help="derive even when the design has lint errors")
+
+    sp = add("openapi", cmd_openapi, "OpenAPI 3.0 skeleton from the design's HTTP interfaces")
+    sp.add_argument("-o", "--output", help="write JSON to a file (default: stdout)")
+    sp.add_argument("--force", action="store_true", help="derive even when the design has lint errors")
 
     sp = add("template", cmd_template, "print a requirements template that makes the engine's job easiest", design=False)
     sp.add_argument("-o", "--output", help="write to a file, e.g. requirements.md")

@@ -84,9 +84,9 @@
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "records lost across a process crash",
+        "name": "lost or duplicate updates under concurrent writes to one record",
         "target": "= 0",
-        "unit": "records"
+        "unit": "updates"
       },
       "rationale": ""
     },
@@ -239,7 +239,6 @@
       "requires": [],
       "satisfies": [
         "R-1",
-        "R-7",
         "R-14",
         "R-16",
         "R-17"
@@ -325,6 +324,7 @@
         "R-3",
         "R-1",
         "R-5",
+        "R-7",
         "R-9",
         "R-10",
         "R-19",
@@ -960,15 +960,15 @@
           "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
         },
         {
-          "name": "notify_manager",
+          "name": "notify_sms",
           "inputs": [
             {
-              "name": "manager",
-              "type": "Manager | id",
+              "name": "sms",
+              "type": "Sms | id",
               "description": ""
             }
           ],
-          "output": "Manager | None",
+          "output": "Sms | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1012,60 +1012,6 @@
           "pre": "",
           "post": "",
           "description": "from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV"
-        },
-        {
-          "name": "record_kept",
-          "inputs": [
-            {
-              "name": "kept",
-              "type": "Kept | id",
-              "description": ""
-            }
-          ],
-          "output": "Kept | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-11)",
-          "post": "",
-          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "log_history",
-          "inputs": [
-            {
-              "name": "history",
-              "type": "History | id",
-              "description": ""
-            }
-          ],
-          "output": "History | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-11)",
-          "post": "",
-          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
-        },
-        {
-          "name": "delete_job",
-          "inputs": [
-            {
-              "name": "job",
-              "type": "Job | id",
-              "description": ""
-            }
-          ],
-          "output": "Job | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 1 year (R-11)",
-          "post": "",
-          "description": "from R-11: Domain records are kept indefinitely; logs and audit history are retained for 1 year, afte"
         }
       ],
       "stability": "draft",
@@ -1803,10 +1749,21 @@
           "cons": [
             "certificate lifecycle for every customer"
           ]
+        },
+        {
+          "name": "Email one-time code / magic link (no account needed)",
+          "pros": [
+            "no password, no sign-up",
+            "works for occasional customers"
+          ],
+          "cons": [
+            "depends on email delivery",
+            "weak against mailbox compromise"
+          ]
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.84. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.29; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
@@ -1823,10 +1780,31 @@
           "pros": [
             "transactions",
             "indexes and JSON",
-            "already available"
+            "widely available"
           ],
           "cons": [
             "operational dependency"
+          ]
+        },
+        {
+          "name": "MySQL / MariaDB (the stated database)",
+          "pros": [
+            "transactions",
+            "already operated by the team"
+          ],
+          "cons": [
+            "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Managed document store (DynamoDB/MongoDB, as stated)",
+          "pros": [
+            "scales without operations",
+            "flexible records"
+          ],
+          "cons": [
+            "no cross-record transactions by default",
+            "query patterns must be designed up front"
           ]
         },
         {
@@ -1862,8 +1840,8 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.42; In-memory: 1.70; SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers). stated in the constraints",
-      "consequences": "Not choosing 'In-memory' gives up: fastest, trivial.",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "consequences": "",
       "affects": [
         "C-1"
       ],
@@ -1907,7 +1885,7 @@
         }
       ],
       "choice": "One image, role by flag: `api` and `worker` processes scale independently",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.95; Single process with background threads: 1.51; Separate services per concern: 1.42",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). One image, role by flag: `api` and `worker` proc: 1.84; Single process with background threads: 1.45; Separate services per concern: 1.37",
       "consequences": "Not choosing 'Single process with background threads' gives up: one deployable. Not choosing 'Separate services per concern' gives up: clear ownership.",
       "affects": [
         "C-14",
@@ -1966,7 +1944,7 @@
         }
       ],
       "choice": "Managed broker (SQS/RabbitMQ/Kafka)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 2.07; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Managed broker: 1.94; PostgreSQL table with SELECT ... FOR UPDATE SKIP: unavailable (stated rate 20,000/s exceeds this option's ceiling of 10,000/s); Redis Streams with consumer groups: unavailable (needs redis, not in the constraints); In-memory queue: unavailable (stated rate 20,000/s exceeds this option's ceiling of 1,000/s)",
       "consequences": "",
       "affects": [
         "C-2"
@@ -2011,7 +1989,7 @@
         }
       ],
       "choice": "TimescaleDB hypertables in PostgreSQL (time partitioning, compression, retention policies)",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.42; Plain PostgreSQL tables partitioned by day: 2.19; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). TimescaleDB hypertables in PostgreSQL: 3.25; Plain PostgreSQL tables partitioned by day: 2.04; ClickHouse: unavailable (needs clickhouse, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'Plain PostgreSQL tables partitioned by day' gives up: no extension.",
       "affects": [
         "C-1"
@@ -2020,6 +1998,51 @@
     },
     {
       "id": "D-6",
+      "title": "Concurrency control for conflicting writes",
+      "context": "Two callers may change the same record at the same time and the result must be consistent.",
+      "options": [
+        {
+          "name": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
+          "pros": [
+            "no locks held across requests",
+            "works with stateless instances"
+          ],
+          "cons": [
+            "callers must handle 409"
+          ]
+        },
+        {
+          "name": "Row locks inside a short transaction (SELECT ... FOR UPDATE)",
+          "pros": [
+            "simple mental model",
+            "no client retry"
+          ],
+          "cons": [
+            "lock waits under contention",
+            "needs a transactional store"
+          ]
+        },
+        {
+          "name": "Last write wins",
+          "pros": [
+            "nothing to implement"
+          ],
+          "cons": [
+            "lost updates"
+          ]
+        }
+      ],
+      "choice": "Optimistic concurrency: version column checked on every update; conflict returns 409 and the caller retries",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Optimistic concurrency: version column checked o: 1.75; Row locks inside a short transaction: 1.71; Last write wins: 1.53",
+      "consequences": "Not choosing 'Row locks inside a short transaction' gives up: simple mental model, no client retry. Not choosing 'Last write wins' gives up: nothing to implement.",
+      "affects": [
+        "C-1",
+        "C-7"
+      ],
+      "status": "accepted"
+    },
+    {
+      "id": "D-7",
       "title": "Redundancy for the availability target",
       "context": "The availability target must be met through instance failures and deploys.",
       "options": [
@@ -2056,7 +2079,7 @@
         }
       ],
       "choice": "Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.58; Single instance with health-based restart: 1.33; Active-active across two regions: 1.26",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). Two or more interchangeable instances per role b: 1.51; Single instance with health-based restart: 1.29; Active-active across two regions: 1.22",
       "consequences": "Not choosing 'Single instance with health-based restart' gives up: simplest, cheapest. Not choosing 'Active-active across two regions' gives up: survives a regional outage.",
       "affects": [
         "C-14"
@@ -2064,7 +2087,7 @@
       "status": "accepted"
     },
     {
-      "id": "D-7",
+      "id": "D-8",
       "title": "Assumed answer: load (Q-payload)",
       "context": "The requirements do not say. Question: Q-payload. No evidence in the text; engine default.",
       "options": [
@@ -2093,7 +2116,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-8",
+      "id": "D-9",
       "title": "Assumed answer: quality (Q-availability)",
       "context": "The requirements do not say. Question: Q-availability. No evidence in the text; engine default.",
       "options": [
@@ -2123,7 +2146,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-9",
+      "id": "D-10",
       "title": "Assumed answer: data (Q-retention)",
       "context": "The requirements do not say. Question: Q-retention. No evidence in the text; engine default.",
       "options": [
@@ -2153,7 +2176,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-10",
+      "id": "D-11",
       "title": "Assumed answer: data (Q-backup)",
       "context": "The requirements do not say. Question: Q-backup. No evidence in the text; engine default.",
       "options": [
@@ -2182,7 +2205,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-11",
+      "id": "D-12",
       "title": "Assumed answer: security (Q-auth)",
       "context": "The requirements do not say. Question: Q-auth. Evidence: staff/employees mentioned.",
       "options": [
@@ -2211,7 +2234,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-12",
+      "id": "D-13",
       "title": "Assumed answer: cost (Q-budget)",
       "context": "The requirements do not say. Question: Q-budget. No evidence in the text; engine default.",
       "options": [
@@ -2238,7 +2261,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-13",
+      "id": "D-14",
       "title": "Assumed answer: data (Q-migration)",
       "context": "The requirements do not say. Question: Q-migration. No evidence in the text; engine default.",
       "options": [
@@ -2265,7 +2288,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-14",
+      "id": "D-15",
       "title": "Assumed answer: security (Q-authz)",
       "context": "The requirements do not say. Question: Q-authz. No evidence in the text; engine default.",
       "options": [
@@ -2295,7 +2318,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-15",
+      "id": "D-16",
       "title": "Assumed answer: resilience (Q-external)",
       "context": "The requirements do not say. Question: Q-external. No evidence in the text; engine default.",
       "options": [
@@ -2325,7 +2348,7 @@
       "status": "proposed"
     },
     {
-      "id": "D-16",
+      "id": "D-17",
       "title": "Assumed answer: operations (Q-alerting)",
       "context": "The requirements do not say. Question: Q-alerting. No evidence in the text; engine default.",
       "options": [
@@ -2579,7 +2602,7 @@
         },
         {
           "id": "A-2",
-          "description": "R-7: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
+          "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
           "metric": "R-7"
@@ -2725,6 +2748,7 @@
         "R-1",
         "R-3",
         "R-5",
+        "R-7",
         "R-9",
         "R-10",
         "R-19",
@@ -2742,6 +2766,13 @@
           "kind": "test",
           "command": "./gradlew test --tests app.CoreTest",
           "metric": ""
+        },
+        {
+          "id": "A-9",
+          "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-7"
         }
       ],
       "notes": "family: mqtt_ingest"
@@ -2770,7 +2801,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-10",
           "description": "unit tests of MQTT consumer pass",
           "kind": "test",
           "command": "./gradlew test --tests app.Mqtt_consumerTest",
@@ -2802,7 +2833,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-11",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "./gradlew test --tests app.ExporterTest",
@@ -2840,14 +2871,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-12",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "./gradlew test --tests app.BatchTest",
           "metric": ""
         },
         {
-          "id": "A-12",
+          "id": "A-13",
           "description": "R-8: time at 5 years 90 days",
           "kind": "metric",
           "command": "",
@@ -2886,14 +2917,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-14",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "./gradlew test --tests app.Surface_apiTest",
           "metric": ""
         },
         {
-          "id": "A-14",
+          "id": "A-15",
           "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
