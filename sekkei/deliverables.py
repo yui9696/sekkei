@@ -359,7 +359,7 @@ def slos(design: Design) -> str:
                     window_min = int(hours * 60 * days)
                     note = f" (stated window {hm.group(0)}: {hours:g} h × {days} days)"
             minutes = (100 - val) / 100 * window_min
-            budget = f"error budget {minutes:.1f} min / 30 days = (100 − {val:g}) % × {window_min:,} min{note}"
+            budget = f"error budget {minutes:.2f} min / 30 days = (100 − {val:g}) % × {window_min:,} min{note}"
             alert = "page at 14.4× burn over 1 h and 6× over 6 h (multi-window burn rate)"
         elif is_latency and val is not None:
             unit = m.unit.strip() if m.unit.strip() not in m.target else ""

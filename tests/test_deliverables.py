@@ -41,7 +41,7 @@ def test_package_is_deterministic(saas):
 
 def test_slo_error_budget_is_computed_not_typed(pkg):
     slo = pkg.files["SLO.md"]
-    assert "error budget 43.2 min / 30 days = (100 − 99.9) % × 43,200 min" in slo
+    assert "error budget 43.20 min / 30 days = (100 − 99.9) % × 43,200 min" in slo
     assert "<= 400 ms |" in slo and "ms ms" not in slo         # unit printed once
 
 
