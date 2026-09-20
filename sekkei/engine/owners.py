@@ -128,7 +128,8 @@ def place(u: ReqUnit, d: Design, layout: K.Layout, cid: dict[str, str], iid: dic
     thing = bool(re.search(r"\b(?:a|an|the|each|every|its|their|per|\d+)\s+(?:[a-z-]+\s+)?" + re.escape(base) + r"s?\b", alltext)) or obj.endswith("s")
     actor_words = {w for a in u.sentence.actors for w in a.split()} | {"officer", "manager", "engineer", "operator", "user", "customer", "admin", "staff", "team"}
     physical = verb in READ_VERBS | CONTROL_VERBS and re.search(r"\bsensors?\b|\bdevices?\b|\bvalves?\b|\bpumps?\b|\bmotors?\b|\bfans?\b|\bheaters?\b|\bvents?\b|\brelays?\b|\bcontrollers?\b|\bprobes?\b|\bcameras?\b|\bgpio\b|\bserial\b|\bmodbus\b", u.sentence.lower)
-    one_off = mentions < 2 or not thing or obj in T.TECH_WORDS or base in T.TECH_WORDS or obj.endswith(("ly", "ed")) or re.fullmatch(r"[a-z]-?\d+", obj) or obj in actor_words or base in actor_words
+    not_a_noun = obj in T.STOPWORDS or obj in T._NEGATIONS or obj in ("cannot", "must", "should", "may", "can", "will", "not", "never") or (T.verb_of(obj) and obj not in ("order", "request", "offer", "claim", "match", "ticket", "record"))
+    one_off = mentions < 2 or not thing or not_a_noun or obj in T.TECH_WORDS or base in T.TECH_WORDS or obj.endswith(("ly", "ed")) or re.fullmatch(r"[a-z]-?\d+", obj) or obj in actor_words or base in actor_words
     if one_off and not physical and "core" in cid:
         return Placement(u.id, [cid["core"]], "core rule", f"'{obj}' is named once, is a person, or is not a thing the system keeps; the sentence is a rule the core carries")
     if verb in READ_VERBS:

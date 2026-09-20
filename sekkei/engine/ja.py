@@ -214,7 +214,9 @@ QUALITIES = {
     "下回る": "falls below", "下回った": "falls below", "上回る": "exceeds", "超える": "exceeds", "超えた": "exceeds",
     "発注点": "reorder level", "在庫切れ": "out of stock", "欠品": "out of stock", "遅い": "slow", "遅くても": "at most",
     "に従って": "in accordance with", "に従い": "in accordance with", "委ねる": "delegated to", "委ね": "delegated to",
-    "以降": "onwards", "以下「": "", "把握": "track", "背後": "behind", "既存": "existing", "同一": "same", "順番": "order", "順序通り": "in order", "一度だけ": "exactly once", "少なくとも一度": "at least once",
+    "以降": "onwards", "以下「": "", "済み": "already", "持つ": "has", "明細": "line items", "額": "amount", "一致": "match", "合計": "total",
+    "状態を持つ": "has the states", "状態": "status", "届け先住所": "delivery address", "届け先": "delivery address",
+    "把握": "track", "背後": "behind", "既存": "existing", "同一": "same", "順番": "order", "順序通り": "in order", "一度だけ": "exactly once", "少なくとも一度": "at least once",
     "取りこぼさない": "must never be lost", "取りこぼし": "lost", "落とさない": "must never be lost", "確実に": "reliably",
     "エラー": "errors", "例外": "errors", "タイムアウト": "timeout", "接続数": "connections", "同時接続": "concurrent connections",
     "レスポンス": "response", "処理時間": "latency", "処理速度": "throughput", "秒間": "per second", "毎秒": "per second",
@@ -511,7 +513,7 @@ class Rewrite:
 
 
 #: fixed phrases folded into one modal before tokenising (inflection tails would otherwise split them)
-_PRE = {"不可であること": "禁止", "不可とする": "禁止", "不可能であること": "禁止", "できないこと": "禁止", "してはならない": "禁止", "してはいけない": "禁止", "しては行けない": "禁止", "してはならず": "禁止",
+_PRE = {"済みの": "済み ", "済の": "済み ", "不可であること": "禁止", "不可とする": "禁止", "不可能であること": "禁止", "できないこと": "禁止", "してはならない": "禁止", "してはいけない": "禁止", "しては行けない": "禁止", "してはならず": "禁止",
         "てはならない": "禁止", "てはならず": "禁止", "てはいけない": "禁止", "てはいけず": "禁止",
         "しなければならない": "必須", "しなくてはならない": "必須", "しなければいけない": "必須", "する必要がある": "必須",
         "なければならない": "必須", "ねばならない": "必須", "できるようにする": "できる", "できること": "できる",
@@ -535,6 +537,34 @@ def _clauses(s: str) -> list[str]:
     the actor of the first clause carries over."""
     parts = [p.strip("、 ") for p in _CLAUSE_SPLIT.split(s) if p and p.strip("、 ")]
     return parts if len(parts) > 1 else [s]
+
+
+def _state_forms(s: str) -> str:
+    """「発送済み」→ shipped, 「発送前」→ before shipped, 「発送後」→ after shipped, 「受付→発送→完了」→ accepted -> shipped -> completed."""
+    _IRREG = {"ship": "shipped", "cancel": "cancelled", "submit": "submitted", "pay": "paid", "withdraw": "withdrawn", "activate": "active",
+              "retry": "retrying", "run": "running", "stop": "stopped", "plan": "planned", "refer": "referred"}
+
+    def part(v_en: str) -> str:
+        return _IRREG.get(v_en, v_en + ("d" if v_en.endswith("e") else "ed"))
+    keys = sorted(VERBS, key=len, reverse=True)
+    for k in keys:
+        en = VERBS[k]
+        if re.search(re.escape(k) + r"(?:済み|済|前|後)", s):
+            s = re.sub(re.escape(k) + r"(?:済み|済)(?=の|で|に|は|が|を|$|、|\s)", " " + part(en) + " ", s)
+            s = re.sub(re.escape(k) + r"前(?=で|に|は|の|$|、|\s)", " before " + part(en) + " ", s)
+            s = re.sub(re.escape(k) + r"後(?=で|に|は|の|$|、|\s)", " after " + part(en) + " ", s)
+
+    def arrows(m: re.Match) -> str:
+        items = [x.strip() for x in re.split(r"→|->|⇒", m.group(0))]
+        out = []
+        for it in items:
+            if it in VERBS:
+                out.append(part(VERBS[it]))
+            else:
+                out.append(NOUNS.get(it) or QUALITIES.get(it) or OTHER.get(it) or it)
+        return " " + " -> ".join(out) + " "
+    s = re.sub(r"[぀-ヿ㐀-䶿一-鿿A-Za-z]+(?:\s*(?:→|->|⇒)\s*[぀-ヿ㐀-䶿一-鿿A-Za-z]+)+", arrows, s)
+    return s
 
 
 def rewrite_sentence(src: str) -> Rewrite:
@@ -611,6 +641,7 @@ def _rewrite_clause(src: str, original: str | None = None) -> Rewrite:
         return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
     s = unicodedata.normalize("NFKC", src).strip().rstrip("。.")
     s = _PRE_RE.sub(lambda m: _PRE[m.group(0)], s)
+    s = _state_forms(s)
     s = numbers(s)
     toks = _tokenise_list(s)
     unknown = [t.text for t in toks if t.role == "unknown"]

@@ -121,7 +121,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
 - **requires**: I-1, I-6, I-9, I-3, I-11, I-5, I-16
-- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-21, R-22
+- **satisfies**: R-1, R-2, R-3, R-5, R-11, R-12, R-21, R-22
 
 ### C-5 — Notifier
 
@@ -209,7 +209,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
 - **requires**: I-4, I-6, I-7, I-8, I-10, I-16
-- **satisfies**: R-1, R-10, R-8, R-9, R-17, R-20
+- **satisfies**: R-1, R-8, R-9, R-17, R-20
 
 ### C-16 — Document domain
 
@@ -217,7 +217,7 @@ graph LR
 - **responsibility**: Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.
 - **provides**: I-16
 - **requires**: I-1
-- **satisfies**: R-2
+- **satisfies**: R-2, R-10
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -987,7 +987,7 @@ Implement Model server: Loads the model, serves predictions with batching and ti
 Implement Document domain: Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.
 
 - **components**: C-16 · **implements**: I-16
-- **depends on**: WP-2 · **satisfies**: R-2
+- **depends on**: WP-2 · **satisfies**: R-2, R-10
 - **write scope**: `app/domain_document.py`, `tests/test_domain_document.py`
 - **acceptance**:
   - A-10 (test) unit tests of Document domain pass — `python -m pytest -q tests/test_domain_document.py`
@@ -1044,7 +1044,7 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5, WP-7 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-21, R-22
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5, WP-7 · **satisfies**: R-1, R-2, R-3, R-5, R-11, R-12, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
   - A-17 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
@@ -1066,7 +1066,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-5, WP-6, WP-9, WP-10 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-20
+- **depends on**: WP-2, WP-5, WP-6, WP-9, WP-10 · **satisfies**: R-1, R-8, R-9, R-17, R-20
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
   - A-19 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
@@ -1087,7 +1087,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 | R-7 | must | C-2, C-5, C-10, C-12, C-13, C-14 | WP-6, WP-7, WP-8, WP-9, WP-11 | A-11, A-12, A-13, A-14, A-15, A-16, A-18 |
 | R-8 | must | C-9, C-10, C-15 | WP-3, WP-9, WP-12 | A-5, A-6, A-7, A-14, A-15, A-16, A-19, A-20, A-21 |
 | R-9 | must | C-3, C-9, C-10, C-11, C-15 | WP-1, WP-3, WP-4, WP-9, WP-12 | A-1, A-2, A-5, A-6, A-7, A-8, A-9, A-14, A-15, A-16, A-19, A-20, A-21 |
-| R-10 | must | C-4, C-15 | WP-10, WP-12 | A-17, A-19, A-20, A-21 |
+| R-10 | must | C-16 | WP-5 | A-10 |
 | R-11 | must | C-1, C-4, C-8 | WP-2, WP-10 | A-3, A-4, A-17 |
 | R-12 | must | C-4 | WP-10 | A-17 |
 | R-13 | must | C-7 | WP-6 | A-11 |

@@ -391,11 +391,11 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = N
     seen: dict[str, Operation] = {}
     dents = dents or []
     for u in units:
-        if not u.sentence.actors:
+        stated = [(m_, p_.rstrip(".,;:")) for m_, p_ in re.findall(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9_{}/.-]+)", u.sentence.text)]
+        if not stated and not u.sentence.actors:
             continue  # behaviour statements ("each event is delivered ...") are contracts, not use cases
-        if not _actor_is_subject(u.sentence):
+        if not stated and not _actor_is_subject(u.sentence):
             continue  # "Email the customer …": the actor is the object; a notification, not a use case
-        stated = re.findall(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9_{}/.-]+)", u.sentence.text)
         if stated and surface_kind == "http":
             for method_, path_ in stated:
                 name = f"{method_} {path_}"
@@ -650,7 +650,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                 if opname not in seen_ops:
                     seen_ops.add(opname)
                     froms = sorted({a for a, b, _ in e.edges if b == state})
-                    pre = ("status in (" + ", ".join(froms) + ")") if froms else "allowed source states not stated in the text"
+                    pre = ("status in (" + ", ".join(froms) + ")") if froms else "allowed source states not read by the engine (it reads 'then/until/otherwise' prose and a → b lists; state the transition or set it here)"
                     ops.append(Operation(opname, [Param(f"{e.name}_id", "ref")], f"{e.display} (status = {state})",
                                          ["NotFound", "InvalidTransition (source status not allowed)"], pre=pre, post=f"status = {state}", description=f"from {ev}"))
             if not any(o.name.startswith(("create_", "register_", "submit_")) and o.name.endswith(e.name) for o in ops):
@@ -703,6 +703,10 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         else:
             words = {DM.singular(w) for w in u.sentence.words}
             agg = next((agg_of_entity[e] for e in agg_of_entity if e in words and u.id in next(x.strong for x in dents if x.name == e)), None)
+            if agg is None:
+                # a rule about an entity the design already owns ("an invoice total must equal …") goes to that aggregate, not to a new component
+                agg = next((agg_of_entity[e] for e in agg_of_entity if e in words), None)
+                agg = agg if agg and (u.sentence.prohibition or not [v for v in u.sentence.verbs if v not in T.STATIVE_VERBS]) else None
             if agg and agg in cid:
                 p = Placement(u.id, [cid[agg]], "aggregate", f"the sentence speaks of {[e for e in agg_of_entity if e in words][0]}, owned by {d.component(cid[agg]).name}")
             else:

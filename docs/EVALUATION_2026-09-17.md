@@ -347,3 +347,45 @@ expired; cancel not allowed once shipped; immutable once shipped)` and offers
 `confirm_order / decline_order / ship_order / cancel_order / expire_order` with their allowed
 source states. Not yet re-scored by an independent reviewer.
 
+## Sixth independent red team (2026-09-21): the domain layer was overfitted
+
+Fresh-eyes re-score of 22 specs after the domain layer and the fifth-round fixes: the 18
+specs of rounds 2–4 average **6.3** (fifth reviewer 6.5) and the four specs of round 5,
+against which the fixes were written, average **10.3** (fifth reviewer 6.3). C6 (data model)
+is 1/2 on 4 of 18, C4 (interfaces) 1/2 on 4, C7 (work packages) 1/2 on 4 — the same four —
+and 2 on none. The reviewer named the evidence in the code: field names from one spec
+whitelisted in the reader, stop-lists holding words from three others, three sequence
+regexes that were the three sentences of one spec. Its five attack specs (fields in other
+prose forms and tables, a state machine as a table, homonyms and a many-to-many, arithmetic
+business rules, Japanese fields/states) scored **5 / 8 / 9 / 5 / 4**: zero of fourteen stated
+fields read in form (a), transition tables not read in (b) while the output asserted "not
+stated in the text", both senses of "account" impossible by stop-list in (c), 2 of 8 rules in
+(d), and a Japanese must-not inverted into a "ship is not allowed" invariant in (e).
+
+What changed after it. The corpus constants are gone (a field word that is also a verb is
+judged by an attribute-noun list, not a whitelist; "london/hallway/acquirer/region" no longer
+block anything). The false statement is gone: a transition operation now says "allowed source
+states not read by the engine (it reads 'then/until/otherwise' prose and a → b lists)". The
+bugs that were bugs are fixed and tested: a 任意 (optional) row was deleted as "not work"; a
+Japanese 「発送済みの注文はキャンセルしてはならない」 became "must not ship and cancel" (済み /
+前 / 後 are now state adjectives and 「受付→発送→完了」 an arrow list); "an invoice cannot …"
+produced a "Cannot processor" (non-nouns never seed a component, and a rule about an entity
+the design owns goes to its aggregate); an arrow list `approved/held/rejected → paid` joined
+rejected to paid (terminal states do not continue); a verbatim `DELETE /v2/queue/{ticket}`
+was dropped when the sentence had no human actor; duplicate routes were renamed `/events-2`
+instead of merged and noted; NBSP-grouped numbers ("2 000 ms") read as 0; HTML comments and
+image links were read as sentences.
+
+What did **not** change, on purpose: no new phrasings were added for the reviewer's five
+attack specs. Writing readers for "is identified by", "we store for each X", a from/to
+table, 「…を持つ」 would raise those five scores and prove nothing — that is exactly the
+overfitting the review exposed. The protocol from round seven: the reviewer writes its
+specifications, scores them, reports scores and defect *classes*, and deletes the
+specifications; the engine's authors never see them. A phrasing gets a reader only when it
+is reported as a class across several independent rounds.
+
+Verdict adopted in the README: a requirements linter with a catalogue behind it. The
+requirement table, numbers, team size, non-goals, open questions, the generic layer and the
+dropped/assumed lists are reliable; the domain decomposition, data model, routes and work
+packages are drafts a person rewrites.
+

@@ -492,9 +492,9 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `deliver_event` | `event_id`: ref | Event (status = delivered) | NotFound, InvalidTransition (source status not allowed) | allowed source states not stated in the text / status = delivered |
+| `deliver_event` | `event_id`: ref | Event (status = delivered) | NotFound, InvalidTransition (source status not allowed) | allowed source states not read by the engine (it reads 'then/until/otherwise' prose and a → b lists; state the transition or set it here) / status = delivered |
 | | from R-1 | | | |
-| `publish_event` | `event_id`: ref | Event (status = published) | NotFound, InvalidTransition (source status not allowed) | allowed source states not stated in the text / status = published |
+| `publish_event` | `event_id`: ref | Event (status = published) | NotFound, InvalidTransition (source status not allowed) | allowed source states not read by the engine (it reads 'then/until/otherwise' prose and a → b lists; state the transition or set it here) / status = published |
 | | from R-3 | | | |
 | `create_event` | `event`: Event | Event (id assigned) | ValidationError listing every invalid field | record is durable before return |
 | | creation of the aggregate root | | | |

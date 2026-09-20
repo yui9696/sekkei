@@ -196,7 +196,7 @@ _UNIT_KIND = {
     "x": "factor",
 }
 
-_NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB](?![a-zA-Z]))?(?![:\d])(?=[\s%/a-zA-Z)-]|$)"
+_NUM = r"(?<![\w.:-])(?P<num>\d{1,3}(?:[,\u00a0\u202f\u2009 ]\d{3})+|\d+(?:\.\d+)?)(?P<mult>[kKmMbB](?![a-zA-Z]))?(?![:\d])(?=[\s%/a-zA-Z)-]|$)"
 _UNIT = r"(?P<unit>%|/s|/sec|/min|/h|/day|per second|per sec|per minute|per hour|per day|rps|qps|ms|milliseconds?|secs?|seconds?|mins?|minutes?|hrs?|hours?|business days?|working days?|days?|weeks?|months?|years?|[kmgt]b|bytes?|x|s|h|d|m)?"
 _QUANT_RE = re.compile(_NUM + r"[\s-]?" + _UNIT + r"(?![a-zA-Z])", re.I)
 _CODE_CONTEXT = re.compile(r"\b(?:status|http|returns?|code|response|error|responds? with|reply|replies|retry-after|rate[- ]limit\w*|except|honou?rs?)\b|\b[45]xx\b", re.I)
@@ -370,7 +370,7 @@ def modality(text: str) -> str:
 def quantities(text: str) -> list[Quantity]:
     out: list[Quantity] = []
     for m in _QUANT_RE.finditer(text):
-        raw_num = m.group("num").replace(",", "")
+        raw_num = re.sub(r"[,\u00a0\u202f\u2009 ]", "", m.group("num"))
         value = float(raw_num)
         mult = (m.group("mult") or "").lower()
         unit = (m.group("unit") or "").lower()

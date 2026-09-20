@@ -69,7 +69,7 @@ _CONTENT_HEADERS = ("内容", "要件", "説明", "詳細", "requirement", "desc
 _PRIORITY_HEADERS = ("優先度", "優先", "priority", "moscow", "importance", "重要度", "必須")
 _STATUS_HEADERS = ("status", "state", "ステータス", "状態", "区分", "type", "種別", "kind")
 _NOT_WORK = {"current", "existing", "done", "delivered", "n/a", "na", "not applicable", "out of scope", "std", "standard", "config", "configuration",
-             "既存", "対応済", "済", "現状", "対象外", "任意"}
+             "既存", "対応済", "済", "現状", "対象外"}
 _ID_HEADERS = ("no", "no.", "#", "id", "番号", "項番", "key", "req", "req id", "識別子", "ref", "clause", "row")
 _TITLE_HEADERS = ("機能", "項目", "名称", "feature", "title", "name", "function", "分類", "カテゴリ", "category")
 
@@ -152,9 +152,11 @@ def _table_to_bullets(rows: list[list[str]], notes: list[str]) -> list[str]:
                 notes.append(f"table row without a content cell kept as text: {text[:50]}")
             continue
         content = r[ci].strip()
-        if si is not None and si < len(r) and si != ci:
+        if si is not None and si < len(r) and si != ci and si != pi:
             status = r[si].strip().lower().strip("*")
-            if status in _NOT_WORK or any(status.startswith(w) for w in ("current", "existing", "n/a", "done", "既存", "対応済")):
+            if _priority_of(r[si]):
+                pass                                  # 任意 / optional / should: a priority, not a status
+            elif status in _NOT_WORK or any(status.startswith(w) for w in ("current", "existing", "n/a", "done", "既存", "対応済")):
                 skipped += 1
                 notes.append(f"table row with status '{r[si].strip()}' is not work: {content[:50]}")
                 continue
@@ -268,7 +270,10 @@ def _unwrap_pasted(lines: list[str], notes: list[str]) -> list[str]:
 def canonicalise(text: str) -> Canonical:
     can = Canonical("")
     out: list[str] = []
-    lines = text.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").split("\n")
+    text = re.sub(r"<!--.*?-->", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)      # an HTML comment is not text
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)                                            # an image is not a sentence
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)                                       # a link keeps its text
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").replace("\u00a0", " ").replace("\u202f", " ").replace("\u2009", " ").split("\n")
     if lines and lines[0].startswith("\ufeff"):
         lines[0] = lines[0][1:]
     lines = _unwrap_pasted(lines, can.notes)

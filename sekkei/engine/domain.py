@@ -52,6 +52,7 @@ STATE_VERBS = {"submit": "submitted", "approve": "approved", "reject": "rejected
                "adjudicate": "adjudicated", "allocate": "allocated", "provision": "provisioned", "deprovision": "deprovisioned",
                "reimburse": "reimbursed", "disburse": "disbursed", "flag": "flagged", "unlock": "unlocked", "lock": "locked", "grant": "granted",
                "redeem": "redeemed", "pause": "paused", "resume": "resumed", "reinstate": "reinstated", "quote": "quoted", "bill": "billed"}
+_TERMINAL = {"rejected", "declined", "cancelled", "canceled", "expired", "failed", "withdrawn", "closed", "discarded", "deleted", "revoked", "voided", "refunded"}
 _STATE_WORDS = {"pending", "working", "open", "closed", "active", "inactive", "draft", "live", "expired", "scheduled", "queued",
                 "processing", "done", "failed", "succeeded", "new", "approved", "rejected", "cancelled", "canceled", "submitted",
                 "published", "archived", "paid", "unpaid", "settled", "shipped", "delivered", "acknowledged", "escalated", "quarantined",
@@ -73,14 +74,14 @@ _TYPES = [
 _FIELD_STOP = {"and", "or", "etc", "e.g", "eg", "i.e", "the", "a", "an", "of", "with", "per", "each", "both", "only", "also", "such", "as",
                "at", "least", "most", "than", "more", "less", "one", "two", "three", "if", "any", "all", "some", "other", "same", "own"}
 _REL_STOP = {"time", "day", "hour", "minute", "second", "week", "month", "year", "request", "response", "call", "second", "system",
-             "service", "api", "process", "run", "way", "case", "basis", "default", "region", "team", "tenant", "customer", "user",
-             "person", "people", "staff", "operator", "admin", "role", "take", "let", "object", "thing", "things", "cloud", "bank",
-             "burst", "flow", "open", "hallway", "wifi", "certified", "london", "price", "prices", "value", "values", "part", "parts",
+             "service", "api", "process", "run", "way", "case", "basis", "default", "team", "tenant", "customer", "user",
+             "person", "people", "staff", "operator", "admin", "take", "let", "object", "thing", "things", "cloud",
+             "burst", "flow", "open", "price", "prices", "value", "values", "part", "parts",
              "step", "steps", "action", "actions", "change", "changes", "control", "controls", "check", "checks", "state", "states",
              "result", "results", "kind", "kinds", "type", "types", "section", "sections", "page", "pages", "screen", "screens",
              "rule", "rules", "field", "fields", "table", "tables", "row", "rows", "column", "columns", "code", "codes",
              "sequence", "queue", "queues", "topic", "topics", "endpoint", "endpoints", "email", "emails", "sms", "webhook", "webhooks",
-             "notice", "notices", "notification", "notifications", "message", "messages", "acquirer", "provider", "providers", "vendor",
+             "notice", "notices", "notification", "notifications", "message", "messages", "provider", "providers", "vendor",
              "image", "images", "version", "versions", "library", "libraries", "attempt", "attempts", "share", "shares", "entry", "entries",
              "batch", "batches", "duplicate", "duplicates", "copy", "copies", "list", "lists", "set", "sets", "number", "numbers", "latest", "precision",
              "percentage", "percentages", "portion", "fraction", "majority", "subset", "sample", "samples", "trail", "trails", "total", "totals",
@@ -176,6 +177,24 @@ def field_type(name: str) -> str:
         if re.search(rx, low):
             return t
     return "str"
+
+
+#: words that are verbs in the lexicon but nouns when they name an attribute
+_ATTRIBUTE_NOUNS = {"hash", "start", "end", "limit", "order", "record", "estimate", "total", "count", "rate", "score", "grade", "match",
+                    "request", "offer", "charge", "claim", "share", "measure", "filter", "flag", "lock", "release", "return", "issue", "note",
+                    "notes", "name", "label", "tag", "link", "file", "form", "report", "export", "import", "plan", "test", "run", "check",
+                    "balance", "deposit", "transfer", "quote", "bill", "vote", "review", "comment", "reply", "status", "type", "value", "amount",
+                    "strike", "notional", "price", "date", "time", "time_zone", "term", "expiry", "address", "email", "phone", "reason", "state"}
+
+
+def _field_ok(f: str) -> bool:
+    """A field name is a noun phrase; a lexicon verb is fine when it is the usual name of an attribute (hash, start_time, limit_price)."""
+    words = f.split("_")
+    if all(T.verb_of(w) and w not in _ATTRIBUTE_NOUNS and not w.endswith(("ed", "ing")) for w in words):
+        return False
+    if words[0].endswith("ing") or (T.verb_of(words[0]) and words[0] not in _ATTRIBUTE_NOUNS and len(words) == 1):
+        return False
+    return True
 
 
 def _clean_field(f: str) -> str:
@@ -339,7 +358,7 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
             if _ALT_PAREN.match(inside) or re.search(r"\b(?:or|vs|versus)\b", inside):
                 continue                      # "(vanilla and barrier)", "(WPA2/WPA3)": kinds of the thing, not its fields
             fields = [_clean_field(f) for f in re.split(r",|\s+and\s+|/|;", inside)]
-            fields = [f for f in fields if f and not T.verb_of(f.split("_")[0]) or f in ("limit_price", "notional", "strike")]
+            fields = [f for f in fields if f and _field_ok(f)]
             is_obj = any(_head_after(v, s) and singular(_head_after(v, s)) == singular(noun) for v in s.verbs if v in TRANSACTIONAL)
             if (len(fields) >= 3 or (len(fields) >= 2 and is_obj)) and _noun_ok(noun, an):
                 e = ent(noun, rid, 2)
@@ -361,7 +380,7 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                     wm = _WITH_LIST.match(seg.lstrip()) if seg.lstrip().lower().startswith(("with ", "including ", "carrying ")) else None
                 if wm:
                     fields = [_clean_field(f) for f in re.split(r",|\s+and\s+|/", wm.group(1))]
-                    fields = [f for f in fields if f and not any(T.verb_of(w) for w in f.split("_")) or f in ("limit_price", "notional", "strike")]
+                    fields = [f for f in fields if f and _field_ok(f)]
                     if len(fields) >= 2:
                         e = ent(o, rid, 1)
                         if e:
@@ -493,13 +512,21 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                             if p not in target.states:
                                 target.states.append(p)
                     for ga, gb in zip(groups, groups[1:]):
-                        for x in ga:
+                        # "approved/held/rejected → paid": only the alternatives that plausibly continue lead on; rejected/declined/
+                        # cancelled/expired/failed are terminal, so paid follows approved (and held, marked as read-with-doubt)
+                        cont = [x for x in ga if x not in _TERMINAL] or ga
+                        for x in cont:
                             for y in gb:
                                 target.edges.append((x, y, rid))
+                        for x in ga:
+                            if x in _TERMINAL and x not in target.states:
+                                target.states.append(x)
         # negated actions on a state: "once shipped it must not be cancelled", "declined … cannot be confirmed later",
         # "cannot be marked done while …", "not refundable once …"
-        for m in re.finditer(r"\b(?:must not|cannot|can't|may not|must never|never)\s+(?:be\s+)?([a-z]+(?:ed|en)?)\b(?:\s+(?:later|again|twice|once|while|when|unless|without|for|until)\b)?", low):
+        for m in re.finditer(r"\b(?:must not|cannot|can't|may not|must never|shall not|never)\s+(?:be\s+|be able to\s+)?([a-z]+(?:ed|en)?)\b(\s+(?:later|again|twice|once|while|when|unless|without|for|until)\b)?", low):
             verb = T.verb_of(m.group(1)) or m.group(1)
+            if m.group(2) and m.group(2).strip() in ("twice", "again"):
+                continue                 # "never randomised twice" is the no-duplicates invariant below, not a ban on randomising
             subj = _subject_entity(low[: m.start()], ents) or _first_entity_in(low, ents)
             if subj is not None and (verb in STATE_VERBS or verb in KEEPING or verb in ("modify", "edit", "change", "delete", "refund", "issue")):
                 cm = re.search(r"\b(once|while|when|unless|until|after|before|that (?:has been|is|was)|without)\b\s+(?:it\s+|the\s+[a-z]+\s+|an?\s+[a-z]+\s+)?(?:is\s+|has been\s+|was\s+|not\s+)?([a-z]+(?:ed|en))\b", low)

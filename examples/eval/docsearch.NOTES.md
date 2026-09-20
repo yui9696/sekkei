@@ -24,7 +24,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
 | R-1 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'employee': a use case |
-| R-10 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'member': a use case |
+| R-10 | C-16 Document domain | aggregate | the sentence speaks of document, owned by Document domain |
 
 ## 2. Capacity estimates
 

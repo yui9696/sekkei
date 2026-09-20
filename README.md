@@ -1,11 +1,22 @@
 # sekkei
 
-**A solution-architecture engine and a design-first harness for LLM coding agents.**
-sekkei (設計, "design") takes a requirements text and produces a complete architecture —
-components, contracts, entities, flows, scored decisions, risks, work packages with
-acceptance checks — **without calling a model**, then holds the line while agents build it:
-it lints the design, hands each agent a self-contained brief, refuses stale briefs, and
-checks the code against the design afterwards.
+**A requirements linter with an architecture catalogue behind it, and a design-first
+harness for LLM coding agents.** sekkei (設計, "design") reads a requirements text — the
+way teams actually write one — and produces a checkable design: the requirement table with
+priorities and numbers as metrics, the generic layer (store, queue, auth, audit, notifier,
+observability) with scored decisions, SLO arithmetic, risks, and a *draft* of the domain
+layer (entities, states, operations, work packages) — **without calling a model**. It then
+holds the line while agents build: lints the design, hands each agent a self-contained
+brief, refuses stale briefs, and checks the code against the design afterwards.
+
+**What it is good at, measured** (six independent red teams, 41 specifications written by
+people who wanted it to fail — see [How good is it](#how-good-is-it-measured)): the
+requirement table, the numbers, team size, non-goals, open questions, the generic layer,
+and an honest list of what it dropped and what it assumed. **What it is not**: the
+domain-specific decomposition, the data model, the routes and the work-package cuts are
+drafts that a person rewrites — the sixth review's phrase for the product is "a requirements
+linter with a catalogue behind it", and the `design.json` data model should not be shown to
+a client as if it were read from their text.
 
 Pure Python standard library, 3.11+ (the optional `draft` command imports the `anthropic` SDK only when you choose that backend). Deterministic: same text, same design, byte for byte.
 
@@ -267,7 +278,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 340 (incl. 11 real-world specs, 41 specs written by five independent red teams, and a mutation fuzz) |
+| tests | 346 (incl. 11 real-world specs, 41 specs written by six independent red teams, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
@@ -290,6 +301,17 @@ two in Japanese (hospital booking, corporate LMS) and one in English (loan origi
 with KYC and an underwriter workflow): 13/12/13 → 15/15/16 after the fixes they motivated.
 Japanese lands two points lower on fidelity and operation naming — the cost of a glossary
 instead of a parser — and the same everywhere else.
+
+Then six independent red teams (same document, later sections). On specifications written
+the way teams write them — Confluence pages, Jira epics, meeting notes, tender annexes,
+post-mortems, a 提案依頼書 — the fresh-eyes median after five rounds of fixes is **6–7 out of
+20**, and the three criteria that matter most to an architect (data model, interfaces, work
+packages) are 0–1 on almost every spec. The sixth review's finding is the important one:
+a domain-model layer written against one round's specs scored 10/20 on those specs and left
+every other spec where it was — **it was pattern-matching the corpus, not reading text**.
+From round seven on, the reviewers keep their specifications private and report only scores
+and defect classes, so that a fix cannot be written against the test. Use the numbers, not
+the file count, when deciding what to trust.
 
 ## Prior art
 

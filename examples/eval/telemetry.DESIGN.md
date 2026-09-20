@@ -414,7 +414,7 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `publish_reading` | `reading_id`: ref | Reading (status = published) | NotFound, InvalidTransition (source status not allowed) | allowed source states not stated in the text / status = published |
+| `publish_reading` | `reading_id`: ref | Reading (status = published) | NotFound, InvalidTransition (source status not allowed) | allowed source states not read by the engine (it reads 'then/until/otherwise' prose and a → b lists; state the transition or set it here) / status = published |
 | | from R-1 | | | |
 | `create_reading` | `reading`: Reading | Reading (id assigned) | ValidationError listing every invalid field | durability: no reading lost |
 | | creation of the aggregate root | | | |

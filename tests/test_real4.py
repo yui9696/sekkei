@@ -147,3 +147,54 @@ def test_names_and_temperatures_are_not_quantities():                   # M11
     assert not [q for q in T.quantities("operated in accordance with IEC 62443-3-3 Security Level 2") if q.value == 62443]
     assert not [q for q in T.quantities("21 CFR Part 11 applies") if q.value == 21]
     assert T.quantities("stored at −20 °C") == []
+
+
+# ---- sixth red team: bugs (not phrasings) ------------------------------------------------------
+
+def test_optional_priority_row_is_not_dropped_as_status():
+    r = design((REAL4.parent / "real2" / "04_youken_medical.md").read_text(encoding="utf-8"))
+    assert any(q.priority == "could" for q in r.design.requirements if not q.rationale.startswith("assumed"))
+    assert not any("status '任意'" in n for n in r.analysis.structure.notes)
+
+
+def test_japanese_state_adjectives_and_arrows():
+    from sekkei.engine import ja
+    assert ja.rewrite_sentence("発送済みの注文はキャンセルしてはならない").english == "The system must not cancel shipped orders."
+    assert "cancel orders before shipped" in ja.rewrite_sentence("発送前であれば注文をキャンセルできる").english
+    assert "accepted -> shipped -> completed" in ja.rewrite_sentence("注文は 受付→発送→完了 の状態を持つ").english
+
+
+def test_non_nouns_never_seed_components_and_rules_go_to_the_aggregate():
+    text = ("# Billing\n## Requirements\n- Customers can create an invoice with a number, a date and lines.\n- An invoice cannot be issued for a customer whose account is closed.\n"
+            "- A refund amount cannot exceed the captured amount of the invoice.\n- An invoice total must equal the sum of its lines.\n## Constraints\n- Python, PostgreSQL. Team of 2.\n")
+    r = design(text)
+    names = {c.name for c in r.design.components}
+    assert not any(n.startswith(("Cannot", "Line", "Refund")) and n.endswith(("processor", "reader", "controller")) for n in names), names
+
+
+def test_terminal_states_do_not_continue_in_arrow_lists():
+    from sekkei.engine import domain
+    r = design((REAL4.parent / "real3" / "02_prd_petclaims.md").read_text(encoding="utf-8"))
+    claim = next(e for e in domain.extract(r.analysis) if e.name == "claim")
+    assert ("rejected", "paid") not in {(a, b) for a, b, _ in claim.edges}
+    assert ("approved", "paid") in {(a, b) for a, b, _ in claim.edges}
+
+
+def test_verbatim_routes_survive_without_an_actor_and_duplicates_are_merged():
+    from sekkei import export as X
+    text = "# Q\n## Requirements\n- The queue is left with DELETE /v2/queue/{ticket}; status is read with GET /v2/queue/{ticket}.\n- Players can join a queue.\n## Constraints\n- Go, Redis. Team of 3.\n"
+    r = design(text)
+    ops = {o.name for i in r.design.interfaces for o in i.operations}
+    assert "DELETE /v2/queue/{ticket}" in ops and "GET /v2/queue/{ticket}" in ops
+    spec = X.openapi(r.design)
+    assert not any(p.endswith("-2") for p in spec["paths"])
+
+
+def test_nbsp_numbers_html_comments_and_images():
+    text = "# W\n## Requirements\n- Search responds within 2 000 ms p95 for 1 500 orders/s.\n<!-- Customers can delete all data instantly. -->\n- ![mockup](mockup.png) Staff can see the [dashboard](https://x) daily.\n## Constraints\n- Python. Team of 2.\n"
+    r = design(text)
+    stmts = " ".join(q.statement for q in r.design.requirements)
+    assert "delete all data" not in stmts and "mockup" not in stmts
+    m = next(q.metric for q in r.design.requirements if q.metric and "latency" in q.metric.name)
+    assert "2000" in m.target
+    assert not any("mockup" in o.name for i in r.design.interfaces for o in i.operations)
