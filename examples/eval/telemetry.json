@@ -318,9 +318,11 @@
         "I-1",
         "I-9",
         "I-8",
-        "I-16"
+        "I-16",
+        "I-17"
       ],
       "satisfies": [
+        "R-3",
         "R-1",
         "R-5",
         "R-7",
@@ -465,6 +467,7 @@
         "I-16"
       ],
       "satisfies": [
+        "R-3",
         "R-6",
         "R-9",
         "R-13",
@@ -498,7 +501,7 @@
     {
       "id": "C-16",
       "name": "Reading domain",
-      "responsibility": "Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
+      "responsibility": "Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading states: published; transitions not stated; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
       "kind": "module",
       "path": "src/main/java/app/DomainReading.java",
       "requires": [
@@ -506,17 +509,30 @@
       ],
       "satisfies": [
         "R-1",
-        "R-2",
-        "R-3",
-        "R-5",
-        "R-6",
-        "R-7",
-        "R-8"
+        "R-7"
       ],
       "tags": [
         "layer:1",
         "archetype:domain_reading",
         "aggregate"
+      ]
+    },
+    {
+      "id": "C-17",
+      "name": "Readings processor",
+      "responsibility": "Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
+      "kind": "module",
+      "path": "src/main/java/app/ReadingsProcessor.java",
+      "requires": [
+        "I-9"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:readings_processor",
+        "synthesised"
       ]
     }
   ],
@@ -1418,9 +1434,9 @@
           "output": "Reading (status = published)",
           "errors": [
             "NotFound",
-            "InvalidTransition (not allowed from the current status)"
+            "InvalidTransition (source status not allowed)"
           ],
-          "pre": "",
+          "pre": "allowed source states not stated in the text",
           "post": "status = published",
           "description": "from R-1"
         },
@@ -1459,6 +1475,67 @@
       ],
       "stability": "draft",
       "description": "Provided by Reading domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
+    },
+    {
+      "id": "I-17",
+      "name": "Readings processor interface",
+      "owner": "C-17",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "validate_readings",
+          "inputs": [
+            {
+              "name": "readings",
+              "type": "list[Reading]",
+              "description": ""
+            }
+          ],
+          "output": "list[Reading] (validated)",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "drop_duplicates",
+          "inputs": [
+            {
+              "name": "duplicates",
+              "type": "…",
+              "description": ""
+            }
+          ],
+          "output": "…",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        },
+        {
+          "name": "store",
+          "inputs": [
+            {
+              "name": "input",
+              "type": "…",
+              "description": ""
+            }
+          ],
+          "output": "…",
+          "errors": [
+            "…"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Readings processor. Contract derived from R-2; fill in the types marked '…'."
     }
   ],
   "entities": [
@@ -1652,7 +1729,7 @@
         {
           "name": "status",
           "type": "enum(published)",
-          "constraints": "state machine read from R-1",
+          "constraints": "states read from R-1; transitions not stated in the text",
           "description": ""
         },
         {
@@ -2623,7 +2700,7 @@
     {
       "id": "WP-2",
       "title": "Reading domain",
-      "goal": "Implement Reading domain: Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
+      "goal": "Implement Reading domain: Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading states: published; transitions not stated; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
       "components": [
         "C-16"
       ],
@@ -2635,18 +2712,13 @@
       ],
       "satisfies": [
         "R-1",
-        "R-2",
-        "R-3",
-        "R-5",
-        "R-6",
-        "R-7",
-        "R-8"
+        "R-7"
       ],
       "files": [
         "src/main/java/app/DomainReading.java",
         "src/test/java/app/DomainReadingTest.java"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-4",
@@ -2657,13 +2729,6 @@
         },
         {
           "id": "A-5",
-          "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-6"
-        },
-        {
-          "id": "A-6",
           "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
@@ -2704,7 +2769,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-6",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "./gradlew test --tests app.AuthTest",
@@ -2736,7 +2801,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-7",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "./gradlew test --tests app.NotifierTest",
@@ -2747,6 +2812,38 @@
     },
     {
       "id": "WP-5",
+      "title": "Readings processor",
+      "goal": "Implement Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
+      "components": [
+        "C-17"
+      ],
+      "implements": [
+        "I-17"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-2"
+      ],
+      "files": [
+        "src/main/java/app/ReadingsProcessor.java",
+        "src/test/java/app/ReadingsProcessorTest.java"
+      ],
+      "size": "S",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "unit tests of Readings processor pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.ReadingsProcessorTest",
+          "metric": ""
+        }
+      ],
+      "notes": "family: synthesised:readings_processor"
+    },
+    {
+      "id": "WP-6",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -2758,10 +2855,12 @@
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-4"
+        "WP-4",
+        "WP-5"
       ],
       "satisfies": [
         "R-1",
+        "R-3",
         "R-5",
         "R-7",
         "R-9",
@@ -2793,7 +2892,7 @@
       "notes": "family: mqtt_ingest"
     },
     {
-      "id": "WP-6",
+      "id": "WP-7",
       "title": "MQTT consumer",
       "goal": "Implement MQTT consumer: Subscribes to the broker's topics, validates and de-duplicates messages, persists them and acknowledges only after persistence.",
       "components": [
@@ -2804,7 +2903,7 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-5"
+        "WP-6"
       ],
       "satisfies": [
         "R-1"
@@ -2826,7 +2925,7 @@
       "notes": "family: mqtt_ingest"
     },
     {
-      "id": "WP-7",
+      "id": "WP-8",
       "title": "Import/export",
       "goal": "Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
       "components": [
@@ -2836,7 +2935,7 @@
         "I-11"
       ],
       "depends_on": [
-        "WP-5"
+        "WP-6"
       ],
       "satisfies": [
         "R-5"
@@ -2858,7 +2957,7 @@
       "notes": "family: sftp_export"
     },
     {
-      "id": "WP-8",
+      "id": "WP-9",
       "title": "Batch job",
       "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
@@ -2870,8 +2969,8 @@
       "depends_on": [
         "WP-1",
         "WP-3",
-        "WP-5",
-        "WP-7"
+        "WP-6",
+        "WP-8"
       ],
       "satisfies": [
         "R-1",
@@ -2883,7 +2982,7 @@
         "src/main/java/app/Batch.java",
         "src/test/java/app/BatchTest.java"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-13",
@@ -2896,7 +2995,7 @@
       "notes": "family: batch_pipeline"
     },
     {
-      "id": "WP-9",
+      "id": "WP-10",
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
@@ -2909,10 +3008,11 @@
         "WP-1",
         "WP-2",
         "WP-3",
-        "WP-5",
-        "WP-7"
+        "WP-6",
+        "WP-8"
       ],
       "satisfies": [
+        "R-3",
         "R-6",
         "R-9",
         "R-13",
@@ -2922,7 +3022,7 @@
         "src/main/java/app/SurfaceApi.java",
         "src/test/java/app/SurfaceApiTest.java"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-14",

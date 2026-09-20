@@ -80,7 +80,7 @@ def shape(d: M.Design) -> dict:
         "entities": sorted((e.name, tuple(f.name for f in e.fields)) for e in d.entities),
         "flows": sorted((f.name, len(f.steps)) for f in d.flows),
         "decisions": sorted((x.title, x.choice) for x in d.decisions if x.status == "accepted"),
-        "packages": sorted((w.title, w.size) for w in d.work_packages),
+        "packages": sorted(w.title for w in d.work_packages),
         "acceptance": sorted(re.sub(r"\bR-\d+\b", "R-?", f"{a.kind}:{a.description}:{a.command}") for w in d.work_packages for a in w.acceptance),
         "metrics": sorted(f"{r.metric.name}:{r.metric.target}" for r in d.requirements if r.metric and not r.rationale.startswith("assumed")),
         "conventions": sorted(d.conventions.rules),
@@ -254,6 +254,8 @@ def _contradictions(base: EngineResult, rt: RedTeam) -> None:
     for u in base.analysis.requirements:
         low = u.sentence.lower
         for m in _NEG_VERB.finditer(low):
+            if re.search(r"\b(?:that|which|whose|if|unless|while)\b", low[m.end(): m.end() + 60]):
+                continue                 # "cannot place an order for a product that is not in stock": a condition, not a contradiction
             k = _verb_obj(m, low)
             if k:
                 neg[k] = u.id

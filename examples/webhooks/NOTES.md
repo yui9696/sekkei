@@ -39,7 +39,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **80 person-days**; critical path **35 days**; with a team of 3: **about 40 working days** (8 weeks).
+- Total effort: **62 person-days**; critical path **30 days**; with a team of 3: **about 33 working days** (7 weeks).
 - Wave 1: WP-1, WP-2, WP-3
 - Wave 2: WP-4, WP-5, WP-6, WP-7, WP-8
 - Wave 3: WP-9
@@ -110,11 +110,11 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 5b. Domain model read from the text
 
-Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.
 
 | entity | fields (type) | relations | states | invariants | from |
 |---|---|---|---|---|---|
-| Event | status (enum), response_code (ref), timestamps (str) | — | delivered → published | — | R-1, R-3, R-4, R-6 |
+| Event | status (enum), response_code (ref), timestamps (str) | — | delivered, published; transitions not stated | — | R-1, R-3, R-4, R-6 |
 
 ## 6. How the text was read
 

@@ -93,11 +93,11 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 5b. Domain model read from the text
 
-Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.
 
 | entity | fields (type) | relations | states | invariants | from |
 |---|---|---|---|---|---|
-| Loan | — | — | approved | — | R-5 |
+| Loan | — | — | approved; transitions not stated | — | R-5 |
 
 ## 6. How the text was read
 

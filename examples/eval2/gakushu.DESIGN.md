@@ -67,7 +67,7 @@ graph LR
   C_12["C-12 Localisation"]
   C_13["C-13 Scheduler"]
   C_14["C-14 Public HTTP API"]
-  C_15["C-15 Course domain"]
+  C_15["C-15 Grade domain"]
   C_6 -->|I-1| C_1
   C_6 -->|I-8| C_8
   C_6 -->|I-3| C_3
@@ -201,13 +201,13 @@ graph LR
 - **requires**: I-6, I-8, I-9, I-10, I-11, I-15
 - **satisfies**: R-3, R-8, R-9, R-10, R-14, R-16, R-17
 
-### C-15 — Course domain
+### C-15 — Grade domain
 
-- **kind**: module · **path**: `src/domain_course.ts`
-- **responsibility**: Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.
+- **kind**: module · **path**: `src/domain_grade.ts`
+- **responsibility**: Owns the Grade aggregate: creation, changes and state transitions of these records, and the rules that hold across them. invariant (R-6): retention: grade. Read from R-3.
 - **provides**: I-15
 - **requires**: I-1
-- **satisfies**: R-1, R-2, R-6, R-10
+- **satisfies**: R-6
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -388,27 +388,21 @@ graph LR
 | | from R-1: Admins can create, publish and unpublish courses (videos, files, tests). | | | |
 | `GET /courses` | `filter`: query, `page`: cursor | 200 [courses], next cursor | 401 unauthenticated | — |
 | | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
-| `POST /positions/{id}/save` | `id`: str | 202 save accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
-| | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
-| `POST /positions/{id}/resume` | `id`: str | 202 resume accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
-| | from R-2: Employees can search and take courses. Employees can save and resume playback position vid | | | |
 | `GET /grades` | `filter`: query, `page`: cursor | 200 [grades], next cursor | 401 unauthenticated | — |
 | | from R-3: Employees can take tests. Employees can view explanations grades immediately. | | | |
 | `GET /progress` | `filter`: query, `page`: cursor | 200 [progress], next cursor | 401 unauthenticated | — |
 | | from R-4: Managers can list and view grades their reports progress. Managers can export CSV. | | | |
 
-### I-15 — Course domain interface
+### I-15 — Grade domain interface
 
 - **kind**: module · **owner**: C-15 · **stability**: draft
-- Provided by Course domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
+- Provided by Grade domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `unpublish_course` | `course_id`: ref | Course (status = unpublished) | NotFound, InvalidTransition (not allowed from the current status) | status = unpublished |
-| | from R-1 | | | |
-| `create_course` | `course`: Course | Course (id assigned) | ValidationError listing every invalid field | retention: course |
+| `create_grade` | `grade`: Grade | Grade (id assigned) | ValidationError listing every invalid field | retention: grade |
 | | creation of the aggregate root | | | |
-| `get_course` | `course_id`: ref | Course \| None | — | — |
+| `get_grade` | `grade_id`: ref | Grade \| None | — | — |
 
 ## Entities
 
@@ -439,33 +433,33 @@ graph LR
 | `resource` | str | indexed |
 | `at` | timestamp |  |
 
-### E-4 — Course (owner C-15)
+### E-4 — Course (owner C-1)
 
-Domain entity read from R-1. No fields are stated in the text beyond its name; add them. Invariant (R-6): retention: course.
+Domain entity read from R-1. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `status` | enum(unpublished) | state machine read from R-1 |
+| `status` | enum(unpublished) | states read from R-1; transitions not stated in the text |
 | `created_at` | timestamp |  |
 
-### E-5 — Video (owner C-1)
+### E-5 — Grade (owner C-15)
+
+Domain entity read from R-3. No fields are stated in the text beyond its name; add them. Invariant (R-6): retention: grade.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `created_at` | timestamp |  |
+
+### E-6 — Video (owner C-1)
 
 Domain entity read from R-2. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `status` | enum(resumed) | state machine read from R-2 |
-| `created_at` | timestamp |  |
-
-### E-6 — Grade (owner C-1)
-
-Domain entity read from R-3. No fields are stated in the text beyond its name; add them.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
+| `status` | enum(resumed) | states read from R-2; transitions not stated in the text |
 | `created_at` | timestamp |  |
 
 ### E-7 — Progress (owner C-1)
@@ -835,16 +829,16 @@ _Affects:_ C-8
 ```mermaid
 graph LR
   WP_1["WP-1 Audit log (S)"]
-  WP_2["WP-2 File storage (M)"]
+  WP_2["WP-2 File storage (S)"]
   WP_3["WP-3 Localisation (S)"]
   WP_4["WP-4 Store + Observability (L)"]
-  WP_5["WP-5 Course domain (M)"]
+  WP_5["WP-5 Grade domain (S)"]
   WP_6["WP-6 Authentication + Scheduler (M)"]
   WP_7["WP-7 Notifier (S)"]
-  WP_8["WP-8 Search index (M)"]
+  WP_8["WP-8 Search index (S)"]
   WP_9["WP-9 Domain core (L)"]
   WP_10["WP-10 Import/export (S)"]
-  WP_11["WP-11 Public HTTP API (L)"]
+  WP_11["WP-11 Public HTTP API (M)"]
   WP_4 --> WP_5
   WP_4 --> WP_6
   WP_4 --> WP_7
@@ -871,7 +865,7 @@ graph LR
 4. WP-10
 5. WP-11
 
-_Critical path (37 person-days):_ WP-4 → WP-5 → WP-9 → WP-10 → WP-11
+_Critical path (29 person-days):_ WP-4 → WP-7 → WP-9 → WP-10 → WP-11
 
 ### WP-1 — Audit log (S)
 
@@ -884,7 +878,7 @@ Implement Audit log: Append-only record of who did what to which resource, query
   - A-1 (test) unit tests of Audit log pass — `npx vitest run tests/audit.test.ts`
 - **notes**: family: audit_log
 
-### WP-2 — File storage (M)
+### WP-2 — File storage (S)
 
 Implement File storage: Stores and serves uploaded files/blobs with content-type and size limits.
 
@@ -920,17 +914,16 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-7 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: infra
 
-### WP-5 — Course domain (M)
+### WP-5 — Grade domain (S)
 
-Implement Course domain: Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.
+Implement Grade domain: Owns the Grade aggregate: creation, changes and state transitions of these records, and the rules that hold across them. invariant (R-6): retention: grade. Read from R-3.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-4 · **satisfies**: R-1, R-2, R-6, R-10
-- **write scope**: `src/domain_course.ts`, `tests/domain_course.test.ts`
+- **depends on**: WP-4 · **satisfies**: R-6
+- **write scope**: `src/domain_grade.ts`, `tests/domain_grade.test.ts`
 - **acceptance**:
-  - A-8 (test) unit tests of Course domain pass — `npx vitest run tests/domain_course.test.ts`
-  - A-9 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
-- **notes**: family: aggregate:domain_course
+  - A-8 (test) unit tests of Grade domain pass — `npx vitest run tests/domain_grade.test.ts`
+- **notes**: family: aggregate:domain_grade
 
 ### WP-6 — Authentication + Scheduler (M)
 
@@ -940,7 +933,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-4 · **satisfies**: R-5, R-14, R-15
 - **write scope**: `src/auth.ts`, `tests/auth.test.ts`, `src/scheduler.ts`, `tests/scheduler.test.ts`
 - **acceptance**:
-  - A-10 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
+  - A-9 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
 - **notes**: family: infra
 
 ### WP-7 — Notifier (S)
@@ -951,10 +944,10 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-4 · **satisfies**: R-5, R-7
 - **write scope**: `src/notifier.ts`, `tests/notifier.test.ts`
 - **acceptance**:
-  - A-11 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
+  - A-10 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
 - **notes**: family: notification
 
-### WP-8 — Search index (M)
+### WP-8 — Search index (S)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
@@ -962,9 +955,9 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-4 · **satisfies**: R-2, R-8, R-10, R-16
 - **write scope**: `src/search.ts`, `tests/search.test.ts`
 - **acceptance**:
-  - A-12 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
-  - A-13 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-14 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-11 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
+  - A-12 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-13 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: search
 
 ### WP-9 — Domain core (L)
@@ -975,8 +968,8 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-4, WP-5, WP-7 · **satisfies**: R-3, R-4, R-9, R-11, R-13, R-20, R-21
 - **write scope**: `src/core.ts`, `tests/core.test.ts`
 - **acceptance**:
-  - A-15 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
-  - A-16 (metric) R-11: occurrences of the forbidden action (record) = 0 occurrences — metric R-11
+  - A-14 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
+  - A-15 (metric) R-11: occurrences of the forbidden action (record) = 0 occurrences — metric R-11
 - **notes**: family: crud_api
 
 ### WP-10 — Import/export (S)
@@ -987,11 +980,11 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-9 · **satisfies**: R-4, R-12
 - **write scope**: `src/exporter.ts`, `tests/exporter.test.ts`
 - **acceptance**:
-  - A-17 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
-  - A-18 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
+  - A-16 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-17 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: import_export
 
-### WP-11 — Public HTTP API (L)
+### WP-11 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
@@ -999,36 +992,36 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-4, WP-5, WP-6, WP-8, WP-9, WP-10 · **satisfies**: R-3, R-8, R-9, R-10, R-14, R-16, R-17
 - **write scope**: `src/surface_api.ts`, `tests/surface_api.test.ts`
 - **acceptance**:
-  - A-19 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
-  - A-20 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-21 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-18 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
+  - A-19 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-20 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-5, C-15 | WP-2, WP-5 | A-2, A-3, A-8, A-9 |
-| R-2 | must | C-3, C-5, C-10, C-15 | WP-2, WP-5, WP-8 | A-2, A-3, A-8, A-9, A-12, A-13, A-14 |
-| R-3 | must | C-6, C-14 | WP-9, WP-11 | A-15, A-16, A-19, A-20, A-21 |
-| R-4 | must | C-6, C-11 | WP-9, WP-10 | A-15, A-16, A-17, A-18 |
-| R-5 | must | C-2, C-7, C-13 | WP-6, WP-7 | A-10, A-11 |
-| R-6 | must | C-4, C-15 | WP-1, WP-5 | A-1, A-8, A-9 |
-| R-7 | must | C-2, C-7, C-12 | WP-3, WP-7 | A-4, A-11 |
-| R-8 | must | C-3, C-5, C-10, C-14 | WP-2, WP-8, WP-11 | A-2, A-3, A-12, A-13, A-14, A-19, A-20, A-21 |
-| R-9 | must | C-1, C-3, C-5, C-6, C-14 | WP-2, WP-4, WP-9, WP-11 | A-2, A-3, A-5, A-6, A-7, A-15, A-16, A-19, A-20, A-21 |
-| R-10 | must | C-10, C-14, C-15 | WP-5, WP-8, WP-11 | A-8, A-9, A-12, A-13, A-14, A-19, A-20, A-21 |
-| R-11 | must | C-1, C-6 | WP-4, WP-9 | A-5, A-6, A-7, A-15, A-16 |
-| R-12 | must | C-8, C-11 | WP-4, WP-10 | A-5, A-6, A-7, A-17, A-18 |
-| R-13 | must | C-1, C-6 | WP-4, WP-9 | A-5, A-6, A-7, A-15, A-16 |
-| R-14 | must | C-9, C-14 | WP-6, WP-11 | A-10, A-19, A-20, A-21 |
-| R-15 | must | C-9 | WP-6 | A-10 |
-| R-16 | must | C-10, C-14 | WP-8, WP-11 | A-12, A-13, A-14, A-19, A-20, A-21 |
-| R-17 | should | C-14 | WP-11 | A-19, A-20, A-21 |
+| R-1 | must | C-3, C-5 | WP-2 | A-2, A-3 |
+| R-2 | must | C-3, C-5, C-10 | WP-2, WP-8 | A-2, A-3, A-11, A-12, A-13 |
+| R-3 | must | C-6, C-14 | WP-9, WP-11 | A-14, A-15, A-18, A-19, A-20 |
+| R-4 | must | C-6, C-11 | WP-9, WP-10 | A-14, A-15, A-16, A-17 |
+| R-5 | must | C-2, C-7, C-13 | WP-6, WP-7 | A-9, A-10 |
+| R-6 | must | C-4, C-15 | WP-1, WP-5 | A-1, A-8 |
+| R-7 | must | C-2, C-7, C-12 | WP-3, WP-7 | A-4, A-10 |
+| R-8 | must | C-3, C-5, C-10, C-14 | WP-2, WP-8, WP-11 | A-2, A-3, A-11, A-12, A-13, A-18, A-19, A-20 |
+| R-9 | must | C-1, C-3, C-5, C-6, C-14 | WP-2, WP-4, WP-9, WP-11 | A-2, A-3, A-5, A-6, A-7, A-14, A-15, A-18, A-19, A-20 |
+| R-10 | must | C-10, C-14 | WP-8, WP-11 | A-11, A-12, A-13, A-18, A-19, A-20 |
+| R-11 | must | C-1, C-6 | WP-4, WP-9 | A-5, A-6, A-7, A-14, A-15 |
+| R-12 | must | C-8, C-11 | WP-4, WP-10 | A-5, A-6, A-7, A-16, A-17 |
+| R-13 | must | C-1, C-6 | WP-4, WP-9 | A-5, A-6, A-7, A-14, A-15 |
+| R-14 | must | C-9, C-14 | WP-6, WP-11 | A-9, A-18, A-19, A-20 |
+| R-15 | must | C-9 | WP-6 | A-9 |
+| R-16 | must | C-10, C-14 | WP-8, WP-11 | A-11, A-12, A-13, A-18, A-19, A-20 |
+| R-17 | should | C-14 | WP-11 | A-18, A-19, A-20 |
 | R-18 | should | C-1 | WP-4 | A-5, A-6, A-7 |
 | R-19 | must | C-8 | WP-4 | A-5, A-6, A-7 |
-| R-20 | must | C-6 | WP-9 | A-15, A-16 |
-| R-21 | must | C-6 | WP-9 | A-15, A-16 |
+| R-20 | must | C-6 | WP-9 | A-14, A-15 |
+| R-21 | must | C-6 | WP-9 | A-14, A-15 |
 
 ## Conventions
 

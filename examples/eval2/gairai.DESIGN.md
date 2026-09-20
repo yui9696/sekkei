@@ -143,7 +143,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-6
 - **requires**: I-1, I-8, I-4, I-7, I-16
-- **satisfies**: R-7, R-9, R-13, R-21, R-22
+- **satisfies**: R-1, R-7, R-9, R-13, R-21, R-22
 
 ### C-7 — Notifier
 
@@ -215,7 +215,7 @@ graph LR
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
 - **requires**: I-6, I-8, I-9, I-10, I-16
-- **satisfies**: R-8, R-12, R-13, R-17, R-18
+- **satisfies**: R-1, R-8, R-12, R-13, R-17, R-18
 
 ### C-16 — Patient domain
 
@@ -223,7 +223,7 @@ graph LR
 - **responsibility**: Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.
 - **provides**: I-16
 - **requires**: I-1
-- **satisfies**: R-1, R-2, R-3, R-4, R-10
+- **satisfies**: R-2
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -316,6 +316,8 @@ graph LR
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 | `audit_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
+| `confirm_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
+| | from R-7: The system must integrate confirmed bookings existing electronic health record system (ext | | | |
 
 ### I-7 — Notifier interface
 
@@ -424,8 +426,6 @@ graph LR
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
 | `GET /departments` | `filter`: query, `page`: cursor | 200 [departments], next cursor | 401 unauthenticated | — |
 | | from R-2: Staff can accept and register bookings patients. Staff can view bookings list the same day | | | |
-| `GET /informations/{id}` | `id`: str | 200 information | 401 unauthenticated, 404 unknown id | — |
-| | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 
 ### I-16 — Patient domain interface
 
@@ -496,7 +496,7 @@ Domain entity read from R-1. No fields are stated in the text beyond its name; a
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `status` | enum(cancelled) | state machine read from R-1 |
+| `status` | enum(cancelled) | states read from R-1; transitions not stated in the text |
 | `created_at` | timestamp |  |
 
 ### E-7 — Patient (owner C-16)
@@ -511,6 +511,25 @@ Domain entity read from R-2. No fields are stated in the text beyond its name; a
 ### E-8 — Department (owner C-1)
 
 Domain entity read from R-2. No fields are stated in the text beyond its name; add them.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `created_at` | timestamp |  |
+
+### E-9 — Health (owner C-1)
+
+Domain entity read from R-7. No fields are stated in the text beyond its name; add them.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `status` | enum(confirmed) | states read from R-7; transitions not stated in the text |
+| `created_at` | timestamp |  |
+
+### E-10 — Record (owner C-1)
+
+Domain entity read from R-10. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -942,14 +961,14 @@ _Affects:_ C-8
 graph LR
   WP_1["WP-1 Audit log (S)"]
   WP_2["WP-2 Store + Observability (L)"]
-  WP_3["WP-3 Patient domain (M)"]
+  WP_3["WP-3 Patient domain (S)"]
   WP_4["WP-4 Data protection (S)"]
   WP_5["WP-5 Authentication + Scheduler (M)"]
   WP_6["WP-6 Notifier (S)"]
   WP_7["WP-7 Search index (S)"]
   WP_8["WP-8 Domain core (L)"]
   WP_9["WP-9 Batch job (S)"]
-  WP_10["WP-10 Public HTTP API (L)"]
+  WP_10["WP-10 Public HTTP API (M)"]
   WP_11["WP-11 Legacy system adapter (S)"]
   WP_2 --> WP_3
   WP_1 --> WP_4
@@ -979,7 +998,7 @@ graph LR
 3. WP-8
 4. WP-10, WP-11, WP-9
 
-_Critical path (35 person-days):_ WP-2 → WP-3 → WP-8 → WP-10
+_Critical path (27 person-days):_ WP-2 → WP-6 → WP-8 → WP-10
 
 ### WP-1 — Audit log (S)
 
@@ -1007,16 +1026,15 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-6 (metric) R-11: ratio >= 99.5 % — kill one instance under load; error rate stays within the target — metric R-11
 - **notes**: family: infra
 
-### WP-3 — Patient domain (M)
+### WP-3 — Patient domain (S)
 
 Implement Patient domain: Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.
 
 - **components**: C-16 · **implements**: I-16
-- **depends on**: WP-2 · **satisfies**: R-1, R-2, R-3, R-4, R-10
+- **depends on**: WP-2 · **satisfies**: R-2
 - **write scope**: `app/domain_patient.py`, `tests/test_domain_patient.py`
 - **acceptance**:
   - A-7 (test) unit tests of Patient domain pass — `python -m pytest -q tests/test_domain_patient.py`
-  - A-8 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: aggregate:domain_patient
 
 ### WP-4 — Data protection (S)
@@ -1027,8 +1045,8 @@ Implement Data protection: Retention schedules, deletion and export requests for
 - **depends on**: WP-1, WP-2 · **satisfies**: R-10
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
-  - A-10 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
+  - A-8 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
+  - A-9 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: compliance_data
 
 ### WP-5 — Authentication + Scheduler (M)
@@ -1039,7 +1057,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2 · **satisfies**: R-3, R-4, R-5, R-7, R-14, R-15, R-16
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-11 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+  - A-10 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
 - **notes**: family: infra
 
 ### WP-6 — Notifier (S)
@@ -1050,7 +1068,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-2 · **satisfies**: R-3
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`
 - **acceptance**:
-  - A-12 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+  - A-11 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
 ### WP-7 — Search index (S)
@@ -1061,9 +1079,9 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-8, R-12
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
-  - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-14 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-15 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
+  - A-12 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
+  - A-13 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-14 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: search
 
 ### WP-8 — Domain core (L)
@@ -1071,11 +1089,11 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-6 · **implements**: I-6
-- **depends on**: WP-1, WP-2, WP-3, WP-6 · **satisfies**: R-7, R-9, R-13, R-21, R-22
+- **depends on**: WP-1, WP-2, WP-3, WP-6 · **satisfies**: R-1, R-7, R-9, R-13, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
-  - A-17 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-15 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-16 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
 - **notes**: family: crud_api
 
 ### WP-9 — Batch job (S)
@@ -1086,20 +1104,20 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-2, WP-5, WP-8 · **satisfies**: R-5, R-7, R-15
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-18 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-17 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-10 — Public HTTP API (L)
+### WP-10 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-3, WP-5, WP-7, WP-8 · **satisfies**: R-8, R-12, R-13, R-17, R-18
+- **depends on**: WP-2, WP-3, WP-5, WP-7, WP-8 · **satisfies**: R-1, R-8, R-12, R-13, R-17, R-18
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
-  - A-19 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-20 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-21 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
+  - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-19 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-20 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: crud_api
 
 ### WP-11 — Legacy system adapter (S)
@@ -1110,35 +1128,35 @@ Implement Legacy system adapter: Anti-corruption layer in front of the existing 
 - **depends on**: WP-8 · **satisfies**: R-7
 - **write scope**: `app/legacy_adapter.py`, `tests/test_legacy_adapter.py`
 - **acceptance**:
-  - A-22 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
+  - A-21 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
 - **notes**: family: legacy_integration
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-16 | WP-3 | A-7, A-8 |
-| R-2 | must | C-16 | WP-3 | A-7, A-8 |
-| R-3 | must | C-2, C-3, C-7, C-11, C-16 | WP-3, WP-5, WP-6 | A-7, A-8, A-11, A-12 |
-| R-4 | must | C-11, C-16 | WP-3, WP-5 | A-7, A-8, A-11 |
-| R-5 | must | C-11, C-12 | WP-5, WP-9 | A-11, A-18 |
+| R-1 | must | C-6, C-15 | WP-8, WP-10 | A-15, A-16, A-18, A-19, A-20 |
+| R-2 | must | C-16 | WP-3 | A-7 |
+| R-3 | must | C-2, C-3, C-7, C-11 | WP-5, WP-6 | A-10, A-11 |
+| R-4 | must | C-11 | WP-5 | A-10 |
+| R-5 | must | C-11, C-12 | WP-5, WP-9 | A-10, A-17 |
 | R-6 | must | C-4 | WP-1 | A-1, A-2 |
-| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-5, WP-8, WP-9, WP-11 | A-11, A-16, A-17, A-18, A-22 |
-| R-8 | must | C-10, C-15 | WP-7, WP-10 | A-13, A-14, A-15, A-19, A-20, A-21 |
-| R-9 | must | C-1, C-6 | WP-2, WP-8 | A-3, A-4, A-5, A-6, A-16, A-17 |
-| R-10 | must | C-1, C-4, C-14, C-16 | WP-1, WP-2, WP-3, WP-4 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10 |
+| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-5, WP-8, WP-9, WP-11 | A-10, A-15, A-16, A-17, A-21 |
+| R-8 | must | C-10, C-15 | WP-7, WP-10 | A-12, A-13, A-14, A-18, A-19, A-20 |
+| R-9 | must | C-1, C-6 | WP-2, WP-8 | A-3, A-4, A-5, A-6, A-15, A-16 |
+| R-10 | must | C-1, C-4, C-14 | WP-1, WP-2, WP-4 | A-1, A-2, A-3, A-4, A-5, A-6, A-8, A-9 |
 | R-11 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
-| R-12 | must | C-10, C-15 | WP-7, WP-10 | A-13, A-14, A-15, A-19, A-20, A-21 |
-| R-13 | must | C-1, C-6, C-15 | WP-2, WP-8, WP-10 | A-3, A-4, A-5, A-6, A-16, A-17, A-19, A-20, A-21 |
-| R-14 | must | C-9 | WP-5 | A-11 |
-| R-15 | must | C-11, C-12 | WP-5, WP-9 | A-11, A-18 |
-| R-16 | must | C-9 | WP-5 | A-11 |
-| R-17 | must | C-15 | WP-10 | A-19, A-20, A-21 |
-| R-18 | should | C-15 | WP-10 | A-19, A-20, A-21 |
+| R-12 | must | C-10, C-15 | WP-7, WP-10 | A-12, A-13, A-14, A-18, A-19, A-20 |
+| R-13 | must | C-1, C-6, C-15 | WP-2, WP-8, WP-10 | A-3, A-4, A-5, A-6, A-15, A-16, A-18, A-19, A-20 |
+| R-14 | must | C-9 | WP-5 | A-10 |
+| R-15 | must | C-11, C-12 | WP-5, WP-9 | A-10, A-17 |
+| R-16 | must | C-9 | WP-5 | A-10 |
+| R-17 | must | C-15 | WP-10 | A-18, A-19, A-20 |
+| R-18 | should | C-15 | WP-10 | A-18, A-19, A-20 |
 | R-19 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |
 | R-20 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
-| R-21 | must | C-6 | WP-8 | A-16, A-17 |
-| R-22 | must | C-6 | WP-8 | A-16, A-17 |
+| R-21 | must | C-6 | WP-8 | A-15, A-16 |
+| R-22 | must | C-6 | WP-8 | A-15, A-16 |
 
 ## Conventions
 

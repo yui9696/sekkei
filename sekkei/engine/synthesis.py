@@ -355,9 +355,35 @@ def _resource_for(obj: str, sentence: T.Sentence, dents: list) -> str:
     words = {DM.singular(w) for w in sentence.words}
     base = DM.singular(obj)
     for e in dents:
-        if e.name in words and e.name != base and (base in {f[0] for f in e.fields} or base.replace("-", "_") in {f[0] for f in e.fields} or (base in _ATTRIBUTE_WORDS and obj in _ATTRIBUTE_WORDS)):
-            return e.name
+        if e.name in words and e.name != base and (base in {f[0] for f in e.fields} or base.replace("-", "_") in {f[0] for f in e.fields} or (base in _ATTRIBUTE_WORDS and obj in _ATTRIBUTE_WORDS)
+                                                    or base in T.TECH_WORDS or base in T.NON_OBJECTS):
+            return e.name          # "upload PDF and Markdown documents": the resource is documents, PDF is a format
     return obj
+
+
+_BAD_RESOURCES = {"another", "anothers", "urgent", "urgents", "ask", "asks", "past", "pasts", "fail", "fails", "number", "numbers", "laptop", "laptops",
+                  "history", "histories", "ble", "bles", "full", "fulls", "previous", "matchs", "completes", "mobiles", "multiples", "cannots", "same",
+                  "own", "other", "others", "first", "last", "next", "new", "old", "current", "time", "times", "way", "ways", "case", "cases"}
+_res_text_cache: dict = {}
+
+
+def _resource_ok(obj: str, u: ReqUnit, dents: list, units: list[ReqUnit]) -> bool:
+    """A REST resource is a thing the text keeps: a domain entity, or a noun that occurs determined/plural somewhere and is not
+    an adjective, participle, person or technology word."""
+    base = DM.singular(obj)
+    if base in {e.name for e in dents}:
+        return True
+    if obj in _BAD_RESOURCES or base in _BAD_RESOURCES or base in T.TECH_WORDS or base.endswith(("ly", "ed", "ing")) or base in T.NON_OBJECTS:
+        return False
+    if base in T.ACTORS or obj in T.ACTORS or any(base == a.split()[-1] for a in u.sentence.actors):
+        return False
+    key = id(units)
+    if key not in _res_text_cache:
+        _res_text_cache.clear()
+        _res_text_cache[key] = " ".join(x.sentence.text for x in units).lower()
+    low = _res_text_cache[key]
+    return bool(re.search(r"\b(?:a|an|the|each|every|its|their|per|one|\d+)\s+(?:[a-z-]+\s+)?" + re.escape(base) + r"s?\b", low)
+                or re.search(r"\b" + re.escape(base) + r"(?:s|es)\b", low) and base + "s" != obj or obj.endswith("s") and low.count(obj) >= 2)
 
 
 def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = None) -> list[Operation]:
@@ -386,6 +412,8 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = N
             if not obj:
                 continue
             obj = _resource_for(obj, u.sentence, dents)
+            if surface_kind == "http" and not _resource_ok(obj, u, dents, units):
+                continue
             if surface_kind in ("http", "cli") and v in _INTERNAL_VERBS:
                 continue
             if surface_kind == "http" and v in _HTTP_ONLY_INTERNAL:
@@ -397,7 +425,7 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = N
                 plural_obj = obj.endswith("s") and not obj.endswith(("ss", "us", "is")) and len(obj) > 3
                 if iverb in ("get", "view", "check") and plural_obj:
                     iverb = "list"          # "see all returns", "view their orders": a listing, not one resource
-                if iverb in ("create", "register", "add", "publish", "submit", "upload", "send", "request", "book", "order", "reserve", "invite"):
+                if iverb in ("create", "register", "add", "publish", "submit", "upload", "send", "request", "book", "order", "reserve", "invite", "place", "enter", "raise", "open", "file", "log", "issue"):
                     name, inputs, out = f"POST /{coll}", [("body", f"{obj} fields")], f"201 {{{obj} id}}"
                     errs = ["400 invalid body", "401 unauthenticated", "409 conflict"]
                 elif iverb in ("list", "search", "query", "export"):
@@ -428,10 +456,10 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = N
 
 
 def _size_of(comps, d: Design, satisfies: list[str]) -> str:
-    """Package size from what it carries: operations to implement, entities to model, requirements to satisfy."""
+    """Package size from what it carries: operations to implement, entities to model, functional requirements to satisfy."""
     ops = sum(len(i.operations) for c in comps for i in d.provided_by(c.id))
     ents = sum(1 for e in d.entities if e.owner in {c.id for c in comps})
-    reqs = len(satisfies)
+    reqs = sum(1 for r in satisfies if (d.requirement(r) is not None and d.requirement(r).kind == "functional"))
     if ops >= 8 or reqs >= 8 or ents >= 3 or (ops >= 5 and reqs >= 5):
         return "L"
     if ops <= 3 and reqs <= 3 and ents <= 1:
@@ -590,8 +618,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
     dents = early_dents if "store" in cid else []
     agg_of_entity: dict[str, str] = {}      # entity name -> archetype key of its aggregate component
     for group in DM.aggregates(dents):
-        top = group[0]
-        if not top.kept or (top.score < 4 and len(group) < 2):
+        top = next((e for e in group if any(k == "has_many" for k, _, _ in e.relations)), group[0])   # the root owns the aggregate
+        if not (top.kept or any(e.kept for e in group)) or (top.score < 4 and len(group) < 2):
             continue
         key = "domain_" + re.sub(r"[^a-z0-9]+", "_", top.name)
         if key in cid:
@@ -602,7 +630,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         bits = []
         for e in group:
             if e.states:
-                bits.append(f"{e.display} state machine: " + " → ".join(e.states))
+                bits.append(f"{e.display} states: " + ", ".join(e.states) + ("; transitions " + ", ".join(f"{a}→{b}" for a, b, _ in e.edges) if e.edges else "; transitions not stated"))
             for txt, ev in e.invariants:
                 bits.append(f"invariant ({ev}): {txt}")
         responsibility = (f"Owns the {ents_txt} aggregate: creation, changes and state transitions of these records, and the rules that hold across them. "
@@ -612,14 +640,19 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         ops: list[Operation] = []
         seen_ops: set[str] = set()
         for e in group:
-            for verb, state, ev in e.transitions:
+            # states reached only through a prose sequence ("placed, then confirmed") get the verb that leads to them
+            state_to_verb = {st: v for v, st in DM.STATE_VERBS.items()}
+            extra = [(state_to_verb[b], b, ev) for a, b, ev in e.edges if b in state_to_verb and not any(t[1] == b for t in e.transitions)]
+            for verb, state, ev in e.transitions + list(dict.fromkeys(extra)):
                 if "→" in verb:
                     continue
                 opname = f"{verb}_{e.name}"
                 if opname not in seen_ops:
                     seen_ops.add(opname)
+                    froms = sorted({a for a, b, _ in e.edges if b == state})
+                    pre = ("status in (" + ", ".join(froms) + ")") if froms else "allowed source states not stated in the text"
                     ops.append(Operation(opname, [Param(f"{e.name}_id", "ref")], f"{e.display} (status = {state})",
-                                         ["NotFound", f"InvalidTransition (not allowed from the current status)"], post=f"status = {state}", description=f"from {ev}"))
+                                         ["NotFound", "InvalidTransition (source status not allowed)"], pre=pre, post=f"status = {state}", description=f"from {ev}"))
             if not any(o.name.startswith(("create_", "register_", "submit_")) and o.name.endswith(e.name) for o in ops):
                 opname = f"create_{e.name}"
                 if opname not in seen_ops:
@@ -645,13 +678,16 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                 if sc is not None and iface.id not in sc.requires:
                     sc.requires.append(iface.id)
                     requires.setdefault(sk, []).append(key)
-        # requirements that speak of the aggregate's entities are satisfied by it
+        # requirements whose evidence built the aggregate (the entity is created, changed, moved between states or constrained
+        # there) are satisfied by it — not every sentence that happens to contain the word
+        evid = {r for e in group for r in e.strong}
         for u in an.requirements:
             if u.sentence.assumed or u.kind == "constraint":
                 continue
-            words = {DM.singular(w) for w in u.sentence.words}
-            if any(e.name in words for e in group) and u.id not in comp.satisfies:
+            if u.id in evid and u.id not in comp.satisfies:
                 comp.satisfies.append(u.id)
+        if not comp.satisfies:
+            comp.satisfies = [r for e in group for r in e.evidence][:1]
         trace[comp.id] = {"sentences": sorted({u.sentence.index for u in functional_units if u.id in comp.satisfies}), "rules": [f"aggregate:{top.name}"]}
         trace[iface.id] = {"sentences": [], "rules": [f"aggregate:{top.name}"]}
 
@@ -666,7 +702,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             p = Placement(u.id, [target.id], "chosen in the interview", f"owner {target.name} named by the human")
         else:
             words = {DM.singular(w) for w in u.sentence.words}
-            agg = next((agg_of_entity[e] for e in agg_of_entity if e in words), None)
+            agg = next((agg_of_entity[e] for e in agg_of_entity if e in words and u.id in next(x.strong for x in dents if x.name == e)), None)
             if agg and agg in cid:
                 p = Placement(u.id, [cid[agg]], "aggregate", f"the sentence speaks of {[e for e in agg_of_entity if e in words][0]}, owned by {d.component(cid[agg]).name}")
             else:
@@ -724,7 +760,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                     if fn not in have:
                         tgt.fields.append(FieldDef(fn, ft, f"from {ev}"))
                 if de.states and "status" not in have:
-                    tgt.fields.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "state machine read from " + ", ".join(dict.fromkeys(r for _, _, r in de.transitions))))
+                    src = list(dict.fromkeys([r for _, _, r in de.edges] + [r for _, _, r in de.transitions])) or de.evidence[:3]
+                    tgt.fields.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "states read from " + ", ".join(src)))
                 for txt, ev in de.invariants:
                     tgt.description = (tgt.description.rstrip(".") + f". Invariant ({ev}): {txt}.").lstrip(". ")
                 continue
@@ -735,7 +772,9 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                 if kind == "belongs_to":
                     fds.append(FieldDef(f"{target}_id", "ref", f"belongs to one {target} ({ev})"))
             if de.states:
-                fds.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "state machine read from " + ", ".join(dict.fromkeys(r for _, _, r in de.transitions))))
+                src = list(dict.fromkeys([r for _, _, r in de.edges] + [r for _, _, r in de.transitions])) or de.evidence[:3]
+                trans = ("; transitions: " + ", ".join(f"{a}→{b}" for a, b, _ in de.edges)) if de.edges else "; transitions not stated in the text"
+                fds.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "states read from " + ", ".join(src) + trans))
             fds.append(FieldDef("created_at", "timestamp", ""))
             desc = f"Domain entity read from {', '.join(de.evidence[:6])}."
             if not de.fields:

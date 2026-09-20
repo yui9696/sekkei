@@ -102,7 +102,11 @@ VERBS = {
     "expose": ("GET", "expose"), "record": ("", "record"), "track": ("", "track"), "measure": ("", "measure"),
     "aggregate": ("", "aggregate"), "archive": ("", "archive"), "purge": ("DELETE", "purge"),
     "authenticate": ("", "authenticate"), "authorize": ("", "authorize"), "log": ("", "log"),
-    "enter": ("POST", "enter"), "join": ("POST", "join"), "leave": ("DELETE", "leave"), "form": ("", "form"), "place": ("", "place"),
+    "confirm": ("POST", "confirm"), "complete": ("POST", "complete"), "activate": ("POST", "activate"), "fail": ("", "fail"),
+    "fill": ("", "fill"), "reopen": ("POST", "reopen"), "start": ("POST", "start"), "stop": ("POST", "stop"), "expire": ("", "expire"),
+    "decline": ("POST", "decline"), "ship": ("POST", "ship"), "deliver": ("POST", "deliver"), "resolve": ("POST", "resolve"),
+    "mark": ("POST", "mark"), "depend": ("", "depend"), "block": ("", "block"), "scan": ("POST", "scan"), "transfer": ("POST", "transfer"),
+    "enter": ("POST", "enter"), "join": ("POST", "join"), "leave": ("DELETE", "leave"), "form": ("", "form"), "place": ("POST", "place"),
     "compare": ("", "compare"), "poll": ("GET", "poll"), "subscribe": ("POST", "subscribe"), "decide": ("", "decide"), "select": ("", "select"),
     "collect": ("", "collect"), "acquire": ("", "acquire"), "detect": ("", "detect"), "raise": ("", "raise"), "buffer": ("", "buffer"),
     "escalate": ("POST", "escalate"), "define": ("PUT", "define"), "replay": ("POST", "replay"), "book": ("POST", "book"), "halt": ("POST", "halt"),
@@ -451,8 +455,12 @@ def verb_of(word: str) -> str:
         cands.append(word[:-3] + "y")
     elif word.endswith("ed"):
         cands += [word[:-2], word[:-1]]
+        if len(word) > 4 and word[-3] == word[-4]:
+            cands.append(word[:-3])            # shipped -> ship, cancelled -> cancel, submitted -> submit
     if word.endswith("ing"):
         cands += [word[:-3], word[:-3] + "e"]
+        if len(word) > 5 and word[-4] == word[-5]:
+            cands.append(word[:-4])            # shipping -> ship
     for c in cands:
         if len(c) >= 3 and c in VERBS:
             return c
@@ -599,3 +607,13 @@ ENTITY_STOP = {"audit", "access", "data", "request", "requests", "log", "logs", 
                 "aws", "gcp", "azure", "docker", "python", "java", "kotlin", "go", "rust", "typescript", "previous", "next", "given", "then",
                 "platform", "platforms", "seller", "sellers", "share", "shares", "fee", "fees", "bps", "input", "inputs", "output", "outputs",
                 "credit", "credits", "account", "accounts", "tech", "player", "players", "hour", "hours", "week", "weeks", "month", "months", "year", "years"}
+
+#: technology and product names: never people, never domain entities
+TECH_WORDS = {"slack", "teams", "kafka", "redis", "postgres", "postgresql", "mysql", "clickhouse", "grafana", "kubernetes", "eks", "gke", "aws",
+               "azure", "gcp", "s3", "python", "go", "rust", "java", "kotlin", "typescript", "react", "vue", "angular", "node", "docker", "airflow",
+               "bigquery", "snowflake", "elasticsearch", "opensearch", "rabbitmq", "sqs", "pagerduty", "opentelemetry", "prometheus", "linux",
+               "windows", "macos", "ios", "android", "sftp", "ftp", "smtp", "http", "https", "grpc", "rest", "graphql", "json", "csv", "xml", "pdf",
+               "yaml", "sql", "nosql", "oidc", "oauth", "saml", "scim", "jwt", "tls", "ssl", "vpn", "cdn", "api", "sdk", "cli", "ui", "ux",
+               "pos", "erp", "crm", "hr", "kms", "hsm", "pain", "chain", "sepa", "iban", "swift", "fix", "murex", "guidewire", "netsuite", "workday",
+               "medidata", "rave", "cosign", "pgp", "ed25519", "aes", "hmac", "sha", "md5", "base64", "utf", "ascii", "unicode"}
+

@@ -48,7 +48,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **50 person-days**; critical path **35 days**; with a team of 4: **about 35 working days** (7 weeks).
+- Total effort: **42 person-days**; critical path **27 days**; with a team of 4: **about 30 working days** (6 weeks).
 - Wave 1: WP-1, WP-2
 - Wave 2: WP-3, WP-4, WP-5, WP-6
 - Wave 3: WP-7
@@ -104,11 +104,11 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 5b. Domain model read from the text
 
-Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.
 
 | entity | fields (type) | relations | states | invariants | from |
 |---|---|---|---|---|---|
-| Trip | — | — | active | — | R-5 |
+| Trip | — | — | active; transitions not stated | — | R-5 |
 | Ride | — | — | — | — | R-1 |
 
 ## 6. How the text was read
@@ -126,7 +126,7 @@ Entities with the fields, relations, state machines and invariants the sentences
 | R-5 | functional | must | **none** | operability | — |
 | R-6 | functional | must | **none** | performance, operability | — |
 | R-7 | nonfunctional | must | — | consistency, performance | p95 latency at 300, 2,000 <= 2 s |
-| R-8 | nonfunctional | should | — | durability | occurrences of the forbidden action (request) = 0 occurrences |
+| R-8 | nonfunctional | should | — | durability | occurrences of the forbidden action (request, complete) = 0 occurrences |
 | R-9 | nonfunctional | should | — | — | time 30 days |
 | R-10 | constraint | must | geo | simplicity | — |
 | R-11 | constraint | must | auth | security | — |

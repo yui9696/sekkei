@@ -467,8 +467,7 @@
         "I-1"
       ],
       "satisfies": [
-        "R-1",
-        "R-5"
+        "R-1"
       ],
       "tags": [
         "layer:1",
@@ -1240,50 +1239,6 @@
           "pre": "",
           "post": "",
           "description": "from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API."
-        },
-        {
-          "name": "GET /stocks",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [stock], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-3: Managers can export stock list CSV."
-        },
-        {
-          "name": "GET /skus",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [sku], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-4: Users can search stock SKU warehouses."
         }
       ],
       "stability": "draft",
@@ -2455,8 +2410,7 @@
         "WP-2"
       ],
       "satisfies": [
-        "R-1",
-        "R-5"
+        "R-1"
       ],
       "files": [
         "src/domain_item.ts",
@@ -2470,13 +2424,6 @@
           "kind": "test",
           "command": "npx vitest run tests/domain_item.test.ts",
           "metric": ""
-        },
-        {
-          "id": "A-7",
-          "description": "R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-5"
         }
       ],
       "notes": "family: aggregate:domain_item"
@@ -2510,7 +2457,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-7",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "npx vitest run tests/auth.test.ts tests/scheduler.test.ts",
@@ -2542,7 +2489,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-8",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "npx vitest run tests/notifier.test.ts",
@@ -2576,14 +2523,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-9",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "npx vitest run tests/search.test.ts",
           "metric": ""
         },
         {
-          "id": "A-11",
+          "id": "A-10",
           "description": "R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -2620,17 +2567,17 @@
         "src/core.ts",
         "tests/core.test.ts"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-11",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "npx vitest run tests/core.test.ts",
           "metric": ""
         },
         {
-          "id": "A-13",
+          "id": "A-12",
           "description": "R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
@@ -2663,14 +2610,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-14",
+          "id": "A-13",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "npx vitest run tests/exporter.test.ts",
           "metric": ""
         },
         {
-          "id": "A-15",
+          "id": "A-14",
           "description": "R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
@@ -2705,7 +2652,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-15",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "npx vitest run tests/batch.test.ts",
@@ -2744,17 +2691,17 @@
         "src/surface_api.ts",
         "tests/surface_api.test.ts"
       ],
-      "size": "L",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-16",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "npx vitest run tests/surface_api.test.ts",
           "metric": ""
         },
         {
-          "id": "A-18",
+          "id": "A-17",
           "description": "R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

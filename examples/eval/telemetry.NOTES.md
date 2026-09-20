@@ -24,8 +24,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-2 | C-16 Reading domain | aggregate | the sentence speaks of reading, owned by Reading domain |
-| R-3 | C-16 Reading domain | aggregate | the sentence speaks of reading, owned by Reading domain |
+| R-2 | C-17 Readings processor | synthesised | new component Readings processor (processor) from verb 'validate' and object 'readings' |
+| R-3 | C-14 Public HTTP API, C-7 Domain core | surface+core | human actor 'fleet manager': a use case |
 
 ## 2. Capacity estimates
 
@@ -42,12 +42,12 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **46 person-days**; critical path **32 days**; with a team of 5: **about 32 working days** (7 weeks).
+- Total effort: **39 person-days**; critical path **26 days**; with a team of 5: **about 29 working days** (6 weeks).
 - Wave 1: WP-1
-- Wave 2: WP-2, WP-3, WP-4
-- Wave 3: WP-5
-- Wave 4: WP-6, WP-7
-- Wave 5: WP-8, WP-9
+- Wave 2: WP-2, WP-3, WP-4, WP-5
+- Wave 3: WP-6
+- Wave 4: WP-7, WP-8
+- Wave 5: WP-10, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 5; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -104,11 +104,11 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 5b. Domain model read from the text
 
-Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.
 
 | entity | fields (type) | relations | states | invariants | from |
 |---|---|---|---|---|---|
-| Reading | speed (str), fuel_level (int), engine_temperature (str), position (address) | — | published | durability: no reading lost | R-1, R-2 |
+| Reading | speed (str), fuel_level (int), engine_temperature (str), position (address) | — | published; transitions not stated | durability: no reading lost | R-1, R-2 |
 
 ## 6. How the text was read
 

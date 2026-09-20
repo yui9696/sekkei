@@ -55,7 +55,8 @@ def test_aggregates_become_components_with_transitions_and_own_packages():
     wps = {w.title: w.size for w in r.design.work_packages}
     assert "Order domain" in wps and wps["Order domain"] in ("M", "L")
     assert not any(c.name.endswith(("processor", "controller")) and c.name.split()[0] in ("Precision", "Officer") for c in r.design.components)
-    assert all(p.how == "aggregate" for p in r.placements if p.requirement in ("R-1", "R-2", "R-4"))
+    assert all(p.how == "aggregate" for p in r.placements if p.requirement in ("R-1", "R-3", "R-5"))
+    assert all(p.how == "core rule" for p in r.placements if p.requirement in ("R-15", "R-16"))   # precision, risk officer: no "X processor"
 
 
 def test_resources_follow_the_entity_not_the_attribute():
@@ -70,3 +71,40 @@ def test_sizes_follow_scope():
     r = design((EX / "real2/01_confluence_trading.md").read_text(encoding="utf-8"))
     sizes = {w.size for w in r.design.work_packages}
     assert "L" in sizes and "S" in sizes
+
+
+def test_prose_state_machine_and_negated_rules():                       # red team 5
+    e = _ents("real5/A_orders.md")
+    order = e["order"]
+    assert {"placed", "confirmed", "shipped", "cancelled", "declined", "expired"} <= set(order.states)
+    edges = {(a, b) for a, b, _ in order.edges}
+    assert ("placed", "confirmed") in edges and ("confirmed", "shipped") in edges and ("placed", "declined") in edges
+    assert {"delivery_address", "delivery_slot"} <= {f[0] for f in order.fields}
+    inv = " | ".join(t for t, _ in order.invariants)
+    assert "cancel is not allowed once shipped" in inv and "immutable once shipped" in inv
+    assert "used" not in e
+
+
+def test_has_lists_relations_and_actor_entities():
+    e = _ents("real5/B_projects.md")
+    assert {"due_date", "estimate", "priority"} <= {f[0] for f in e["task"].fields}
+    assert {"display_name", "email_address", "time_zone"} <= {f[0] for f in e["member"].fields}
+    assert ("belongs_to", "project") in {(k, t) for k, t, _ in e["task"].relations}
+    assert ("has_many", "task") in {(k, t) for k, t, _ in e["project"].relations}
+    assert not any("uniqueness" in t for t, _ in e["task"].invariants)
+
+
+def test_tech_names_are_not_people_or_entities():
+    from sekkei.engine import structure as S
+    c = S.Canonical("")
+    assert not S._team_line("Team of 5, Go, Kafka and ClickHouse already run on the EKS cluster.", c).startswith("Team of 2")
+    e = _ents("real5/D_techy.md")
+    assert "span" in e and {"trace_id", "service_name", "duration", "status"} <= {f[0] for f in e["span"].fields}
+    assert not {"slack", "kafka", "grafana", "acme", "globex"} & set(e)
+
+
+def test_arrow_alternatives_keep_every_state():
+    e = _ents("real3/02_prd_petclaims.md")
+    claim = e["claim"]
+    assert {"submitted", "adjudicating", "approved", "held", "rejected", "paid"} <= set(claim.states)
+    assert ("adjudicating", "held") in {(a, b) for a, b, _ in claim.edges}

@@ -800,6 +800,24 @@
           "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
         },
         {
+          "name": "confirm_link",
+          "inputs": [
+            {
+              "name": "link",
+              "type": "Link | id",
+              "description": ""
+            }
+          ],
+          "output": "Link | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
+        },
+        {
           "name": "export_subscriber",
           "inputs": [
             {
@@ -1264,26 +1282,23 @@
           "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
         },
         {
-          "name": "GET /subscribers",
+          "name": "POST /links/{id}/confirm",
           "inputs": [
             {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
+              "name": "id",
+              "type": "str",
               "description": ""
             }
           ],
-          "output": "200 [subscriber], next cursor",
+          "output": "202 confirm accepted",
           "errors": [
-            "401 unauthenticated"
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
           ],
           "pre": "",
           "post": "",
-          "description": "from R-2: Admins can export the subscriber list as CSV."
+          "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
         }
       ],
       "stability": "draft",
@@ -2888,7 +2903,7 @@
         "app/core.py",
         "tests/test_core.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-7",
@@ -2927,7 +2942,7 @@
         "app/worker.py",
         "tests/test_worker.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-8",
@@ -3041,7 +3056,7 @@
         "app/surface_api.py",
         "tests/test_surface_api.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-12",

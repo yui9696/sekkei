@@ -733,7 +733,7 @@ def _resolve_i(body: str, actor: str) -> str:
 
 def _team_line(body: str, can: Canonical) -> str:
     """'Team: 5 engineers, 1 SRE' / 'Team of 4 backend + 2 mobile' / 'team: Bo + Chen' -> a 'Team of N' the engine reads."""
-    if re.search(r"\bteam of \d+\.", body, re.I):
+    if re.search(r"\bteam of \d+\s*(?:[.,;)(]|$)", body, re.I):
         return body
     m = re.match(r"^(?:team|チーム|体制|members?|staffing)\s*(?:is|are|=|:|：)?\s*(?P<rest>.+)$", body, re.I) or re.search(r"\bteam of (?P<rest>\d+[^.。]*?\+[^.。]*)", body, re.I) \
         or re.search(r"\bteam\s*(?:is|=|:|：)\s*(?P<rest>\d[^.。]*)", body, re.I)
@@ -749,8 +749,10 @@ def _team_line(body: str, can: Canonical) -> str:
         can.notes.append(f"team size {n} read from '{rest.strip()[:40]}'")
         return f"Team of {n}. " + body
     head = re.sub(r"\b(?:half|full|part)[- ]time\b|\(.*?\)", "", rest)
-    names = [x.strip() for x in re.split(r"\s*(?:\+|,|、|/| and | & )\s*", head) if x.strip() and len(x.strip().split()) <= 2 and re.match(r"[A-Z][a-z]+", x.strip())]
-    if len(names) >= 1 and all(re.fullmatch(r"[A-Z][a-z]+(?: [A-Z][a-z]+)?", x) for x in names):
+    from .text import TECH_WORDS as _TECH_WORDS
+    names = [x.strip() for x in re.split(r"\s*(?:\+|,|、|/| and | & )\s*", head) if x.strip() and len(x.strip().split()) <= 2 and re.match(r"[A-Z][a-z]+", x.strip())
+             and x.strip().lower() not in _TECH_WORDS and not re.search(r"\b(?:already|run|runs|cluster|server|stack|platform)\b", x, re.I)]
+    if len(names) >= 2 and all(re.fullmatch(r"[A-Z][a-z]+(?: [A-Z][a-z]+)?", x) for x in names) and not re.search(r"\d", head):
         can.notes.append(f"team size {len(names)} read from the names")
         return f"Team of {len(names)} ({', '.join(names)}). " + body
     return body

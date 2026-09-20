@@ -1647,25 +1647,6 @@
       "kind": "http",
       "operations": [
         {
-          "name": "POST /applications",
-          "inputs": [
-            {
-              "name": "body",
-              "type": "application fields",
-              "description": ""
-            }
-          ],
-          "output": "201 {application id}",
-          "errors": [
-            "400 invalid body",
-            "401 unauthenticated",
-            "409 conflict"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-1: Applicants can create an application (amount, term, income, employment), upload identity d"
-        },
-        {
           "name": "POST /documents",
           "inputs": [
             {
@@ -1753,25 +1734,6 @@
           "errors": [
             "401 unauthenticated",
             "404 unknown id"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-7: Applicants can download a copy of their data and request deletion after the retention peri"
-        },
-        {
-          "name": "POST /deletions",
-          "inputs": [
-            {
-              "name": "body",
-              "type": "deletion fields",
-              "description": ""
-            }
-          ],
-          "output": "201 {deletion id}",
-          "errors": [
-            "400 invalid body",
-            "401 unauthenticated",
-            "409 conflict"
           ],
           "pre": "",
           "post": "",
@@ -2019,7 +1981,7 @@
         {
           "name": "status",
           "type": "enum(approved)",
-          "constraints": "state machine read from R-5",
+          "constraints": "states read from R-5; transitions not stated in the text",
           "description": ""
         },
         {

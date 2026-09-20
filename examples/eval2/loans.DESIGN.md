@@ -477,8 +477,6 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `POST /applications` | `body`: application fields | 201 {application id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
-| | from R-1: Applicants can create an application (amount, term, income, employment), upload identity d | | | |
 | `POST /documents` | `body`: documents fields | 201 {documents id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-1: Applicants can create an application (amount, term, income, employment), upload identity d | | | |
 | `GET /status/{id}` | `id`: str | 200 status | 401 unauthenticated, 404 unknown id | — |
@@ -488,8 +486,6 @@ graph LR
 | `POST /reasons/{id}/reject` | `id`: str | 202 reject accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 2 business days (R-4) |
 | | from R-4: Underwriters review borderline applications in a queue, request more documents, and approv | | | |
 | `GET /copies/{id}` | `id`: str | 200 copy | 401 unauthenticated, 404 unknown id | — |
-| | from R-7: Applicants can download a copy of their data and request deletion after the retention peri | | | |
-| `POST /deletions` | `body`: deletion fields | 201 {deletion id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-7: Applicants can download a copy of their data and request deletion after the retention peri | | | |
 
 ## Entities
@@ -560,7 +556,7 @@ Domain entity read from R-5. No fields are stated in the text beyond its name; a
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `status` | enum(approved) | state machine read from R-5 |
+| `status` | enum(approved) | states read from R-5; transitions not stated in the text |
 | `created_at` | timestamp |  |
 
 ## Flows

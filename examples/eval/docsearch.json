@@ -286,6 +286,8 @@
         "I-16"
       ],
       "satisfies": [
+        "R-1",
+        "R-10",
         "R-2",
         "R-3",
         "R-5",
@@ -493,6 +495,8 @@
         "I-16"
       ],
       "satisfies": [
+        "R-1",
+        "R-10",
         "R-8",
         "R-9",
         "R-17",
@@ -513,12 +517,7 @@
         "I-1"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
-        "R-4",
-        "R-6",
-        "R-8",
-        "R-10"
+        "R-2"
       ],
       "tags": [
         "layer:1",
@@ -735,15 +734,15 @@
           "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
         },
         {
-          "name": "upload_pdf",
+          "name": "upload_document",
           "inputs": [
             {
-              "name": "pdf",
-              "type": "Pdf | id",
+              "name": "document",
+              "type": "Document | id",
               "description": ""
             }
           ],
-          "output": "Pdf | None",
+          "output": "Document | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1413,38 +1412,19 @@
           "description": "from R-1: Employees must find internal documents quickly and get a short summary without opening the"
         },
         {
-          "name": "POST /pdfs",
+          "name": "POST /documents",
           "inputs": [
             {
               "name": "body",
-              "type": "pdf fields",
+              "type": "document fields",
               "description": ""
             }
           ],
-          "output": "201 {pdf id}",
+          "output": "201 {document id}",
           "errors": [
             "400 invalid body",
             "401 unauthenticated",
             "409 conflict"
-          ],
-          "pre": "stated values: 20 MB (R-2)",
-          "post": "",
-          "description": "from R-2: Employees upload PDF and Markdown documents (up to 20 MB) and tag them with a team."
-        },
-        {
-          "name": "POST /teams/{id}/tag",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 tag accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
           ],
           "pre": "stated values: 20 MB (R-2)",
           "post": "",
@@ -1740,7 +1720,7 @@
         {
           "name": "status",
           "type": "enum(acknowledged)",
-          "constraints": "state machine read from R-9",
+          "constraints": "states read from R-9; transitions not stated in the text",
           "description": ""
         },
         {
@@ -2876,18 +2856,13 @@
         "WP-2"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
-        "R-4",
-        "R-6",
-        "R-8",
-        "R-10"
+        "R-2"
       ],
       "files": [
         "app/domain_document.py",
         "tests/test_domain_document.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-10",
@@ -2895,13 +2870,6 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_domain_document.py",
           "metric": ""
-        },
-        {
-          "id": "A-11",
-          "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
         }
       ],
       "notes": "family: aggregate:domain_document"
@@ -2936,7 +2904,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-11",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
@@ -2968,7 +2936,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-12",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -3000,7 +2968,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-14",
+          "id": "A-13",
           "description": "unit tests of Reporting pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_reporting.py",
@@ -3037,21 +3005,21 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-14",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_search.py",
           "metric": ""
         },
         {
-          "id": "A-16",
+          "id": "A-15",
           "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-17",
+          "id": "A-16",
           "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -3079,9 +3047,11 @@
         "WP-7"
       ],
       "satisfies": [
+        "R-1",
         "R-2",
         "R-3",
         "R-5",
+        "R-10",
         "R-11",
         "R-12",
         "R-21",
@@ -3094,7 +3064,7 @@
       "size": "L",
       "acceptance": [
         {
-          "id": "A-18",
+          "id": "A-17",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -3129,7 +3099,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-18",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_batch.py",
@@ -3156,8 +3126,10 @@
         "WP-10"
       ],
       "satisfies": [
+        "R-1",
         "R-8",
         "R-9",
+        "R-10",
         "R-17",
         "R-20"
       ],
@@ -3168,21 +3140,21 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-20",
+          "id": "A-19",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_surface_api.py",
           "metric": ""
         },
         {
-          "id": "A-21",
+          "id": "A-20",
           "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-22",
+          "id": "A-21",
           "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

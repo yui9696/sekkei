@@ -500,22 +500,19 @@
     },
     {
       "id": "C-15",
-      "name": "Course domain",
-      "responsibility": "Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.",
+      "name": "Grade domain",
+      "responsibility": "Owns the Grade aggregate: creation, changes and state transitions of these records, and the rules that hold across them. invariant (R-6): retention: grade. Read from R-3.",
       "kind": "module",
-      "path": "src/domain_course.ts",
+      "path": "src/domain_grade.ts",
       "requires": [
         "I-1"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
-        "R-6",
-        "R-10"
+        "R-6"
       ],
       "tags": [
         "layer:1",
-        "archetype:domain_course",
+        "archetype:domain_grade",
         "aggregate"
       ]
     }
@@ -1481,44 +1478,6 @@
           "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "POST /positions/{id}/save",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 save accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
-        },
-        {
-          "name": "POST /positions/{id}/resume",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 resume accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
-        },
-        {
           "name": "GET /grades",
           "inputs": [
             {
@@ -1568,55 +1527,37 @@
     },
     {
       "id": "I-15",
-      "name": "Course domain interface",
+      "name": "Grade domain interface",
       "owner": "C-15",
       "kind": "module",
       "operations": [
         {
-          "name": "unpublish_course",
+          "name": "create_grade",
           "inputs": [
             {
-              "name": "course_id",
-              "type": "ref",
+              "name": "grade",
+              "type": "Grade",
               "description": ""
             }
           ],
-          "output": "Course (status = unpublished)",
-          "errors": [
-            "NotFound",
-            "InvalidTransition (not allowed from the current status)"
-          ],
-          "pre": "",
-          "post": "status = unpublished",
-          "description": "from R-1"
-        },
-        {
-          "name": "create_course",
-          "inputs": [
-            {
-              "name": "course",
-              "type": "Course",
-              "description": ""
-            }
-          ],
-          "output": "Course (id assigned)",
+          "output": "Grade (id assigned)",
           "errors": [
             "ValidationError listing every invalid field"
           ],
           "pre": "",
-          "post": "retention: course",
+          "post": "retention: grade",
           "description": "creation of the aggregate root"
         },
         {
-          "name": "get_course",
+          "name": "get_grade",
           "inputs": [
             {
-              "name": "course_id",
+              "name": "grade_id",
               "type": "ref",
               "description": ""
             }
           ],
-          "output": "Course | None",
+          "output": "Grade | None",
           "errors": [],
           "pre": "",
           "post": "",
@@ -1624,7 +1565,7 @@
         }
       ],
       "stability": "draft",
-      "description": "Provided by Course domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
+      "description": "Provided by Grade domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
@@ -1727,7 +1668,7 @@
     {
       "id": "E-4",
       "name": "Course",
-      "owner": "C-15",
+      "owner": "C-1",
       "fields": [
         {
           "name": "id",
@@ -1738,7 +1679,7 @@
         {
           "name": "status",
           "type": "enum(unpublished)",
-          "constraints": "state machine read from R-1",
+          "constraints": "states read from R-1; transitions not stated in the text",
           "description": ""
         },
         {
@@ -1748,10 +1689,30 @@
           "description": ""
         }
       ],
-      "description": "Domain entity read from R-1. No fields are stated in the text beyond its name; add them. Invariant (R-6): retention: course."
+      "description": "Domain entity read from R-1. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-5",
+      "name": "Grade",
+      "owner": "C-15",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity read from R-3. No fields are stated in the text beyond its name; add them. Invariant (R-6): retention: grade."
+    },
+    {
+      "id": "E-6",
       "name": "Video",
       "owner": "C-1",
       "fields": [
@@ -1764,7 +1725,7 @@
         {
           "name": "status",
           "type": "enum(resumed)",
-          "constraints": "state machine read from R-2",
+          "constraints": "states read from R-2; transitions not stated in the text",
           "description": ""
         },
         {
@@ -1775,26 +1736,6 @@
         }
       ],
       "description": "Domain entity read from R-2. No fields are stated in the text beyond its name; add them."
-    },
-    {
-      "id": "E-6",
-      "name": "Grade",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity read from R-3. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-7",
@@ -2709,7 +2650,7 @@
         "src/files.ts",
         "tests/files.test.ts"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-2",
@@ -2813,8 +2754,8 @@
     },
     {
       "id": "WP-5",
-      "title": "Course domain",
-      "goal": "Implement Course domain: Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.",
+      "title": "Grade domain",
+      "goal": "Implement Grade domain: Owns the Grade aggregate: creation, changes and state transitions of these records, and the rules that hold across them. invariant (R-6): retention: grade. Read from R-3.",
       "components": [
         "C-15"
       ],
@@ -2825,33 +2766,23 @@
         "WP-4"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
-        "R-6",
-        "R-10"
+        "R-6"
       ],
       "files": [
-        "src/domain_course.ts",
-        "tests/domain_course.test.ts"
+        "src/domain_grade.ts",
+        "tests/domain_grade.test.ts"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-8",
-          "description": "unit tests of Course domain pass",
+          "description": "unit tests of Grade domain pass",
           "kind": "test",
-          "command": "npx vitest run tests/domain_course.test.ts",
+          "command": "npx vitest run tests/domain_grade.test.ts",
           "metric": ""
-        },
-        {
-          "id": "A-9",
-          "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-10"
         }
       ],
-      "notes": "family: aggregate:domain_course"
+      "notes": "family: aggregate:domain_grade"
     },
     {
       "id": "WP-6",
@@ -2882,7 +2813,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-9",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "npx vitest run tests/auth.test.ts tests/scheduler.test.ts",
@@ -2915,7 +2846,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-10",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "npx vitest run tests/notifier.test.ts",
@@ -2947,24 +2878,24 @@
         "src/search.ts",
         "tests/search.test.ts"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-11",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "npx vitest run tests/search.test.ts",
           "metric": ""
         },
         {
-          "id": "A-13",
+          "id": "A-12",
           "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-14",
+          "id": "A-13",
           "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -3006,14 +2937,14 @@
       "size": "L",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-14",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "npx vitest run tests/core.test.ts",
           "metric": ""
         },
         {
-          "id": "A-16",
+          "id": "A-15",
           "description": "R-11: occurrences of the forbidden action (record) = 0 occurrences",
           "kind": "metric",
           "command": "",
@@ -3046,14 +2977,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-16",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "npx vitest run tests/exporter.test.ts",
           "metric": ""
         },
         {
-          "id": "A-18",
+          "id": "A-17",
           "description": "R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
@@ -3093,24 +3024,24 @@
         "src/surface_api.ts",
         "tests/surface_api.test.ts"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-18",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "npx vitest run tests/surface_api.test.ts",
           "metric": ""
         },
         {
-          "id": "A-20",
+          "id": "A-19",
           "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-21",
+          "id": "A-20",
           "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

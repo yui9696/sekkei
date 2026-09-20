@@ -98,8 +98,10 @@ class Notes:
         s.append(rv.replace("\n## ", "\n### ").lstrip("\n"))
         if self.domain_md:
             s.append("## 5b. Domain model read from the text\n")
-            s.append("Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); "
-                     "each aggregate is a component. Dispute any row by its requirement ids.\n")
+            s.append("Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. "
+                     "It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and "
+                     "state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a "
+                     "field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.\n")
             s.append(self.domain_md)
         if self.analysis_md:
             s.append("## 6. How the text was read\n")

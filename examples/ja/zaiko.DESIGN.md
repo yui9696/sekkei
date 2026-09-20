@@ -189,7 +189,7 @@ graph LR
 - **responsibility**: Owns the Item aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-1.
 - **provides**: I-13
 - **requires**: I-1
-- **satisfies**: R-1, R-5
+- **satisfies**: R-1
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -339,10 +339,6 @@ graph LR
 | | from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API. | | | |
 | `DELETE /items/{id}` | `id`: str | 204 | 401 unauthenticated, 404 unknown id | — |
 | | from R-1: Staff can add, move and delete stock items (SKU, quantity, warehouses, bins) REST API. | | | |
-| `GET /stocks` | `filter`: query, `page`: cursor | 200 [stock], next cursor | 401 unauthenticated | — |
-| | from R-3: Managers can export stock list CSV. | | | |
-| `GET /skus` | `filter`: query, `page`: cursor | 200 [sku], next cursor | 401 unauthenticated | — |
-| | from R-4: Users can search stock SKU warehouses. | | | |
 
 ### I-13 — Item domain interface
 
@@ -794,10 +790,10 @@ graph LR
   WP_4["WP-4 Authentication + Scheduler (M)"]
   WP_5["WP-5 Notifier (S)"]
   WP_6["WP-6 Search index (S)"]
-  WP_7["WP-7 Domain core (L)"]
+  WP_7["WP-7 Domain core (M)"]
   WP_8["WP-8 Import/export (S)"]
   WP_9["WP-9 Batch job (S)"]
-  WP_10["WP-10 Public HTTP API (L)"]
+  WP_10["WP-10 Public HTTP API (S)"]
   WP_2 --> WP_3
   WP_2 --> WP_4
   WP_2 --> WP_5
@@ -827,7 +823,7 @@ graph LR
 4. WP-8
 5. WP-10, WP-9
 
-_Critical path (34 person-days):_ WP-2 → WP-5 → WP-7 → WP-8 → WP-10
+_Critical path (21 person-days):_ WP-2 → WP-5 → WP-7 → WP-8 → WP-9
 
 ### WP-1 — Audit log (S)
 
@@ -859,11 +855,10 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 Implement Item domain: Owns the Item aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-1.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-2 · **satisfies**: R-1, R-5
+- **depends on**: WP-2 · **satisfies**: R-1
 - **write scope**: `src/domain_item.ts`, `tests/domain_item.test.ts`
 - **acceptance**:
   - A-6 (test) unit tests of Item domain pass — `npx vitest run tests/domain_item.test.ts`
-  - A-7 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
 - **notes**: family: aggregate:domain_item
 
 ### WP-4 — Authentication + Scheduler (M)
@@ -874,7 +869,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2 · **satisfies**: R-11, R-13, R-20
 - **write scope**: `src/auth.ts`, `tests/auth.test.ts`, `src/scheduler.ts`, `tests/scheduler.test.ts`
 - **acceptance**:
-  - A-8 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
+  - A-7 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
 - **notes**: family: infra
 
 ### WP-5 — Notifier (S)
@@ -885,7 +880,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-2 · **satisfies**: R-2
 - **write scope**: `src/notifier.ts`, `tests/notifier.test.ts`
 - **acceptance**:
-  - A-9 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
+  - A-8 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
 - **notes**: family: notification
 
 ### WP-6 — Search index (S)
@@ -896,11 +891,11 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-4, R-5, R-14
 - **write scope**: `src/search.ts`, `tests/search.test.ts`
 - **acceptance**:
-  - A-10 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
-  - A-11 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
+  - A-9 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
+  - A-10 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
 - **notes**: family: search
 
-### WP-7 — Domain core (L)
+### WP-7 — Domain core (M)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
@@ -908,8 +903,8 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-6, R-9, R-19, R-21
 - **write scope**: `src/core.ts`, `tests/core.test.ts`
 - **acceptance**:
-  - A-12 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
-  - A-13 (metric) R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-6
+  - A-11 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
+  - A-12 (metric) R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-6
 - **notes**: family: crud_api
 
 ### WP-8 — Import/export (S)
@@ -920,8 +915,8 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-7 · **satisfies**: R-3, R-8
 - **write scope**: `src/exporter.ts`, `tests/exporter.test.ts`
 - **acceptance**:
-  - A-14 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
-  - A-15 (metric) R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-8
+  - A-13 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-14 (metric) R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-8
 - **notes**: family: import_export
 
 ### WP-9 — Batch job (S)
@@ -932,10 +927,10 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-2, WP-4, WP-7, WP-8 · **satisfies**: R-11
 - **write scope**: `src/batch.ts`, `tests/batch.test.ts`
 - **acceptance**:
-  - A-16 (test) unit tests of Batch job pass — `npx vitest run tests/batch.test.ts`
+  - A-15 (test) unit tests of Batch job pass — `npx vitest run tests/batch.test.ts`
 - **notes**: family: batch_pipeline
 
-### WP-10 — Public HTTP API (L)
+### WP-10 — Public HTTP API (S)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
@@ -943,35 +938,35 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-2, WP-3, WP-4, WP-6, WP-7, WP-8 · **satisfies**: R-1, R-5, R-10, R-14, R-15, R-16
 - **write scope**: `src/surface_api.ts`, `tests/surface_api.test.ts`
 - **acceptance**:
-  - A-17 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
-  - A-18 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
+  - A-16 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
+  - A-17 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-12, C-13 | WP-3, WP-7, WP-10 | A-6, A-7, A-12, A-13, A-17, A-18 |
-| R-2 | must | C-2, C-5 | WP-5 | A-9 |
-| R-3 | must | C-4, C-9 | WP-7, WP-8 | A-12, A-13, A-14, A-15 |
-| R-4 | must | C-8 | WP-6 | A-10, A-11 |
-| R-5 | must | C-8, C-12, C-13 | WP-3, WP-6, WP-10 | A-6, A-7, A-10, A-11, A-17, A-18 |
-| R-6 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-12, A-13 |
+| R-1 | must | C-4, C-12, C-13 | WP-3, WP-7, WP-10 | A-6, A-11, A-12, A-16, A-17 |
+| R-2 | must | C-2, C-5 | WP-5 | A-8 |
+| R-3 | must | C-4, C-9 | WP-7, WP-8 | A-11, A-12, A-13, A-14 |
+| R-4 | must | C-8 | WP-6 | A-9, A-10 |
+| R-5 | must | C-8, C-12 | WP-6, WP-10 | A-9, A-10, A-16, A-17 |
+| R-6 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-11, A-12 |
 | R-7 | must | C-6 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-8 | must | C-6, C-9 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-14, A-15 |
-| R-9 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-12, A-13 |
-| R-10 | must | C-12 | WP-10 | A-17, A-18 |
-| R-11 | must | C-10, C-11 | WP-4, WP-9 | A-8, A-16 |
+| R-8 | must | C-6, C-9 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-13, A-14 |
+| R-9 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-11, A-12 |
+| R-10 | must | C-12 | WP-10 | A-16, A-17 |
+| R-11 | must | C-10, C-11 | WP-4, WP-9 | A-7, A-15 |
 | R-12 | must | C-3 | WP-1 | A-1 |
-| R-13 | must | C-7 | WP-4 | A-8 |
-| R-14 | must | C-8, C-12 | WP-6, WP-10 | A-10, A-11, A-17, A-18 |
-| R-15 | must | C-12 | WP-10 | A-17, A-18 |
-| R-16 | should | C-12 | WP-10 | A-17, A-18 |
+| R-13 | must | C-7 | WP-4 | A-7 |
+| R-14 | must | C-8, C-12 | WP-6, WP-10 | A-9, A-10, A-16, A-17 |
+| R-15 | must | C-12 | WP-10 | A-16, A-17 |
+| R-16 | should | C-12 | WP-10 | A-16, A-17 |
 | R-17 | must | C-6 | WP-2 | A-2, A-3, A-4, A-5 |
 | R-18 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-19 | must | C-4 | WP-7 | A-12, A-13 |
-| R-20 | must | C-7 | WP-4 | A-8 |
-| R-21 | must | C-4 | WP-7 | A-12, A-13 |
+| R-19 | must | C-4 | WP-7 | A-11, A-12 |
+| R-20 | must | C-7 | WP-4 | A-7 |
+| R-21 | must | C-4 | WP-7 | A-11, A-12 |
 
 ## Conventions
 

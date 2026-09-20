@@ -116,11 +116,21 @@ def place(u: ReqUnit, d: Design, layout: K.Layout, cid: dict[str, str], iid: dic
         if owners:
             why = "a prohibition: a rule the core enforces" if u.sentence.prohibition else "no operation-like verb: a rule/property the core carries"
             return Placement(u.id, owners, "core rule", why)
-    # synthesise
+    # synthesise — only around a thing the text keeps talking about (named at least twice, as a determined or plural noun);
+    # a one-off noun ("microsecond precision", "the London open", "F-8") is a rule the core carries, not a component
     verb = next((v for v in verbs if v in READ_VERBS | CONTROL_VERBS | COMPUTE_VERBS), verbs[0] if verbs else "")
     obj = _object_phrase(verb, u) if verb else ""
     if not obj:
         obj = next((n for n in u.sentence.nouns if n not in T.NON_OBJECTS and n not in T.ACTORS and not n.endswith(("ly", "ing", "ed"))), "domain")
+    alltext = " ".join(r.statement for r in d.requirements).lower()
+    base = obj.rstrip("s")
+    mentions = len(re.findall(r"\b" + re.escape(base) + r"(?:s|es)?\b", alltext))
+    thing = bool(re.search(r"\b(?:a|an|the|each|every|its|their|per|\d+)\s+(?:[a-z-]+\s+)?" + re.escape(base) + r"s?\b", alltext)) or obj.endswith("s")
+    actor_words = {w for a in u.sentence.actors for w in a.split()} | {"officer", "manager", "engineer", "operator", "user", "customer", "admin", "staff", "team"}
+    physical = verb in READ_VERBS | CONTROL_VERBS and re.search(r"\bsensors?\b|\bdevices?\b|\bvalves?\b|\bpumps?\b|\bmotors?\b|\bfans?\b|\bheaters?\b|\bvents?\b|\brelays?\b|\bcontrollers?\b|\bprobes?\b|\bcameras?\b|\bgpio\b|\bserial\b|\bmodbus\b", u.sentence.lower)
+    one_off = mentions < 2 or not thing or obj in T.TECH_WORDS or base in T.TECH_WORDS or obj.endswith(("ly", "ed")) or re.fullmatch(r"[a-z]-?\d+", obj) or obj in actor_words or base in actor_words
+    if one_off and not physical and "core" in cid:
+        return Placement(u.id, [cid["core"]], "core rule", f"'{obj}' is named once, is a person, or is not a thing the system keeps; the sentence is a rule the core carries")
     if verb in READ_VERBS:
         role, layer, kind, verb_word = "reader", 1, "module", "read"
     elif verb in CONTROL_VERBS:

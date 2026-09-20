@@ -93,7 +93,7 @@
       "kind": "nonfunctional",
       "priority": "should",
       "metric": {
-        "name": "occurrences of the forbidden action (request)",
+        "name": "occurrences of the forbidden action (request, complete)",
         "target": "= 0",
         "unit": "occurrences"
       },
@@ -440,17 +440,14 @@
     {
       "id": "C-13",
       "name": "Trip domain",
-      "responsibility": "Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.",
+      "responsibility": "Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip states: active; transitions not stated. Read from R-5.",
       "kind": "module",
       "path": "internal/domain_trip/domain_trip.go",
       "requires": [
         "I-1"
       ],
       "satisfies": [
-        "R-4",
-        "R-5",
-        "R-7",
-        "R-8"
+        "R-5"
       ],
       "tags": [
         "layer:1",
@@ -1221,24 +1218,6 @@
           "description": "from R-2: Drivers accept or decline an offer within 15 seconds; after three declines the request is"
         },
         {
-          "name": "GET /drivers/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "200 driver",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
-          ],
-          "pre": "stated values: 5 seconds (R-3)",
-          "post": "",
-          "description": "from R-3: Drivers send their GPS position every 5 seconds while online; riders see the assigned driv"
-        },
-        {
           "name": "POST /trips/{id}/rate",
           "inputs": [
             {
@@ -1252,24 +1231,6 @@
             "401 unauthenticated",
             "404 unknown id",
             "409 not applicable in current state"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on"
-        },
-        {
-          "name": "GET /histories/{id}",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "200 history",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id"
           ],
           "pre": "",
           "post": "",
@@ -1454,7 +1415,7 @@
         {
           "name": "status",
           "type": "enum(active)",
-          "constraints": "state machine read from ",
+          "constraints": "states read from R-5; transitions not stated in the text",
           "description": ""
         },
         {
@@ -2218,7 +2179,7 @@
         },
         {
           "id": "A-2",
-          "description": "R-8: occurrences of the forbidden action (request) = 0 occurrences",
+          "description": "R-8: occurrences of the forbidden action (request, complete) = 0 occurrences",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
@@ -2266,7 +2227,7 @@
     {
       "id": "WP-3",
       "title": "Trip domain",
-      "goal": "Implement Trip domain: Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.",
+      "goal": "Implement Trip domain: Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip states: active; transitions not stated. Read from R-5.",
       "components": [
         "C-13"
       ],
@@ -2277,16 +2238,13 @@
         "WP-1"
       ],
       "satisfies": [
-        "R-4",
-        "R-5",
-        "R-7",
-        "R-8"
+        "R-5"
       ],
       "files": [
         "internal/domain_trip/domain_trip.go",
         "internal/domain_trip/domain_trip_test.go"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
           "id": "A-5",
@@ -2294,20 +2252,6 @@
           "kind": "test",
           "command": "go test ./internal/domain_trip/",
           "metric": ""
-        },
-        {
-          "id": "A-6",
-          "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-7"
-        },
-        {
-          "id": "A-7",
-          "description": "R-8: occurrences of the forbidden action (request) = 0 occurrences",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
         }
       ],
       "notes": "family: aggregate:domain_trip"
@@ -2335,7 +2279,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-6",
           "description": "unit tests of Geospatial index pass",
           "kind": "test",
           "command": "go test ./internal/geo/",
@@ -2373,7 +2317,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-7",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "go test ./internal/auth/",
@@ -2405,7 +2349,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-8",
           "description": "unit tests of Payments pass",
           "kind": "test",
           "command": "go test ./internal/payments/",
@@ -2446,7 +2390,7 @@
       "size": "L",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-9",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "go test ./internal/core/",
@@ -2481,7 +2425,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-10",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "go test ./internal/batch/",
@@ -2519,17 +2463,17 @@
         "internal/surface_api/surface_api.go",
         "internal/surface_api/surface_api_test.go"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-11",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "go test ./internal/surface_api/",
           "metric": ""
         },
         {
-          "id": "A-14",
+          "id": "A-12",
           "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -2566,7 +2510,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-13",
           "description": "unit tests of Push gateway pass",
           "kind": "test",
           "command": "go test ./internal/push/",

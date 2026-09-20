@@ -613,7 +613,7 @@
     {
       "id": "C-19",
       "name": "Event domain",
-      "responsibility": "Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event state machine: delivered → published. Read from R-1, R-3, R-4, R-6.",
+      "responsibility": "Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event states: delivered, published; transitions not stated. Read from R-1, R-3, R-4, R-6.",
       "kind": "module",
       "path": "app/domain_event.py",
       "requires": [
@@ -621,12 +621,9 @@
       ],
       "satisfies": [
         "R-1",
-        "R-2",
         "R-3",
         "R-4",
-        "R-6",
-        "R-8",
-        "R-9"
+        "R-6"
       ],
       "tags": [
         "layer:1",
@@ -1042,15 +1039,15 @@
           "description": "from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o"
         },
         {
-          "name": "deliver_signed",
+          "name": "deliver_event",
           "inputs": [
             {
-              "name": "signed",
-              "type": "Signed | id",
+              "name": "event",
+              "type": "Event | id",
               "description": ""
             }
           ],
-          "output": "Signed | None",
+          "output": "Event | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1764,47 +1761,6 @@
           "pre": "",
           "post": "",
           "description": "from R-3: Internal services publish events through an internal API (HTTP or in-process call)."
-        },
-        {
-          "name": "GET /attempts",
-          "inputs": [
-            {
-              "name": "filter",
-              "type": "query",
-              "description": ""
-            },
-            {
-              "name": "page",
-              "type": "cursor",
-              "description": ""
-            }
-          ],
-          "output": "200 [attempts], next cursor",
-          "errors": [
-            "401 unauthenticated"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
-        },
-        {
-          "name": "POST /timestamps/{id}/redeliver",
-          "inputs": [
-            {
-              "name": "id",
-              "type": "str",
-              "description": ""
-            }
-          ],
-          "output": "202 redeliver accepted",
-          "errors": [
-            "401 unauthenticated",
-            "404 unknown id",
-            "409 not applicable in current state"
-          ],
-          "pre": "",
-          "post": "",
-          "description": "from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu"
         }
       ],
       "stability": "draft",
@@ -1866,9 +1822,9 @@
           "output": "Event (status = delivered)",
           "errors": [
             "NotFound",
-            "InvalidTransition (not allowed from the current status)"
+            "InvalidTransition (source status not allowed)"
           ],
-          "pre": "",
+          "pre": "allowed source states not stated in the text",
           "post": "status = delivered",
           "description": "from R-1"
         },
@@ -1884,9 +1840,9 @@
           "output": "Event (status = published)",
           "errors": [
             "NotFound",
-            "InvalidTransition (not allowed from the current status)"
+            "InvalidTransition (source status not allowed)"
           ],
-          "pre": "",
+          "pre": "allowed source states not stated in the text",
           "post": "status = published",
           "description": "from R-3"
         },
@@ -2010,7 +1966,7 @@
         {
           "name": "status",
           "type": "enum(delivered, published)",
-          "constraints": "state machine read from R-1, R-3, R-4",
+          "constraints": "states read from R-1, R-3, R-4",
           "description": ""
         }
       ],
@@ -3711,7 +3667,7 @@
     {
       "id": "WP-4",
       "title": "Event domain",
-      "goal": "Implement Event domain: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event state machine: delivered → published. Read from R-1, R-3, R-4, R-6.",
+      "goal": "Implement Event domain: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event states: delivered, published; transitions not stated. Read from R-1, R-3, R-4, R-6.",
       "components": [
         "C-19"
       ],
@@ -3723,12 +3679,9 @@
       ],
       "satisfies": [
         "R-1",
-        "R-2",
         "R-3",
         "R-4",
-        "R-6",
-        "R-8",
-        "R-9"
+        "R-6"
       ],
       "files": [
         "app/domain_event.py",
@@ -3742,20 +3695,6 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_domain_event.py",
           "metric": ""
-        },
-        {
-          "id": "A-11",
-          "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
-        },
-        {
-          "id": "A-12",
-          "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-9"
         }
       ],
       "notes": "family: aggregate:domain_event"
@@ -3788,21 +3727,21 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-11",
           "description": "unit tests of Outbound HTTP client pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_dispatcher.py",
           "metric": ""
         },
         {
-          "id": "A-14",
+          "id": "A-12",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-15",
+          "id": "A-13",
           "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
@@ -3844,24 +3783,24 @@
         "app/scheduler.py",
         "tests/test_scheduler.py"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-14",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
           "metric": ""
         },
         {
-          "id": "A-17",
+          "id": "A-15",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-18",
+          "id": "A-16",
           "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
@@ -3893,7 +3832,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-17",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -3927,7 +3866,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-20",
+          "id": "A-18",
           "description": "unit tests of Signer pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_signer.py",
@@ -3972,7 +3911,7 @@
       "size": "L",
       "acceptance": [
         {
-          "id": "A-21",
+          "id": "A-19",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -4012,24 +3951,24 @@
         "app/admin_api.py",
         "tests/test_admin_api.py"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-22",
+          "id": "A-20",
           "description": "unit tests of Admin HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_admin_api.py",
           "metric": ""
         },
         {
-          "id": "A-23",
+          "id": "A-21",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-24",
+          "id": "A-22",
           "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -4070,31 +4009,31 @@
         "app/worker.py",
         "tests/test_worker.py"
       ],
-      "size": "L",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-25",
+          "id": "A-23",
           "description": "unit tests of Worker pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_worker.py",
           "metric": ""
         },
         {
-          "id": "A-26",
+          "id": "A-24",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-27",
+          "id": "A-25",
           "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-10"
         },
         {
-          "id": "A-28",
+          "id": "A-26",
           "description": "R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload",
           "kind": "metric",
           "command": "",
@@ -4129,7 +4068,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-29",
+          "id": "A-27",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_batch.py",
@@ -4166,31 +4105,31 @@
         "app/ingest_api.py",
         "tests/test_ingest_api.py"
       ],
-      "size": "M",
+      "size": "S",
       "acceptance": [
         {
-          "id": "A-30",
+          "id": "A-28",
           "description": "unit tests of Ingest API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_ingest_api.py",
           "metric": ""
         },
         {
-          "id": "A-31",
+          "id": "A-29",
           "description": "R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-32",
+          "id": "A-30",
           "description": "R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
         },
         {
-          "id": "A-33",
+          "id": "A-31",
           "description": "R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -4224,7 +4163,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-34",
+          "id": "A-32",
           "description": "unit tests of Health policy pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_policy.py",

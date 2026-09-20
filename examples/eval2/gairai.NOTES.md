@@ -22,7 +22,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-1 | C-16 Patient domain | aggregate | the sentence speaks of patient, owned by Patient domain |
+| R-1 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'doctor': a use case |
 | R-2 | C-16 Patient domain | aggregate | the sentence speaks of patient, owned by Patient domain |
 
 ## 2. Capacity estimates
@@ -37,7 +37,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **52 person-days**; critical path **35 days**; with a team of 3: **about 36 working days** (8 weeks).
+- Total effort: **44 person-days**; critical path **27 days**; with a team of 3: **about 30 working days** (6 weeks).
 - Wave 1: WP-1, WP-2
 - Wave 2: WP-3, WP-4, WP-5, WP-6, WP-7
 - Wave 3: WP-8
@@ -103,14 +103,16 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 5b. Domain model read from the text
 
-Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+Entities with the fields, relations, states and invariants the reader found in the sentences named in the last column. It reads a fixed set of phrasings (attribute lists, 'has/records/carries A, B and C', possessives, 'set its X', transactional and state verbs, 'then'/'until'/'otherwise' sequences, arrow lists, 'never/cannot' rules); a fact stated another way is not here, and a field or state that is here may still be misread — check each row against its requirement. Each aggregate is a component.
 
 | entity | fields (type) | relations | states | invariants | from |
 |---|---|---|---|---|---|
 | Booking | — | — | — | — | R-2 |
-| Slot | — | — | cancelled | — | R-1 |
+| Slot | — | — | cancelled; transitions not stated | — | R-1 |
 | Patient | — | — | — | — | R-2 |
 | Department | — | — | — | — | R-2 |
+| Health | — | — | confirmed; transitions not stated | — | R-7 |
+| Record | — | — | — | — | R-10 |
 
 ## 6. How the text was read
 

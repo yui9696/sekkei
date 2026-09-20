@@ -319,3 +319,31 @@ domain and a Fill domain with `submit_order / cancel_order / book_fill / retry_f
 "Precision processor" or "Officer controller". Not re-scored by an independent reviewer yet;
 that is the next round's job.
 
+## Fifth independent red team (2026-09-20): did the three criteria move?
+
+Fresh-eyes re-score of all 18 specs after the domain model landed: average 6.6 (before 6.5); data
+model 1/2 on 3 of 18, interfaces 1/2 on 4, work packages 0 on all. The reviewer's four attack
+specs (fields spread over sentences, a state machine in prose, a homonym, tech-name-heavy prose)
+scored 7 / 9 / 6 / 3 and found why the module had not moved the numbers: `verb_of` did not
+undo a doubled consonant, so `shipped`, `cancelled`, `submitted` mapped to nothing and eight of
+the state verbs were unreachable; fields were read from four surface forms only ("X has a, b and
+c" gave nothing); states were rendered as a chain that was never read; invariants attached to
+the first-inserted entity; "Team of 5, Go, Kafka and ClickHouse" became a team of two people
+named Go and Kafka; packages were "satisfied" by every sentence containing the entity's word;
+routes like `POST /anothers/{id}/assign` came from any verb + noun.
+
+All fixed and turned into tests (`tests/test_domain.py`, `examples/real5/`): inflection;
+"has/records/carries" lists and "set its A, B and C"; real transitions from "placed, then
+confirmed, then shipped", "may cancel until it is shipped", "must confirm or decline within 2
+hours, otherwise it expires" and `a → b/c → d` arrow lists (`status in (placed)` preconditions
+on the transition operations); negated rules attached to the sentence's subject ("cancel is not
+allowed once shipped", "immutable once shipped"); a person is never read from a tech name;
+aggregates are satisfied only by the sentences that built them, and sized by functional scope;
+a REST resource must be a thing the text keeps; one-off nouns and people no longer become "X
+processor" components (a reader/controller is still synthesised for physical sources such as
+sensors). On the reviewer's order spec the engine now reads `Order(delivery_address,
+delivery_slot; placed → confirmed → shipped, placed → declined, → cancelled until shipped, →
+expired; cancel not allowed once shipped; immutable once shipped)` and offers
+`confirm_order / decline_order / ship_order / cancel_order / expire_order` with their allowed
+source states. Not yet re-scored by an independent reviewer.
+

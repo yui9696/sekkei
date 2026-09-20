@@ -255,10 +255,10 @@ graph LR
 ### C-19 — Event domain
 
 - **kind**: module · **path**: `app/domain_event.py`
-- **responsibility**: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event state machine: delivered → published. Read from R-1, R-3, R-4, R-6.
+- **responsibility**: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event states: delivered, published; transitions not stated. Read from R-1, R-3, R-4, R-6.
 - **provides**: I-19
 - **requires**: I-1
-- **satisfies**: R-1, R-2, R-3, R-4, R-6, R-8, R-9
+- **satisfies**: R-1, R-3, R-4, R-6
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -342,7 +342,7 @@ graph LR
 |---|---|---|---|---|
 | `register_endpoints` | `endpoints`: Endpoints \| id | Endpoints \| None | ValidationError, NotFound | — |
 | | from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o | | | |
-| `deliver_signed` | `signed`: Signed \| id | Signed \| None | ValidationError, NotFound | — |
+| `deliver_event` | `event`: Event \| id | Event \| None | ValidationError, NotFound | — |
 | | from R-1: Customers register webhook endpoints; when things happen in our platform (order.created, o | | | |
 | `manage_endpoints` | `endpoints`: Endpoints \| id | Endpoints \| None | ValidationError, NotFound | — |
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
@@ -475,10 +475,6 @@ graph LR
 | | from R-2: Customers manage endpoints via an admin HTTP API: create/list/delete endpoints, choose eve | | | |
 | `POST /events` | `body`: events fields | 201 {events id} | 400 invalid body, 401 unauthenticated, 409 conflict | — |
 | | from R-3: Internal services publish events through an internal API (HTTP or in-process call). | | | |
-| `GET /attempts` | `filter`: query, `page`: cursor | 200 [attempts], next cursor | 401 unauthenticated | — |
-| | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
-| `POST /timestamps/{id}/redeliver` | `id`: str | 202 redeliver accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
-| | from R-6: Customers can see delivery attempts per event (status, response code, timestamps) and manu | | | |
 
 ### I-18 — Ingest API interface
 
@@ -496,9 +492,9 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `deliver_event` | `event_id`: ref | Event (status = delivered) | NotFound, InvalidTransition (not allowed from the current status) | status = delivered |
+| `deliver_event` | `event_id`: ref | Event (status = delivered) | NotFound, InvalidTransition (source status not allowed) | allowed source states not stated in the text / status = delivered |
 | | from R-1 | | | |
-| `publish_event` | `event_id`: ref | Event (status = published) | NotFound, InvalidTransition (not allowed from the current status) | status = published |
+| `publish_event` | `event_id`: ref | Event (status = published) | NotFound, InvalidTransition (source status not allowed) | allowed source states not stated in the text / status = published |
 | | from R-3 | | | |
 | `create_event` | `event`: Event | Event (id assigned) | ValidationError listing every invalid field | record is durable before return |
 | | creation of the aggregate root | | | |
@@ -526,7 +522,7 @@ graph LR
 | `status` | enum | from R-6 |
 | `response_code` | ref | from R-6 |
 | `timestamps` | str | from R-6 |
-| `status` | enum(delivered, published) | state machine read from R-1, R-3, R-4 |
+| `status` | enum(delivered, published) | states read from R-1, R-3, R-4 |
 
 ### E-3 — WorkItem (owner C-2)
 
@@ -1154,14 +1150,14 @@ graph LR
   WP_3["WP-3 Observability (M)"]
   WP_4["WP-4 Event domain (M)"]
   WP_5["WP-5 Outbound HTTP client (M)"]
-  WP_6["WP-6 Authentication + Scheduler (L)"]
+  WP_6["WP-6 Authentication + Scheduler (M)"]
   WP_7["WP-7 Notifier (S)"]
   WP_8["WP-8 Signer (S)"]
   WP_9["WP-9 Domain core (L)"]
-  WP_10["WP-10 Admin HTTP API (L)"]
-  WP_11["WP-11 Worker (L)"]
+  WP_10["WP-10 Admin HTTP API (M)"]
+  WP_11["WP-11 Worker (M)"]
   WP_12["WP-12 Batch job (S)"]
-  WP_13["WP-13 Ingest API (M)"]
+  WP_13["WP-13 Ingest API (S)"]
   WP_14["WP-14 Health policy (S)"]
   WP_2 --> WP_4
   WP_3 --> WP_5
@@ -1206,7 +1202,7 @@ graph LR
 3. WP-9
 4. WP-10, WP-11, WP-12, WP-13, WP-14
 
-_Critical path (35 person-days):_ WP-2 → WP-4 → WP-9 → WP-11
+_Critical path (30 person-days):_ WP-2 → WP-4 → WP-9 → WP-11
 
 ### WP-1 — Audit log (S)
 
@@ -1249,15 +1245,13 @@ Implement Observability: Metrics registry and exposition, structured logging, he
 
 ### WP-4 — Event domain (M)
 
-Implement Event domain: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event state machine: delivered → published. Read from R-1, R-3, R-4, R-6.
+Implement Event domain: Owns the Event aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Event states: delivered, published; transitions not stated. Read from R-1, R-3, R-4, R-6.
 
 - **components**: C-19 · **implements**: I-19
-- **depends on**: WP-2 · **satisfies**: R-1, R-2, R-3, R-4, R-6, R-8, R-9
+- **depends on**: WP-2 · **satisfies**: R-1, R-3, R-4, R-6
 - **write scope**: `app/domain_event.py`, `tests/test_domain_event.py`
 - **acceptance**:
   - A-10 (test) unit tests of Event domain pass — `python -m pytest -q tests/test_domain_event.py`
-  - A-11 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-12 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
 - **notes**: family: aggregate:domain_event
 
 ### WP-5 — Outbound HTTP client (M)
@@ -1268,12 +1262,12 @@ Implement Outbound HTTP client: Performs the outbound HTTP call with timeouts, s
 - **depends on**: WP-3 · **satisfies**: R-1, R-4, R-5, R-6, R-8, R-11
 - **write scope**: `app/dispatcher.py`, `tests/test_dispatcher.py`
 - **acceptance**:
-  - A-13 (test) unit tests of Outbound HTTP client pass — `python -m pytest -q tests/test_dispatcher.py`
-  - A-14 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-15 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
+  - A-11 (test) unit tests of Outbound HTTP client pass — `python -m pytest -q tests/test_dispatcher.py`
+  - A-12 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-13 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
 - **notes**: family: async_delivery
 
-### WP-6 — Authentication + Scheduler (L)
+### WP-6 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -1281,9 +1275,9 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2, WP-3 · **satisfies**: R-1, R-2, R-4, R-5, R-6, R-8, R-11, R-14, R-21
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
-  - A-17 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-18 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
+  - A-14 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+  - A-15 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-16 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
 - **notes**: family: infra
 
 ### WP-7 — Notifier (S)
@@ -1294,7 +1288,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-3 · **satisfies**: R-7
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`
 - **acceptance**:
-  - A-19 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+  - A-17 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
 ### WP-8 — Signer (S)
@@ -1305,7 +1299,7 @@ Implement Signer: Produces and verifies HMAC signatures over request bodies with
 - **depends on**: WP-2 · **satisfies**: R-1, R-2, R-5
 - **write scope**: `app/signer.py`, `tests/test_signer.py`
 - **acceptance**:
-  - A-20 (test) unit tests of Signer pass — `python -m pytest -q tests/test_signer.py`
+  - A-18 (test) unit tests of Signer pass — `python -m pytest -q tests/test_signer.py`
 - **notes**: family: signing
 
 ### WP-9 — Domain core (L)
@@ -1316,10 +1310,10 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-3, WP-4, WP-7 · **satisfies**: R-1, R-2, R-3, R-4, R-5, R-6, R-7, R-12, R-20, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-21 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-19 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: crud_api
 
-### WP-10 — Admin HTTP API (L)
+### WP-10 — Admin HTTP API (M)
 
 Implement Admin HTTP API: Management surface for operators/customers: resource lifecycle and configuration; authenticated.
 
@@ -1327,12 +1321,12 @@ Implement Admin HTTP API: Management surface for operators/customers: resource l
 - **depends on**: WP-2, WP-3, WP-4, WP-6, WP-9 · **satisfies**: R-1, R-2, R-6, R-8, R-10, R-13, R-16, R-18
 - **write scope**: `app/admin_api.py`, `tests/test_admin_api.py`
 - **acceptance**:
-  - A-22 (test) unit tests of Admin HTTP API pass — `python -m pytest -q tests/test_admin_api.py`
-  - A-23 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-24 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-20 (test) unit tests of Admin HTTP API pass — `python -m pytest -q tests/test_admin_api.py`
+  - A-21 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-22 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: admin_api
 
-### WP-11 — Worker (L)
+### WP-11 — Worker (M)
 
 Implement Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.
 
@@ -1340,10 +1334,10 @@ Implement Worker: Leases work items, performs the outbound action, records the o
 - **depends on**: WP-2, WP-3, WP-5, WP-6, WP-8, WP-9 · **satisfies**: R-1, R-4, R-5, R-6, R-8, R-10, R-11, R-13
 - **write scope**: `app/worker.py`, `tests/test_worker.py`
 - **acceptance**:
-  - A-25 (test) unit tests of Worker pass — `python -m pytest -q tests/test_worker.py`
-  - A-26 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-27 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
-  - A-28 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
+  - A-23 (test) unit tests of Worker pass — `python -m pytest -q tests/test_worker.py`
+  - A-24 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-25 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-26 (metric) R-11: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-11
 - **notes**: family: async_delivery
 
 ### WP-12 — Batch job (S)
@@ -1354,10 +1348,10 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-2, WP-3, WP-6, WP-9 · **satisfies**: R-14
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-29 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-27 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-13 — Ingest API (M)
+### WP-13 — Ingest API (S)
 
 Implement Ingest API: Accepts events/records from producers, validates them, persists them, and enqueues work; acknowledges only after persistence.
 
@@ -1365,10 +1359,10 @@ Implement Ingest API: Accepts events/records from producers, validates them, per
 - **depends on**: WP-2, WP-3, WP-4, WP-6, WP-9 · **satisfies**: R-3, R-8, R-9, R-10, R-13
 - **write scope**: `app/ingest_api.py`, `tests/test_ingest_api.py`
 - **acceptance**:
-  - A-30 (test) unit tests of Ingest API pass — `python -m pytest -q tests/test_ingest_api.py`
-  - A-31 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-32 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
-  - A-33 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-28 (test) unit tests of Ingest API pass — `python -m pytest -q tests/test_ingest_api.py`
+  - A-29 (metric) R-8: p95 latency at 1,000, 5,000 < 5 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-30 (metric) R-9: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-9
+  - A-31 (metric) R-10: p95 latency of healthy targets while one target stalls within the stated latency target — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: event_ingest
 
 ### WP-14 — Health policy (S)
@@ -1379,35 +1373,35 @@ Implement Health policy: Evaluates per-target failure history against the disabl
 - **depends on**: WP-3, WP-7, WP-9 · **satisfies**: R-7
 - **write scope**: `app/policy.py`, `tests/test_policy.py`
 - **acceptance**:
-  - A-34 (test) unit tests of Health policy pass — `python -m pytest -q tests/test_policy.py`
+  - A-32 (test) unit tests of Health policy pass — `python -m pytest -q tests/test_policy.py`
 - **notes**: family: health_policy
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-3, C-5, C-7, C-8, C-9, C-12, C-13, C-14, C-17, C-19 | WP-2, WP-4, WP-5, WP-6, WP-8, WP-9, WP-10, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-20, A-21, A-22, A-23, A-24, A-25, A-26, A-27, A-28 |
-| R-2 | must | C-3, C-7, C-9, C-12, C-17, C-19 | WP-2, WP-4, WP-6, WP-8, WP-9, WP-10 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-16, A-17, A-18, A-20, A-21, A-22, A-23, A-24 |
-| R-3 | must | C-2, C-7, C-18, C-19 | WP-2, WP-4, WP-9, WP-13 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-21, A-30, A-31, A-32, A-33 |
-| R-4 | must | C-2, C-5, C-7, C-8, C-13, C-14, C-19 | WP-2, WP-4, WP-5, WP-6, WP-9, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-21, A-25, A-26, A-27, A-28 |
-| R-5 | must | C-2, C-3, C-7, C-8, C-9, C-13, C-14 | WP-2, WP-5, WP-6, WP-8, WP-9, WP-11 | A-2, A-3, A-4, A-5, A-6, A-13, A-14, A-15, A-16, A-17, A-18, A-20, A-21, A-25, A-26, A-27, A-28 |
-| R-6 | must | C-2, C-7, C-8, C-12, C-13, C-14, C-17, C-19 | WP-2, WP-4, WP-5, WP-6, WP-9, WP-10, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-21, A-22, A-23, A-24, A-25, A-26, A-27, A-28 |
-| R-7 | must | C-4, C-7, C-10, C-15 | WP-7, WP-9, WP-14 | A-19, A-21, A-34 |
-| R-8 | must | C-2, C-8, C-13, C-14, C-17, C-18, C-19 | WP-2, WP-4, WP-5, WP-6, WP-10, WP-11, WP-13 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-17, A-18, A-22, A-23, A-24, A-25, A-26, A-27, A-28, A-30, A-31, A-32, A-33 |
-| R-9 | should | C-1, C-2, C-18, C-19 | WP-2, WP-4, WP-13 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-30, A-31, A-32, A-33 |
-| R-10 | must | C-13, C-17, C-18 | WP-10, WP-11, WP-13 | A-22, A-23, A-24, A-25, A-26, A-27, A-28, A-30, A-31, A-32, A-33 |
-| R-11 | should | C-2, C-8, C-11, C-13, C-14 | WP-2, WP-3, WP-5, WP-6, WP-11 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-13, A-14, A-15, A-16, A-17, A-18, A-25, A-26, A-27, A-28 |
-| R-12 | must | C-1, C-7 | WP-2, WP-9 | A-2, A-3, A-4, A-5, A-6, A-21 |
-| R-13 | must | C-13, C-17, C-18 | WP-10, WP-11, WP-13 | A-22, A-23, A-24, A-25, A-26, A-27, A-28, A-30, A-31, A-32, A-33 |
-| R-14 | must | C-14, C-16 | WP-6, WP-12 | A-16, A-17, A-18, A-29 |
+| R-1 | must | C-2, C-3, C-5, C-7, C-8, C-9, C-12, C-13, C-14, C-17, C-19 | WP-2, WP-4, WP-5, WP-6, WP-8, WP-9, WP-10, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-18, A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-26 |
+| R-2 | must | C-3, C-7, C-9, C-12, C-17 | WP-2, WP-6, WP-8, WP-9, WP-10 | A-2, A-3, A-4, A-5, A-6, A-14, A-15, A-16, A-18, A-19, A-20, A-21, A-22 |
+| R-3 | must | C-2, C-7, C-18, C-19 | WP-2, WP-4, WP-9, WP-13 | A-2, A-3, A-4, A-5, A-6, A-10, A-19, A-28, A-29, A-30, A-31 |
+| R-4 | must | C-2, C-5, C-7, C-8, C-13, C-14, C-19 | WP-2, WP-4, WP-5, WP-6, WP-9, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-19, A-23, A-24, A-25, A-26 |
+| R-5 | must | C-2, C-3, C-7, C-8, C-9, C-13, C-14 | WP-2, WP-5, WP-6, WP-8, WP-9, WP-11 | A-2, A-3, A-4, A-5, A-6, A-11, A-12, A-13, A-14, A-15, A-16, A-18, A-19, A-23, A-24, A-25, A-26 |
+| R-6 | must | C-2, C-7, C-8, C-12, C-13, C-14, C-17, C-19 | WP-2, WP-4, WP-5, WP-6, WP-9, WP-10, WP-11 | A-2, A-3, A-4, A-5, A-6, A-10, A-11, A-12, A-13, A-14, A-15, A-16, A-19, A-20, A-21, A-22, A-23, A-24, A-25, A-26 |
+| R-7 | must | C-4, C-7, C-10, C-15 | WP-7, WP-9, WP-14 | A-17, A-19, A-32 |
+| R-8 | must | C-2, C-8, C-13, C-14, C-17, C-18 | WP-2, WP-5, WP-6, WP-10, WP-11, WP-13 | A-2, A-3, A-4, A-5, A-6, A-11, A-12, A-13, A-14, A-15, A-16, A-20, A-21, A-22, A-23, A-24, A-25, A-26, A-28, A-29, A-30, A-31 |
+| R-9 | should | C-1, C-2, C-18 | WP-2, WP-13 | A-2, A-3, A-4, A-5, A-6, A-28, A-29, A-30, A-31 |
+| R-10 | must | C-13, C-17, C-18 | WP-10, WP-11, WP-13 | A-20, A-21, A-22, A-23, A-24, A-25, A-26, A-28, A-29, A-30, A-31 |
+| R-11 | should | C-2, C-8, C-11, C-13, C-14 | WP-2, WP-3, WP-5, WP-6, WP-11 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-11, A-12, A-13, A-14, A-15, A-16, A-23, A-24, A-25, A-26 |
+| R-12 | must | C-1, C-7 | WP-2, WP-9 | A-2, A-3, A-4, A-5, A-6, A-19 |
+| R-13 | must | C-13, C-17, C-18 | WP-10, WP-11, WP-13 | A-20, A-21, A-22, A-23, A-24, A-25, A-26, A-28, A-29, A-30, A-31 |
+| R-14 | must | C-14, C-16 | WP-6, WP-12 | A-14, A-15, A-16, A-27 |
 | R-15 | must | C-6 | WP-1 | A-1 |
-| R-16 | must | C-17 | WP-10 | A-22, A-23, A-24 |
+| R-16 | must | C-17 | WP-10 | A-20, A-21, A-22 |
 | R-17 | must | C-2, C-11 | WP-2, WP-3 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9 |
-| R-18 | should | C-17 | WP-10 | A-22, A-23, A-24 |
+| R-18 | should | C-17 | WP-10 | A-20, A-21, A-22 |
 | R-19 | must | C-2, C-11 | WP-2, WP-3 | A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9 |
-| R-20 | must | C-7 | WP-9 | A-21 |
-| R-21 | must | C-12 | WP-6 | A-16, A-17, A-18 |
-| R-22 | must | C-7 | WP-9 | A-21 |
+| R-20 | must | C-7 | WP-9 | A-19 |
+| R-21 | must | C-12 | WP-6 | A-14, A-15, A-16 |
+| R-22 | must | C-7 | WP-9 | A-19 |
 
 ## Conventions
 

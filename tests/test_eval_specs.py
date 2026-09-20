@@ -36,7 +36,7 @@ def test_document_search_exposes_the_use_cases_and_has_no_geo_false_positive():
     assert "Geospatial index" not in names
     api = next(i for i in r.design.interfaces if i.name.startswith("Public HTTP API"))
     ops = {o.name for o in api.operations}
-    assert "POST /pdfs" in ops and "DELETE /documents/{id}" in ops and any(o.startswith("GET /") for o in ops)
+    assert "POST /documents" in ops and "DELETE /documents/{id}" in ops and any(o.startswith("GET /") for o in ops)
     assert "Document" in {e.name for e in r.design.entities}
 
 

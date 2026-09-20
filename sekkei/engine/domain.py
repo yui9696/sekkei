@@ -59,12 +59,12 @@ _STATE_WORDS = {"pending", "working", "open", "closed", "active", "inactive", "d
 #: field-name patterns → type
 _TYPES = [
     (r"(?:^|_)(?:at|date|expiry|expires|deadline|time|timestamp|due|start|end|window|since|until)$|^(?:date|time) of", "timestamp"),
-    (r"price|amount|fee|notional|total|cost|share|balance|payout|premium|salary|budget|strike|limit price|value", "Money"),
-    (r"quantity|count|number of|points|size|attempts|retries|depth|age|level|stock|kits|seats|capacity", "int"),
+    (r"price|amount|fee|notional|total|cost|share|balance|payout|premium|salary|budget|strike|limit|excess|deductible|allowance|charged|paid", "Money"),
+    (r"quantity|count|number of|points|size|attempts|retries|depth|(?:^|_)age$|level|stock|kits|seats|capacity|estimate|hours$|days$", "int"),
     (r"percent|rate$|ratio|bps|discount|probability|score", "decimal"),
     (r"email", "email"), (r"url|link|uri|endpoint", "url"), (r"phone|mobile number", "phone"),
     (r"(?:^|_)(?:id|ref|reference|key|code|sku|number|no)$|_id$|identifier", "ref"),
-    (r"status|state|type|kind|direction|category|role|priority|severity|tier|method|channel|mode|arm|reason code", "enum"),
+    (r"status|state|type|kind|direction|category|role|priority|severity|tier|method|channel|mode|arm|reason code|slot|zone", "enum"),
     (r"enabled|disabled|flag|opted|active$|required$|is_|has_", "bool"),
     (r"hash|checksum|digest|signature", "bytes"), (r"file|attachment|document|pdf|image|photo|video|export", "file"),
     (r"address|location|position|coordinates|gps|geo", "address"), (r"currency", "currency"), (r"locale|language", "locale"),
@@ -84,10 +84,27 @@ _REL_STOP = {"time", "day", "hour", "minute", "second", "week", "month", "year",
              "image", "images", "version", "versions", "library", "libraries", "attempt", "attempts", "share", "shares", "entry", "entries",
              "batch", "batches", "duplicate", "duplicates", "copy", "copies", "list", "lists", "set", "sets", "number", "numbers", "latest", "precision",
              "percentage", "percentages", "portion", "fraction", "majority", "subset", "sample", "samples", "trail", "trails", "total", "totals",
+             "night", "nights", "morning", "mornings", "evening", "afternoon", "weekend", "weekends", "today", "tomorrow", "yesterday", "quarter", "quarters",
              "date", "dates", "reason", "reasons", "identity", "identities", "period", "periods", "interval", "intervals", "accuracy", "loss"}
+_UNITS = {"min", "mins", "sec", "secs", "ms", "hr", "hrs", "kb", "mb", "gb", "tb", "pct", "km", "cm", "mm", "kg", "usd", "eur", "gbp", "jpy"}
+_TECH_WORDS = T.TECH_WORDS
+_NOUN_VERBS = ("order", "request", "offer", "match", "charge", "claim", "booking", "record", "report", "export", "import", "alert", "schedule",
+               "release", "measure", "filter", "share", "rate", "reading", "listing", "setting", "rating", "building", "meeting", "shipping",
+               "training", "billing", "vote", "comment", "review", "invoice", "payment", "ticket", "document", "file", "form", "plan", "test",
+               "run", "job", "task", "deal", "trip", "ride", "quote", "grade", "score", "post", "message", "call", "visit", "transfer", "deposit",
+               "fill", "clip", "flag", "lock", "unlock", "issue", "return", "refund", "quarantine", "block", "bill", "estimate", "reply")
+_ACTORISH = {"member", "members", "employee", "employees", "user", "users", "customer", "customers", "tenant", "tenants", "role", "roles",
+             "team", "teams", "person", "people", "staff", "operator", "operators", "admin", "admins", "participant", "participants", "player", "players"}
 _ALT_PAREN = re.compile(r"^\s*[a-z][a-z0-9-]*(?:\s*(?:/|,|\s+and\s+|\s+or\s+)\s*[a-z][a-z0-9-]*){1,2}\s*$", re.I)
 
-_ARROW_LIST = re.compile(r"((?:[a-z][a-z-]{1,15})(?:\s*(?:→|->|=>|⟶)\s*(?:[a-z][a-z-]{1,15})){1,6})", re.I)
+_ARROW_LIST = re.compile(r"((?:[a-z][a-z-]{1,15}(?:\s*/\s*[a-z][a-z-]{1,15})*)(?:\s*(?:→|->|=>|⟶)\s*(?:[a-z][a-z-]{1,15}(?:\s*/\s*[a-z][a-z-]{1,15})*)){1,6})", re.I)
+#: "is placed, then confirmed by the merchant, then shipped" — an ordered sequence of participles
+_THEN_SEQ = re.compile(r"\b(?:is|are|gets|becomes)\s+([a-z]+(?:ed|en))\b((?:[^.;]{0,40}?,?\s*(?:then|and then|after that|next)\s+(?:[a-z]+\s+){0,2}([a-z]+(?:ed|en))\b){1,5})", re.I)
+_THEN_ITEM = re.compile(r"(?:then|and then|after that|next)\s+(?:[a-z]+\s+){0,2}([a-z]+(?:ed|en))\b", re.I)
+#: "may cancel it until it is shipped", "cannot be confirmed later" after "declined", "must confirm or decline … otherwise expires"
+_UNTIL = re.compile(r"\b(?:can|may|must|could)\s+([a-z]+)\s+(?:it|them|the [a-z]+|an? [a-z]+)?\s*(?:until|before|as long as it is not|unless it is)\s+(?:it\s+)?(?:is|has been|was)\s+([a-z]+(?:ed|en))\b", re.I)
+_OTHERWISE = re.compile(r"\b(?:must|shall|should)\s+([a-z]+)(?:\s+or\s+([a-z]+))?\s+(?:an?|the|it)?\s*[a-z]*\s*within\s+[^,;.]{1,30},?\s*(?:otherwise|or else|failing which)\s+(?:the\s+[a-z]+\s+|it\s+)?([a-z]+s?)\b", re.I)
+_HAS_LIST = re.compile(r"\b(?:the|a|an|each|every)?\s*([a-z][a-z-]{2,})s?\s+(?:has|have|carries|carry|records?|stores?|includes?|contains?|holds?|consists of|is made of|comprises?|is described by|tracks?)\s+(?:a |an |the |its |their )?((?:[a-z][a-z' -]{1,30}?(?:,\s*|\s+and\s+|\s*/\s*)){1,8}[a-z][a-z' -]{1,30})(?=[.;:)]|\s+(?:so that|before|after|which|that|for)\b|$)", re.I)
 _PAREN = re.compile(r"\b([a-z][a-z-]{2,})s?\s*\(([^)]{3,120})\)", re.I)
 _WITH_LIST = re.compile(r"\b(?:with|including|carrying|containing|comprising)\s+((?:[a-z][a-z' -]{1,30}?(?:,\s*|\s+and\s+|\s*/\s*)){1,8}[a-z][a-z' -]{1,30})(?=[.;:)]|\s+(?:and|so that|before|after|from|to|through|via|that|which|for)\b|$)", re.I)
 _POSSESSIVE = re.compile(r"\b(?:the|a|an|each|every|its|their)?\s*([a-z][a-z-]{2,})'s\s+([a-z][a-z-]{2,}(?:\s[a-z-]{2,})?)\b", re.I)
@@ -97,7 +114,7 @@ _HAS_MANY = re.compile(r"\b(?:an?|each|every|the)\s+([a-z][a-z-]{2,})\s+(?:has|c
 _PER = re.compile(r"\b([a-z][a-z-]{2,})s?\s+per\s+([a-z][a-z-]{2,})\b", re.I)
 _INVARIANT = [
     (r"\bnever\b[^.;]{0,40}\btwice\b|\bnot (?:be )?[a-z]+ (?:twice|more than once)\b|\bexactly once\b|\bat most once\b", "no duplicates: {noun} is {verb} at most once"),
-    (r"\bnever (?:be )?(?:modified|edited|changed|altered|updated|deleted|removed)\b|\bimmutable\b|\bappend[- ]only\b|\bmust not be (?:modified|edited|changed|deleted)\b|\bread[- ]only after\b", "immutable after creation: {noun}"),
+    (r"\bnever (?:be )?(?:modified|edited|changed|altered|updated|deleted|removed)\b|\bimmutable\b|\bappend[- ]only\b|\bmust not be (?:modified|edited|changed|deleted)\b|\bread[- ]only after\b", "immutable {when}: {noun}"),
     (r"\bexactly one\b|\bone and only one\b|\bat most one\b|\bunique\b|\bmust not be double[- ]booked\b|\bdouble[- ]booking\b|\bnever (?:be )?(?:double|duplicate)", "uniqueness: {noun}"),
     (r"\bin the same transaction\b|\batomically\b|\ball or nothing\b|\bmust remain balanced\b|\bbalanced at all times\b", "atomicity: {noun} written in one transaction"),
     (r"\bnever (?:lost|discarded|dropped)\b|\bmust not (?:be )?(?:lost|discarded|dropped)\b|\bnot discard\b|\bno [a-z]+ (?:is|are) lost\b", "durability: no {noun} lost"),
@@ -113,9 +130,11 @@ class DEntity:
     fields: list[tuple[str, str, str]] = field(default_factory=list)      # (name, type, evidence)
     relations: list[tuple[str, str, str]] = field(default_factory=list)   # (kind, target, evidence): belongs_to / has_many
     states: list[str] = field(default_factory=list)
-    transitions: list[tuple[str, str, str]] = field(default_factory=list) # (verb, state, evidence)
+    transitions: list[tuple[str, str, str]] = field(default_factory=list) # (verb, state, evidence): a verb that puts the thing in a state
+    edges: list[tuple[str, str, str]] = field(default_factory=list)       # (from_state, to_state, evidence): a transition the text states
     invariants: list[tuple[str, str]] = field(default_factory=list)       # (text, evidence)
-    evidence: list[str] = field(default_factory=list)                     # requirement ids
+    evidence: list[str] = field(default_factory=list)                     # requirement ids (any mention that scored)
+    strong: list[str] = field(default_factory=list)                       # requirement ids where the thing is created/changed/constrained
     score: int = 0
     created: bool = False                                                 # object of a create/register/submit/book-type verb
 
@@ -162,6 +181,7 @@ def field_type(name: str) -> str:
 def _clean_field(f: str) -> str:
     f = re.sub(r"\b(?:e\.g\.|i\.e\.|etc\.?|such as)\b.*$", "", f.strip().lower()).strip(" .,;:-")
     f = re.sub(r"^(?:the|a|an|its|their|per|each|every|optional|current|new|existing)\s+", "", f)
+    f = re.sub(r"^[a-z]+'s\s+", "", f)          # "buyer's email" -> email
     f = re.sub(r"\s+", " ", f)
     if not f or f in _FIELD_STOP or len(f) > 32 or len(f.split()) > 3 or re.search(r"\d{3,}|[()]", f):
         return ""
@@ -171,19 +191,17 @@ def _clean_field(f: str) -> str:
 
 
 def _noun_ok(n: str, an: Analysis, allow_actor: bool = False, allow_verb: bool = False) -> bool:
-    _ENTITY_STOP = T.ENTITY_STOP
+    _ENTITY_STOP = T.ENTITY_STOP - _ACTORISH
     base = singular(n)
     if len(base) < 3 or base in _ENTITY_STOP or n in _ENTITY_STOP or base in T.STOPWORDS or base in T.NON_OBJECTS or base in _REL_STOP:
         return False
-    if base in T.ACTORS or n in T.ACTORS or base + "s" in T.ACTORS or any(base == a.split()[-1] for a in an.actors):
+    if base in T.ACTORS or n in T.ACTORS or base + "s" in T.ACTORS or any(base == a.split()[-1] for a in an.actors) or base in _ACTORISH:
         return allow_actor
-    _NOUN_VERBS = ("order", "request", "offer", "match", "charge", "claim", "booking", "record", "report", "export", "import", "alert", "schedule",
-                   "release", "measure", "filter", "share", "rate", "reading", "listing", "setting", "rating", "building", "meeting", "shipping",
-                   "training", "billing", "vote", "comment", "review", "invoice", "payment", "ticket", "document", "file", "form", "plan", "test",
-                   "run", "job", "task", "deal", "trip", "ride", "quote", "grade", "score", "post", "message", "call", "visit", "transfer", "deposit")
     if T.verb_of(base) and base not in _NOUN_VERBS and not allow_verb:
         return False
     if base.endswith("ing") and base not in _NOUN_VERBS:
+        return False
+    if base.endswith("ly") or (base.endswith("ed") and T.verb_of(base) and base not in _NOUN_VERBS) or base in _UNITS or base in _TECH_WORDS:
         return False
     return bool(re.fullmatch(r"[a-z][a-z_-]{2,}", base))
 
@@ -206,7 +224,8 @@ def _head_after(verb: str, s: T.Sentence) -> str:
             for w2 in words[i + 1: i + 8]:
                 after_det = prev in T._DETERMINERS or prev in ("one", "two", "new", "existing", "own")
                 prev = w2
-                if w2 in ("(", ")", ",", ";", ":", ".") or w2 in _PREPS or (T.verb_of(w2) and (head or not w2.endswith("s")) and not after_det and w2 not in ("order", "request", "offer")):
+                noun_verb = w2.endswith("s") and singular(w2) in _NOUN_VERBS
+                if w2 in ("(", ")", ",", ";", ":", ".") or w2 in _PREPS or (T.verb_of(w2) and (head or not w2.endswith("s")) and not after_det and not noun_verb and w2 not in ("order", "request", "offer")):
                     if w2 in ("and", "or") and not head:
                         continue
                     break
@@ -236,22 +255,33 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
         return bool(re.search(r"\b(?:a|an|the|each|every|its|their|one|any|per|this|that|new|existing|\d+)\s+(?:[a-z-]+\s+){0,2}" + re.escape(base) + r"s?\b", lowall)
                     or re.search(r"\b(?:all|the|these|those|of|per|for|with|from|to|into|between|\d[\d,]*|[a-z]+(?:ed|ing|ate|ant|ive))\s+(?:[a-z-]+\s+)?" + re.escape(base) + r"(?:s|es)\b", lowall)
                     or len(re.findall(r"\b" + re.escape(base) + r"(?:s|es)\b", lowall)) >= 2)
-    proper = {w.lower() for w in re.findall(r"(?<![.!?]\s)(?<!^)\b([A-Z][a-z]{2,})\b", alltext)}
+    caps = {}
+    for w in re.findall(r"\b([A-Z][a-z]{2,})\b", alltext):
+        caps[w.lower()] = caps.get(w.lower(), 0) + 1
     lower = {w for w in re.findall(r"\b([a-z]{3,})\b", alltext)}
-    proper = {w for w in proper if w not in lower and singular(w) not in lower}
+    # a word that is always capitalised (twice or more, or once mid-sentence) and never lower-case is a name, not a thing
+    mid = {w.lower() for w in re.findall(r"(?<![.!?:]\s)(?<!^)(?<!\n)(?<!- )\b([A-Z][a-z]{2,})\b", alltext)}
+    proper = {w for w, n in caps.items() if w not in lower and singular(w) not in lower and (n >= 2 or w in mid)}
 
     def determined(noun: str) -> bool:
         base = singular(noun)
+        if base.endswith("ed"):          # "the customer used": a participle after a subject is not a determined noun
+            return bool(re.search(r"\b(?:a|an|the|each|every|one|its|their|per|this|that)\s+" + re.escape(base) + r"s?\b", lowall))
         return bool(re.search(r"\b(?:a|an|the|each|every|one|its|their|per|this|that)\s+(?:[a-z-]+\s+)?" + re.escape(base) + r"s?\b", lowall))
 
-    def ent(noun: str, rid: str, pts: int = 1, allow_actor: bool = False) -> DEntity | None:
-        if not _noun_ok(noun, an, allow_actor, allow_verb=determined(noun)) or noun.lower() in proper or singular(noun) in proper or not thing_like(noun):
+    def ent(noun: str, rid: str, pts: int = 1, allow_actor: bool = False, strong: bool = False) -> DEntity | None:
+        base = singular(noun)
+        if base.endswith("ed") and (base[:-2] in lower or base[:-1] in lower or base[:-3] + base[-3] in lower or not determined(noun)):
+            return None                                           # "used", "flagged": a participle, not a thing
+        if not _noun_ok(noun, an, allow_actor, allow_verb=determined(noun)) or noun.lower() in proper or base in proper or not thing_like(noun):
             return None
         base = singular(noun)
         e = ents.setdefault(base, DEntity(base))
         e.score += pts
         if rid not in e.evidence:
             e.evidence.append(rid)
+        if (strong or pts >= 2) and rid not in e.strong:
+            e.strong.append(rid)
         return e
 
     for u in units:
@@ -338,6 +368,27 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                             for f in fields:
                                 if f not in [x[0] for x in e.fields]:
                                     e.fields.append((f, field_type(f), rid))
+        # "Every order has a delivery address and a chosen delivery slot", "A member has a display name, an email address …"
+        for m in _HAS_LIST.finditer(text):
+            noun, inside = m.group(1), m.group(2)
+            if T.verb_of(noun) and noun not in ("order", "request", "offer", "claim", "match", "ticket", "record"):
+                continue
+            fields = [_clean_field(f) for f in re.split(r",|\s+and\s+|/", inside)]
+            fields = [f for f in fields if f and not any(T.verb_of(w) and w not in ("estimate", "record", "order") for w in f.split("_")) and len(f) > 2]
+            if len(fields) >= 2 and _noun_ok(noun, an, allow_actor=True):
+                e = ent(noun, rid, 2, allow_actor=True)
+                if e:
+                    for f in fields:
+                        f = re.sub(r"^(?:chosen|current|default|primary|main|weekly|daily|total)_", "", f) or f
+                        if f not in [x[0] for x in e.fields]:
+                            e.fields.append((f, field_type(f), rid))
+        for m in re.finditer(r"\b(?:set|update|edit|change|record|enter|define)s?\s+(?:its|their|the)\s+((?:[a-z][a-z' -]{1,30}?(?:,\s*|\s+and\s+|\s*/\s*)){1,8}[a-z][a-z' -]{1,30})(?=[.;:)]|\s+(?:so that|before|after|which|that|for)\b|$)", text, re.I):
+            subj = _subject_entity(low[: m.start()], ents)
+            if subj is not None:
+                for f in re.split(r",|\s+and\s+|/", m.group(1)):
+                    f = _clean_field(re.sub(r"\s+in\s+[a-z]+$", "", f.strip()))
+                    if f and f not in [x[0] for x in subj.fields] and not any(T.verb_of(w) and w not in ("estimate", "record", "order") for w in f.split("_")):
+                        subj.fields.append((f, field_type(f), rid))
         # "amend the limit price or notional of a working order" → fields on order
         for m in _ATTR_OF.finditer(text):
             attr, noun = m.group(1).lower(), m.group(2)
@@ -377,10 +428,58 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                 eb = ent(b, rid, 0)
                 if eb:
                     ents[a].relations.append(("belongs_to", b, rid))
-        # arrow lists: dev → staging → prod; booked → changed → cancelled
+        # "is placed, then confirmed by the merchant, then shipped"
+        for m in _THEN_SEQ.finditer(text):
+            seq = [m.group(1).lower()] + [x.lower() for x in _THEN_ITEM.findall(m.group(2))]
+            subj = _subject_entity(low[: m.start()], ents) or _first_entity_in(low, ents)
+            if subj is None:
+                head = re.search(r"\b(?:an?|the|each|every)\s+([a-z][a-z-]{2,})\s+(?:is|are|gets|becomes)\s+" + re.escape(seq[0]), low)
+                subj = ent(head.group(1), rid, 1) if head else None
+            if subj is not None:
+                for st in seq:
+                    if st not in subj.states:
+                        subj.states.append(st)
+                for a, b in zip(seq, seq[1:]):
+                    subj.edges.append((a, b, rid))
+        # "may cancel it until it is shipped": cancel allowed from every state before shipped
+        for m in _UNTIL.finditer(text):
+            verb, until = T.verb_of(m.group(1).lower()) or m.group(1).lower(), m.group(2).lower()
+            subj = _first_entity_in(low, ents)
+            if subj is not None and verb in STATE_VERBS:
+                st = STATE_VERBS[verb]
+                for s0 in subj.states:
+                    if s0 == until:
+                        break
+                    if s0 != st:
+                        subj.edges.append((s0, st, rid))
+                if st not in subj.states:
+                    subj.states.append(st)
+                if until not in subj.states:
+                    subj.states.append(until)
+                subj.invariants.append((f"{verb} is not allowed once {until}", rid))
+        # "must confirm or decline an order within 2 hours, otherwise the order expires"
+        for m in _OTHERWISE.finditer(text):
+            subj = _first_entity_in(low, ents)
+            if subj is not None:
+                verbs_ = [T.verb_of(v.lower()) or v.lower() for v in (m.group(1), m.group(2)) if v]
+                tail = T.verb_of(m.group(3).lower()) or m.group(3).lower().rstrip("s")
+                src = subj.states[0] if subj.states else "new"
+                for v in verbs_:
+                    if v in STATE_VERBS:
+                        st = STATE_VERBS[v]
+                        if st not in subj.states:
+                            subj.states.append(st)
+                        subj.edges.append((src, st, rid))
+                if tail in STATE_VERBS:
+                    st = STATE_VERBS[tail]
+                    if st not in subj.states:
+                        subj.states.append(st)
+                    subj.edges.append((src, st, rid))
+                    subj.invariants.append((f"{st} when not {' or '.join(STATE_VERBS.get(v, v) for v in verbs_)} within the stated time", rid))
+        # arrow lists: dev → staging → prod; submitted → adjudicating → approved/held/rejected → paid
         for m in _ARROW_LIST.finditer(text):
             parts = [p.strip().lower() for p in re.split(r"→|->|=>|⟶", m.group(1))]
-            if len(parts) >= 2 and all(re.fullmatch(r"[a-z][a-z-]{1,15}", p) for p in parts):
+            if len(parts) >= 2 and all(re.fullmatch(r"[a-z][a-z-]{1,15}(?:\s*/\s*[a-z][a-z-]{1,15})*", p) for p in parts):
                 # attach to the entity named nearest before the list, else the most-scored entity in the sentence
                 before = low[: low.find(parts[0])]
                 cands = [n for n in ents if re.search(r"\b" + re.escape(n) + r"s?\b", before)]
@@ -388,22 +487,49 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                 if target is None:
                     target = next((ent(o, rid, 1) for v in s.verbs for o in [_head_after(v, s)] if o and _noun_ok(o, an)), None)
                 if target is not None:
-                    for p in parts:
-                        if p not in target.states:
-                            target.states.append(p)
-                    for x, y in zip(parts, parts[1:]):
-                        target.transitions.append((f"{x}→{y}", y, rid))
+                    groups = [[q.strip() for q in p.split("/")] for p in parts]
+                    for g in groups:
+                        for p in g:
+                            if p not in target.states:
+                                target.states.append(p)
+                    for ga, gb in zip(groups, groups[1:]):
+                        for x in ga:
+                            for y in gb:
+                                target.edges.append((x, y, rid))
+        # negated actions on a state: "once shipped it must not be cancelled", "declined … cannot be confirmed later",
+        # "cannot be marked done while …", "not refundable once …"
+        for m in re.finditer(r"\b(?:must not|cannot|can't|may not|must never|never)\s+(?:be\s+)?([a-z]+(?:ed|en)?)\b(?:\s+(?:later|again|twice|once|while|when|unless|without|for|until)\b)?", low):
+            verb = T.verb_of(m.group(1)) or m.group(1)
+            subj = _subject_entity(low[: m.start()], ents) or _first_entity_in(low, ents)
+            if subj is not None and (verb in STATE_VERBS or verb in KEEPING or verb in ("modify", "edit", "change", "delete", "refund", "issue")):
+                cm = re.search(r"\b(once|while|when|unless|until|after|before|that (?:has been|is|was)|without)\b\s+(?:it\s+|the\s+[a-z]+\s+|an?\s+[a-z]+\s+)?(?:is\s+|has been\s+|was\s+|not\s+)?([a-z]+(?:ed|en))\b", low)
+                if cm:
+                    cond = f" {cm.group(1).split()[0]} {'not ' if 'not' in low[cm.start():cm.end()] else ''}{cm.group(2)}"
+                else:
+                    cm2 = re.search(r"\b(once|while|when|unless|until|after|before|without)\b\s+([^,.;]{3,40})", low)
+                    cond = f" {cm2.group(1)} {' '.join(cm2.group(2).split()[:6])}" if cm2 else ""
+                txt = f"{verb} is not allowed{cond}"
+                if txt not in [x[0] for x in subj.invariants]:
+                    subj.invariants.append((txt, rid))
         # invariants: the entity the sentence is about carries them
         for rx, tmpl in _INVARIANT:
-            if re.search(rx, low):
-                subject = next((n for n in ents if re.search(r"\b" + re.escape(n) + r"s?\b", low)), None)
+            im = re.search(rx, low)
+            if im and "uniqueness" in tmpl and re.search(r"\bbelongs to\b|\bis owned by\b|\bper\b", low):
+                continue                               # "belongs to exactly one project" is a relation, not a uniqueness rule
+            if im:
+                subject = None
+                se = _subject_entity(low[: im.start()], ents) or _first_entity_in(low, ents)
+                if se is not None:
+                    subject = se.name
                 if subject is None:
                     o = next((o for v in s.verbs for o in [_head_after(v, s)] if o and _noun_ok(o, an)), None)
                     if o and ent(o, rid, 1) is not None:
                         subject = singular(o)
                 if subject and subject in ents:
                     verb = next((v for v in s.verbs if v in STATE_VERBS or v in TRANSACTIONAL), "record")
-                    txt = tmpl.format(noun=subject, verb=STATE_VERBS.get(verb, verb + ("d" if verb.endswith("e") else "ed")))
+                    wm = re.search(r"\b(?:once|after|when)\s+(?:it\s+|an?\s+[a-z]+\s+|the\s+[a-z]+\s+)?(?:is\s+|has been\s+)?([a-z]+(?:ed|en))\b", low)
+                    when = f"once {wm.group(1)}" if wm else "after creation"
+                    txt = tmpl.format(noun=subject, when=when, verb=STATE_VERBS.get(verb, verb + ("d" if verb.endswith("e") else "ed")))
                     if txt not in [x[0] for x in ents[subject].invariants]:
                         ents[subject].invariants.append((txt, rid))
                 break
@@ -417,6 +543,10 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
         for i, w in enumerate(words[:-1]):
             if w in ("a", "an", "each", "every", "per") and singular(words[i + 1]) in ents:
                 ents[singular(words[i + 1])].score += 1
+    for e in ents.values():
+        for rid in [f[2] for f in e.fields] + [i[1] for i in e.invariants] + [x[2] for x in e.edges] + [t[2] for t in e.transitions] + [r[2] for r in e.relations]:
+            if rid not in e.strong:
+                e.strong.append(rid)
     out = [e for e in ents.values() if e.score >= 2 or len(e.fields) >= 2 or len(e.states) >= 2 or e.invariants or e.relations]
     out.sort(key=lambda e: (-(e.score + 2 * len(e.fields) + len(e.states) + len(e.invariants)), e.name))
     out = out[:limit]
@@ -424,7 +554,29 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
     for e in out:
         e.relations = [(k, t, r) for k, t, r in dict.fromkeys(e.relations) if t in keep and t != e.name]
         e.transitions = list(dict.fromkeys(e.transitions))
+        e.edges = list(dict.fromkeys(e.edges))
+        e.invariants = list(dict.fromkeys(e.invariants))
     return out
+
+
+def _first_entity_in(low: str, ents: dict) -> DEntity | None:
+    """The entity mentioned earliest in the sentence (its grammatical subject, usually)."""
+    best, pos = None, len(low) + 1
+    for n, e in ents.items():
+        m = re.search(r"\b" + re.escape(n) + r"s?\b", low)
+        if m and m.start() < pos:
+            best, pos = e, m.start()
+    return best
+
+
+def _subject_entity(before: str, ents: dict) -> DEntity | None:
+    """The entity named last in the text before a phrase ("once an order is shipped it must never be …" → order)."""
+    best, pos = None, -1
+    for n, e in ents.items():
+        for m in re.finditer(r"\b" + re.escape(n) + r"s?\b", before):
+            if m.start() > pos:
+                best, pos = e, m.start()
+    return best
 
 
 def aggregates(ents: list[DEntity]) -> list[list[DEntity]]:
@@ -458,7 +610,7 @@ def to_markdown(ents: list[DEntity]) -> str:
     for e in ents:
         s.append("| " + e.display + " | " + (", ".join(f"{n} ({t})" for n, t, _ in e.fields) or "—")
                  + " | " + (", ".join(f"{k} {t}" for k, t, _ in e.relations) or "—")
-                 + " | " + (" → ".join(e.states) if e.states else "—")
+                 + " | " + ((", ".join(e.states) + ("; transitions: " + ", ".join(f"{a}→{b}" for a, b, _ in dict.fromkeys(e.edges)) if e.edges else "; transitions not stated")) if e.states else "—")
                  + " | " + ("; ".join(t for t, _ in e.invariants) or "—")
                  + " | " + ", ".join(e.evidence[:6]) + " |")
     return "\n".join(s) + "\n"

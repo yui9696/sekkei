@@ -258,6 +258,8 @@ graph LR
 |---|---|---|---|---|
 | `subscribe_address` | `address`: Address \| id | Address \| None | ValidationError, NotFound | — |
 | | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
+| `confirm_link` | `link`: Link \| id | Link \| None | ValidationError, NotFound | — |
+| | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
 | `export_subscriber` | `subscriber`: Subscriber \| id | Subscriber \| None | ValidationError, NotFound | — |
 | | from R-2: Admins can export the subscriber list as CSV. | | | |
 
@@ -354,8 +356,8 @@ graph LR
 |---|---|---|---|---|
 | `POST /address/{id}/subscribe` | `id`: str | 202 subscribe accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
 | | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
-| `GET /subscribers` | `filter`: query, `page`: cursor | 200 [subscriber], next cursor | 401 unauthenticated | — |
-| | from R-2: Admins can export the subscriber list as CSV. | | | |
+| `POST /links/{id}/confirm` | `id`: str | 202 confirm accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
 
 ## Entities
 
@@ -925,11 +927,11 @@ graph LR
   WP_3["WP-3 Outbound HTTP client (S)"]
   WP_4["WP-4 Authentication + Scheduler (M)"]
   WP_5["WP-5 Notifier (S)"]
-  WP_6["WP-6 Domain core (M)"]
-  WP_7["WP-7 Worker (M)"]
+  WP_6["WP-6 Domain core (S)"]
+  WP_7["WP-7 Worker (S)"]
   WP_8["WP-8 Import/export (S)"]
   WP_9["WP-9 Batch job (S)"]
-  WP_10["WP-10 Public HTTP API (M)"]
+  WP_10["WP-10 Public HTTP API (S)"]
   WP_2 --> WP_3
   WP_2 --> WP_4
   WP_2 --> WP_5
@@ -959,7 +961,7 @@ graph LR
 4. WP-7, WP-8
 5. WP-10, WP-9
 
-_Critical path (24 person-days):_ WP-2 → WP-5 → WP-6 → WP-8 → WP-10
+_Critical path (18 person-days):_ WP-2 → WP-5 → WP-6 → WP-8 → WP-9
 
 ### WP-1 — Audit log (S)
 
@@ -1017,7 +1019,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
   - A-6 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
-### WP-6 — Domain core (M)
+### WP-6 — Domain core (S)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
@@ -1028,7 +1030,7 @@ Implement Domain core: Business rules and validation for the domain entities; th
   - A-7 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: async_delivery
 
-### WP-7 — Worker (M)
+### WP-7 — Worker (S)
 
 Implement Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.
 
@@ -1062,7 +1064,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
   - A-11 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-10 — Public HTTP API (M)
+### WP-10 — Public HTTP API (S)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
