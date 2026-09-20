@@ -708,7 +708,7 @@ sequenceDiagram
   - + flexible queries
   - − complexity budget for a small team
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). REST/JSON over HTTP: 1.37; gRPC: 1.25; GraphQL: 1.12
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). REST/JSON over HTTP: 2.37; gRPC: 1.25; GraphQL: 1.12. stated in the constraints
 
 **Consequences.** Not choosing 'gRPC' gives up: typed contracts, streaming. Not choosing 'GraphQL' gives up: flexible queries.
 
@@ -727,6 +727,11 @@ _Affects:_ C-17
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -746,7 +751,7 @@ _Affects:_ C-17
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.27; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). PostgreSQL: 3.27; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers, multi_instance); Files: unavailable (ruled out by containers, multi_instance); In-memory: unavailable (ruled out by containers, multi_instance, postgres, durable_required). stated in the constraints
 
 _Affects:_ C-1
 
@@ -766,13 +771,17 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -1046,7 +1055,7 @@ _Affects:_ C-12
 
 ### D-18 — Assumed answer: compliance (Q-compliance) (proposed)
 
-**Context.** The requirements do not say. Question: Q-compliance. Evidence: personal data mentioned.
+**Context.** The requirements do not say. Question: Q-compliance. No evidence in the text; engine default.
 
 - ✔ **GDPR-style deletion + audit**
 - ✘ **no regime**

@@ -16,30 +16,63 @@ from .text import interval_seconds
 from .text import per_second as _per_second
 
 
+_PER_REPORT_NOUNS = {"points", "values", "readings", "measurements", "samples", "metrics", "signals", "channels", "fields"}
+_STANDARD_RE = re.compile(r"\b(?:iec|iso|rfc|ieee|din|en|ansi|itu|nist|fips|pci|ietf|jis|bs)[- ]?$", re.I)
+
+
+def _is_population(q, an: Analysis) -> bool:
+    """A count that can be divided by an interval: a population noun (users, devices, rtus, sites …), never a standard's
+    number ('IEC 60870 specialist') and never a noun that appears once with a number that reads as an identifier."""
+    if not q.noun:
+        return False
+    text = " ".join(u.sentence.text for u in an.requirements)
+    i = text.find(q.raw)
+    before = text[max(0, i - 8): i].strip() if i >= 0 else ""
+    if _STANDARD_RE.search(before) or re.search(r"\b(?:version|v|no\.?|number|#)\s*$", before, re.I):
+        return False
+    if q.noun in POPULATION_NOUNS or q.noun.rstrip("s") in POPULATION_NOUNS:
+        return True
+    return q.value >= 100 and text.lower().count(q.noun.lower()) >= 2 and q.noun.endswith("s")
+
+
 def implied_rate(an: Analysis) -> tuple[float, str] | None:
     """'2,000 online drivers ... every 5 seconds' -> 400/s with its derivation; None when not derivable."""
     interval = None
     src = ""
+    per_report = 1.0
+    per_txt = ""
     for u in an.requirements:
         secs = interval_seconds(u.sentence.text)
         if secs:
             interval, src = secs, u.id
+            # "reports 40 analogue points and 24 digital points every 4 seconds": items per report multiply the rate
+            per = [q for q in u.sentence.quantities if q.kind == "count" and q.noun in _PER_REPORT_NOUNS]
+            if per:
+                per_report = sum(q.value for q in per)
+                per_txt = f" × {' + '.join(q.raw for q in per)} {per[0].noun} per report"
             break
     if not interval:
         return None
-    pops = [(q, u) for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and (q.value >= 100 or q.noun in POPULATION_NOUNS or q.noun in ("drivers", "trucks", "devices", "sensors", "vehicles"))]
+    pops = [(q, u) for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)]
     if not pops:
         return None
     q, u = max(pops, key=lambda t: t[0].value)
-    return q.value / interval, f"{q.raw} {q.noun} ({u.id}) ÷ every {interval:g} s ({src})"
+    return q.value * per_report / interval, f"{q.raw} {q.noun} ({u.id}){per_txt} ÷ every {interval:g} s ({src})"
 
-def implied_inputs(an: Analysis) -> tuple[float, float]:
-    """The (count, interval seconds) pair behind ``implied_rate``; (0, 0) when not derivable."""
-    interval = next((interval_seconds(u.sentence.text) for u in an.requirements if interval_seconds(u.sentence.text)), None)
+def implied_inputs(an: Analysis) -> tuple[float, float, float]:
+    """The (count, per-report items, interval seconds) behind ``implied_rate``; zeros when not derivable."""
+    interval, per = None, 1.0
+    for u in an.requirements:
+        secs = interval_seconds(u.sentence.text)
+        if secs:
+            interval = secs
+            per_q = [q for q in u.sentence.quantities if q.kind == "count" and q.noun in _PER_REPORT_NOUNS]
+            per = sum(q.value for q in per_q) if per_q else 1.0
+            break
     if not interval:
-        return 0.0, 0.0
-    pops = [q for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and (q.value >= 100 or q.noun in POPULATION_NOUNS or q.noun in ("drivers", "trucks", "devices", "sensors", "vehicles"))]
-    return (max(q.value for q in pops) if pops else 0.0), interval
+        return 0.0, 1.0, 0.0
+    pops = [q for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)]
+    return (max(q.value for q in pops) if pops else 0.0), per, interval
 
 
 DEFAULT_PAYLOAD_BYTES = 2048
@@ -49,7 +82,10 @@ SIZE_DAYS = G.SIZE_WEIGHT   # person-days per package size (assumption); one tab
 #: count nouns that denote a population worth dividing a rate by (not "5 attempts")
 POPULATION_NOUNS = {"endpoints", "users", "tenants", "customers", "items", "records", "devices", "sensors", "clients",
                     "subscribers", "orders", "products", "accounts", "files", "warehouses", "stores", "sites", "nodes",
-                    "services", "queues", "topics", "channels", "rows", "documents", "events", "messages", "jobs"}
+                    "services", "queues", "topics", "channels", "rows", "documents", "events", "messages", "jobs",
+                    "rtus", "substations", "gateways", "loggers", "meters", "vehicles", "trucks", "drivers", "participants",
+                    "patients", "players", "matches", "tickets", "claims", "policies", "greenhouses", "farms", "fields", "stations",
+                    "terminals", "kiosks", "machines", "cameras", "turbines", "assets", "shipments", "parcels", "repos", "tests"}
 
 
 @dataclass
@@ -118,13 +154,13 @@ def capacity(an: Analysis) -> Capacity:
     implied = implied_rate(an)
     if implied and not [r for r in rates if not r[0].sentence.assumed]:
         rate_val, derivation = implied
-        n_pop, interval = implied_inputs(an)
-        cap.estimates.append(Estimate("implied update rate", _fmt(rate_val) + "/s", "count ÷ interval", derivation,
-                                      "count / interval", {"count": n_pop, "interval": interval}, rate_val))
+        n_pop, per, interval = implied_inputs(an)
+        cap.estimates.append(Estimate("implied update rate", _fmt(rate_val) + "/s", "count × items per report ÷ interval", derivation,
+                                      "count * per / interval", {"count": n_pop, "per": per, "interval": interval}, rate_val))
         cap.estimates.append(Estimate("implied updates per day", _fmt(rate_val * 86400), "implied rate × 86,400 s", derivation,
-                                      "count / interval * 86400", {"count": n_pop, "interval": interval}, rate_val * 86400))
+                                      "count * per / interval * 86400", {"count": n_pop, "per": per, "interval": interval}, rate_val * 86400))
         cap.estimates.append(Estimate("storage growth per day (updates)", _fmt(rate_val * 86400 * payload) + "B", "implied rate × 86,400 × record size", derivation + f"; {payload_src}",
-                                      "count / interval * 86400 * payload", {"count": n_pop, "interval": interval, "payload": payload}, rate_val * 86400 * payload))
+                                      "count * per / interval * 86400 * payload", {"count": n_pop, "per": per, "interval": interval, "payload": payload}, rate_val * 86400 * payload))
     if not rates and not implied:
         cap.missing.append("no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated")
     for u, q, r in rates[:2]:
@@ -150,7 +186,7 @@ def capacity(an: Analysis) -> Capacity:
                 cap.estimates.append(Estimate(f"outbound deliveries per second if each event matches {k} target(s)", _fmt(r * k),
                                               "event rate × fan-out", f"{q.raw} ({u.id}); fan-out {k} assumed",
                                               "rate * fanout", {**base, "fanout": k}, r * k))
-        for lu, lq in latencies[:1]:
+        for lu, lq in [x for x in latencies if x[1].value / (1000 if x[1].unit.lower().startswith("ms") else 1) <= 60][:1]:
             secs = lq.value / (1000 if lq.unit.lower().startswith("ms") else 1)
             cap.estimates.append(Estimate("in-flight items at the latency target", _fmt(r * secs),
                                           "rate × latency target (Little's law upper bound)", f"{q.raw} ({u.id}) × {lq.raw} ({lu.id})",
@@ -160,7 +196,7 @@ def capacity(an: Analysis) -> Capacity:
         cap.estimates.append(Estimate(f"concurrent handlers at the stated peak ({q.noun or 'requests'})", _fmt(conc),
                                       "Little's law: peak rate × mean service time", f"{q.raw} ({u.id}); mean service time assumed {DEFAULT_SERVICE_MS} ms",
                                       "rate * service_ms / 1000", {"rate": r, "service_ms": DEFAULT_SERVICE_MS}, conc))
-    populations = [(u, q) for u, q in counts if (q.value >= 100 or q.noun in POPULATION_NOUNS) and q.value > 0]
+    populations = [(u, q) for u, q in counts if _is_population(q, an) and q.value > 0]
     for u, q in populations[:3]:
         cap.estimates.append(Estimate(f"number of {q.noun}", _fmt(q.value), "stated", f"{q.raw} {q.noun} ({u.id})", "count", {"count": q.value}, q.value))
         if rates:

@@ -564,6 +564,11 @@ _Affects:_ C-6
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -583,9 +588,9 @@ _Affects:_ C-6
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 2.56; SQLite: 1.69; In-memory: 1.29; Files: 1.11; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 2.56; SQLite: 1.69; Files: 1.11; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); In-memory: unavailable (ruled out by durable_required)
 
-**Consequences.** Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'In-memory' gives up: fastest, trivial.
+**Consequences.** Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'Files' gives up: no dependencies, human readable.
 
 _Affects:_ C-1
 
@@ -605,13 +610,17 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.87; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.87; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 

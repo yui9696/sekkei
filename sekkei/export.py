@@ -63,7 +63,13 @@ def issue_body(d: Design, wp: WorkPackage) -> str:
             s.append(f"- [ ] {a.id}: {a.description}{cmd}")
         s.append("")
     s.append(f"_Size {wp.size}. Generated from design `{d.name}` v{d.version}; regenerate with `sekkei issues` after a design change._")
+    s.append(f"<!-- sekkei-key: {issue_key(wp)} -->")
     return "\n".join(s) + "\n"
+
+
+def issue_key(wp: WorkPackage) -> str:
+    """A key that survives renumbering: the package title (components), not its positional id."""
+    return re.sub(r"[^a-z0-9]+", "-", wp.title.lower()).strip("-")[:80]
 
 
 def _sh_quote(s: str) -> str:
@@ -75,15 +81,29 @@ def issues(d: Design) -> dict[str, str]:
     files: dict[str, str] = {}
     order = [w for wave in G.waves(G.package_graph(d)) for w in wave]
     by_id = {w.id: w for w in d.work_packages}
-    script = ["#!/bin/sh", "# Creates one GitHub issue per work package in dependency order (needs the gh CLI, run inside the repo).",
-              "# Usage: sh issues/create_issues.sh [extra gh flags, e.g. --milestone M1]", "set -e", "cd \"$(dirname \"$0\")\""]
-    csv = ["id,title,size,depends_on,components,requirements"]
+    script = ["#!/bin/sh", "# Creates or updates one GitHub issue per work package, in dependency order (needs the gh CLI; run inside the repo).",
+              "# Idempotent: an issue is found by the `sekkei-key:` marker in its body and edited in place; a new package gets a new issue.",
+              "# Dependencies are recorded as 'Blocked by #n' comments once the numbers are known (issues/.numbers).",
+              "# Usage: sh issues/create_issues.sh [extra gh flags, e.g. --milestone M1]", "set -e", "cd \"$(dirname \"$0\")\"", ": > .numbers",
+              "find_issue() { gh issue list --state all --search \"in:body \\\"sekkei-key: $1\\\"\" --json number --jq '.[0].number' 2>/dev/null; }",
+              "upsert() { key=$1; title=$2; body=$3; labels=$4; shift 4",
+              "  n=$(find_issue \"$key\")",
+              "  if [ -n \"$n\" ]; then gh issue edit \"$n\" --title \"$title\" --body-file \"$body\" >/dev/null; else n=$(gh issue create --title \"$title\" --body-file \"$body\" --label \"$labels\" \"$@\" | sed 's#.*/##'); fi",
+              "  echo \"$key $n\" >> .numbers; echo \"$key -> #$n\"; }",
+              "blocked_by() { n=$(grep \"^$1 \" .numbers | cut -d' ' -f2); m=$(grep \"^$2 \" .numbers | cut -d' ' -f2)",
+              "  [ -n \"$n\" ] && [ -n \"$m\" ] && gh issue comment \"$n\" --body \"Blocked by #$m (sekkei dependency)\" >/dev/null || true; }"]
+    csv = ["key,title,size,depends_on,components,requirements"]
     for wid in order:
         w = by_id[wid]
         files[f"issues/{w.id}.md"] = issue_body(d, w)
         labels = ",".join(["sekkei", SIZE_LABEL.get(w.size, "size:M")])
-        script.append(f"gh issue create --title {_sh_quote(w.id + ': ' + w.title)} --body-file {w.id}.md --label {_sh_quote(labels)} \"$@\"")
-        csv.append(",".join([w.id, '"' + w.title.replace('"', '""') + '"', w.size, " ".join(w.depends_on), " ".join(w.components), " ".join(w.satisfies)]))
+        script.append(f"upsert {_sh_quote(issue_key(w))} {_sh_quote(w.title)} {w.id}.md {_sh_quote(labels)} \"$@\"")
+        csv.append(",".join([issue_key(w), '"' + w.title.replace('"', '""') + '"', w.size, " ".join(issue_key(by_id[x]) for x in w.depends_on if x in by_id), " ".join(w.components), " ".join(w.satisfies)]))
+    for wid in order:
+        w = by_id[wid]
+        for dep in w.depends_on:
+            if dep in by_id:
+                script.append(f"blocked_by {_sh_quote(issue_key(w))} {_sh_quote(issue_key(by_id[dep]))}")
     files["issues/create_issues.sh"] = "\n".join(script) + "\n"
     files["issues/issues.csv"] = "\n".join(csv) + "\n"
     return files

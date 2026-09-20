@@ -35,7 +35,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-6 | functional | must | Every decision is recorded with the model version, the inputs and who took it, for regulators. | — |
 | R-7 | functional | must | Applicants can download a copy of their data and request deletion after the retention period. | — |
 | R-8 | nonfunctional | must | 2,000 applications per day; 1,000 pending applications at any time; scoring returns within 2 s p95. | p95 latency at 2,000, 1,000 <= 2 s |
-| R-9 | nonfunctional | must | No application or decision is lost on a crash; a decision is never recorded twice. | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-9 | nonfunctional | must | No application or decision is lost on a crash; a decision is never recorded twice. | occurrences of the forbidden action (record) = 0 occurrences |
 | R-10 | nonfunctional | should | Personal and financial data are encrypted; access to documents is logged; decisions are retained for 7 years. | time 7 years |
 | R-11 | nonfunctional | must | 99.9 % monthly availability for the applicant surface; metrics for Prometheus; structured logs. | ratio 99.9 % |
 | R-12 | constraint | must | Python 3.12, PostgreSQL and S3-compatible object storage available; containers behind an existing ingress; single region. Team of 5. | — |
@@ -466,7 +466,7 @@ graph LR
 |---|---|---|---|---|
 | `request_deletion` | `subject_id`: str, `requested_by`: Principal | DeletionRequest | — | request recorded with a deadline |
 | `run_due` | `now`: datetime | int completed | — | — |
-| | deletes or anonymises across every store; audit entry per subject | | | |
+| | deletes or anonymises the subject's personal data in every store except append-only audit/chain-of-custody records, which are pseudonymised; audit entry per subject | | | |
 | `export` | `subject_id`: str | archive | — | — |
 | | everything held about the subject, machine readable | | | |
 
@@ -688,13 +688,17 @@ sequenceDiagram
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -713,6 +717,11 @@ _Affects:_ C-10
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -732,7 +741,7 @@ _Affects:_ C-10
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required). stated in the constraints
 
 _Affects:_ C-1
 
@@ -828,8 +837,13 @@ _Affects:_ C-18, C-1
   - + no legacy code changes
   - − coupled to the legacy schema
   - − capture tooling to operate
+- ✘ **Events over the existing message topics (the stated integration points); no new synchronous calls**
+  - + decoupled
+  - + already operated
+  - − at-least-once: consumers must be idempotent
+  - − schema of the topics to govern
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41; Events over the existing message topics: unavailable (needs broker, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
@@ -1081,7 +1095,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **write scope**: `app/store.py`, `tests/test_store.py`, `app/observability.py`, `tests/test_observability.py`
 - **acceptance**:
   - A-3 (test) unit tests of Store, Observability pass — `python -m pytest -q tests/test_store.py tests/test_observability.py`
-  - A-4 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-4 (metric) R-9: occurrences of the forbidden action (record) = 0 occurrences — metric R-9
   - A-5 (metric) R-11: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-11
 - **notes**: family: infra
 
@@ -1105,7 +1119,6 @@ Implement Data protection: Retention schedules, deletion and export requests for
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
   - A-7 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
-  - A-8 (metric) R-10: time 7 years — metric R-10
 - **notes**: family: compliance_data
 
 ### WP-6 — Authentication + Scheduler (M)
@@ -1116,8 +1129,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-3 · **satisfies**: R-5, R-10, R-13, R-14
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
-  - A-10 (metric) R-10: time 7 years — metric R-10
+  - A-8 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
 - **notes**: family: infra
 
 ### WP-7 — Identity and credit checks (S)
@@ -1128,7 +1140,7 @@ Implement Identity and credit checks: Calls the external identity/credit provide
 - **depends on**: WP-3 · **satisfies**: R-2, R-3
 - **write scope**: `app/verifier.py`, `tests/test_verifier.py`
 - **acceptance**:
-  - A-11 (test) unit tests of Identity and credit checks pass — `python -m pytest -q tests/test_verifier.py`
+  - A-9 (test) unit tests of Identity and credit checks pass — `python -m pytest -q tests/test_verifier.py`
 - **notes**: family: kyc
 
 ### WP-8 — Notifier (S)
@@ -1139,7 +1151,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-3 · **satisfies**: R-3, R-4, R-5
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`
 - **acceptance**:
-  - A-12 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+  - A-10 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: workflow
 
 ### WP-9 — Domain core (S)
@@ -1150,8 +1162,8 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-3, WP-4, WP-7, WP-8 · **satisfies**: R-1, R-2, R-3, R-5, R-9, R-12, R-18, R-19
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-13 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
-  - A-14 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-11 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-12 (metric) R-9: occurrences of the forbidden action (record) = 0 occurrences — metric R-9
 - **notes**: family: file_storage
 
 ### WP-10 — Workflow engine (S)
@@ -1162,7 +1174,7 @@ Implement Workflow engine: Runs the approval/state machine: allowed transitions,
 - **depends on**: WP-3, WP-8 · **satisfies**: R-3, R-4, R-5
 - **write scope**: `app/workflow.py`, `tests/test_workflow.py`
 - **acceptance**:
-  - A-15 (test) unit tests of Workflow engine pass — `python -m pytest -q tests/test_workflow.py`
+  - A-13 (test) unit tests of Workflow engine pass — `python -m pytest -q tests/test_workflow.py`
 - **notes**: family: workflow
 
 ### WP-11 — Import/export (S)
@@ -1173,7 +1185,7 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-9 · **satisfies**: R-5
 - **write scope**: `app/exporter.py`, `tests/test_exporter.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Import/export pass — `python -m pytest -q tests/test_exporter.py`
+  - A-14 (test) unit tests of Import/export pass — `python -m pytest -q tests/test_exporter.py`
 - **notes**: family: import_export
 
 ### WP-12 — Legacy system adapter (S)
@@ -1184,7 +1196,7 @@ Implement Legacy system adapter: Anti-corruption layer in front of the existing 
 - **depends on**: WP-9 · **satisfies**: R-5
 - **write scope**: `app/legacy_adapter.py`, `tests/test_legacy_adapter.py`
 - **acceptance**:
-  - A-17 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
+  - A-15 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
 - **notes**: family: legacy_integration
 
 ### WP-13 — Batch job (S)
@@ -1195,7 +1207,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-3, WP-6, WP-9, WP-11 · **satisfies**: R-5
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-18 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-16 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
 ### WP-14 — Public HTTP API (S)
@@ -1206,33 +1218,33 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-3, WP-6, WP-9, WP-10, WP-11 · **satisfies**: R-8, R-12, R-15, R-16
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
-  - A-19 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-20 (metric) R-8: p95 latency at 2,000, 1,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-18 (metric) R-8: p95 latency at 2,000, 1,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-8
 - **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-7 | WP-2, WP-9 | A-2, A-13, A-14 |
-| R-2 | must | C-5, C-7, C-13 | WP-7, WP-9 | A-11, A-13, A-14 |
-| R-3 | must | C-5, C-7, C-8, C-11, C-13, C-14 | WP-4, WP-7, WP-8, WP-9, WP-10 | A-6, A-11, A-12, A-13, A-14, A-15 |
-| R-4 | must | C-8, C-14 | WP-8, WP-10 | A-12, A-15 |
-| R-5 | must | C-6, C-7, C-8, C-12, C-14, C-15, C-16, C-17 | WP-6, WP-8, WP-9, WP-10, WP-11, WP-12, WP-13 | A-9, A-10, A-12, A-13, A-14, A-15, A-16, A-17, A-18 |
+| R-1 | must | C-3, C-7 | WP-2, WP-9 | A-2, A-11, A-12 |
+| R-2 | must | C-5, C-7, C-13 | WP-7, WP-9 | A-9, A-11, A-12 |
+| R-3 | must | C-5, C-7, C-8, C-11, C-13, C-14 | WP-4, WP-7, WP-8, WP-9, WP-10 | A-6, A-9, A-10, A-11, A-12, A-13 |
+| R-4 | must | C-8, C-14 | WP-8, WP-10 | A-10, A-13 |
+| R-5 | must | C-6, C-7, C-8, C-12, C-14, C-15, C-16, C-17 | WP-6, WP-8, WP-9, WP-10, WP-11, WP-12, WP-13 | A-8, A-10, A-11, A-12, A-13, A-14, A-15, A-16 |
 | R-6 | must | C-4 | WP-1 | A-1 |
-| R-7 | must | C-4, C-18 | WP-1, WP-5 | A-1, A-7, A-8 |
-| R-8 | must | C-19 | WP-14 | A-19, A-20 |
-| R-9 | must | C-1, C-7 | WP-3, WP-9 | A-3, A-4, A-5, A-13, A-14 |
-| R-10 | should | C-10, C-18 | WP-5, WP-6 | A-7, A-8, A-9, A-10 |
+| R-7 | must | C-4, C-18 | WP-1, WP-5 | A-1, A-7 |
+| R-8 | must | C-19 | WP-14 | A-17, A-18 |
+| R-9 | must | C-1, C-7 | WP-3, WP-9 | A-3, A-4, A-5, A-11, A-12 |
+| R-10 | should | C-10, C-18 | WP-5, WP-6 | A-7, A-8 |
 | R-11 | must | C-9 | WP-3 | A-3, A-4, A-5 |
-| R-12 | must | C-1, C-7, C-19 | WP-3, WP-9, WP-14 | A-3, A-4, A-5, A-13, A-14, A-19, A-20 |
-| R-13 | must | C-10 | WP-6 | A-9, A-10 |
-| R-14 | could | C-10 | WP-6 | A-9, A-10 |
-| R-15 | must | C-19 | WP-14 | A-19, A-20 |
-| R-16 | should | C-19 | WP-14 | A-19, A-20 |
+| R-12 | must | C-1, C-7, C-19 | WP-3, WP-9, WP-14 | A-3, A-4, A-5, A-11, A-12, A-17, A-18 |
+| R-13 | must | C-10 | WP-6 | A-8 |
+| R-14 | could | C-10 | WP-6 | A-8 |
+| R-15 | must | C-19 | WP-14 | A-17, A-18 |
+| R-16 | should | C-19 | WP-14 | A-17, A-18 |
 | R-17 | must | C-9 | WP-3 | A-3, A-4, A-5 |
-| R-18 | must | C-7 | WP-9 | A-13, A-14 |
-| R-19 | must | C-7 | WP-9 | A-13, A-14 |
+| R-18 | must | C-7 | WP-9 | A-11, A-12 |
+| R-19 | must | C-7 | WP-9 | A-11, A-12 |
 
 ## Conventions
 

@@ -960,24 +960,6 @@
           "description": "from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor."
         },
         {
-          "name": "notify_sms",
-          "inputs": [
-            {
-              "name": "sms",
-              "type": "Sms | id",
-              "description": ""
-            }
-          ],
-          "output": "Sms | None",
-          "errors": [
-            "ValidationError",
-            "NotFound"
-          ],
-          "pre": "stated values: 5 minutes (R-4)",
-          "post": "",
-          "description": "from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n"
-        },
-        {
           "name": "aggregate_readings",
           "inputs": [
             {
@@ -1751,6 +1733,16 @@
           ]
         },
         {
+          "name": "Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)",
+          "pros": [
+            "fits clients without a browser",
+            "revocable per device"
+          ],
+          "cons": [
+            "a token service to run"
+          ]
+        },
+        {
           "name": "Email one-time code / magic link (no account needed)",
           "pros": [
             "no password, no sign-up",
@@ -1763,7 +1755,7 @@
         }
       ],
       "choice": "API keys per customer, hashed at rest, sent as a bearer token",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)",
       "consequences": "Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
@@ -1794,6 +1786,17 @@
           ],
           "cons": [
             "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Redis for the hot state (as stated) with a relational store for durable records",
+          "pros": [
+            "the stated home of the hot data",
+            "sub-millisecond reads"
+          ],
+          "cons": [
+            "two stores to keep consistent",
+            "Redis durability depends on AOF/fsync"
           ]
         },
         {
@@ -1840,7 +1843,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required, on_prem). stated in the constraints",
       "consequences": "",
       "affects": [
         "C-1"
@@ -2654,13 +2657,6 @@
           "kind": "test",
           "command": "./gradlew test --tests app.AuthTest",
           "metric": ""
-        },
-        {
-          "id": "A-5",
-          "description": "R-8: time at 5 years 90 days",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
         }
       ],
       "notes": "family: infra"
@@ -2688,7 +2684,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-6",
+          "id": "A-5",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "./gradlew test --tests app.NotifierTest",
@@ -2720,7 +2716,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-6",
           "description": "unit tests of Readings processor pass",
           "kind": "test",
           "command": "./gradlew test --tests app.ReadingsProcessorTest",
@@ -2761,14 +2757,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-7",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "./gradlew test --tests app.CoreTest",
           "metric": ""
         },
         {
-          "id": "A-9",
+          "id": "A-8",
           "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
@@ -2801,7 +2797,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-9",
           "description": "unit tests of MQTT consumer pass",
           "kind": "test",
           "command": "./gradlew test --tests app.MqttConsumerTest",
@@ -2833,7 +2829,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-10",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "./gradlew test --tests app.ExporterTest",
@@ -2871,18 +2867,11 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-11",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "./gradlew test --tests app.BatchTest",
           "metric": ""
-        },
-        {
-          "id": "A-13",
-          "description": "R-8: time at 5 years 90 days",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-8"
         }
       ],
       "notes": "family: batch_pipeline"
@@ -2917,14 +2906,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-14",
+          "id": "A-12",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "./gradlew test --tests app.SurfaceApiTest",
           "metric": ""
         },
         {
-          "id": "A-15",
+          "id": "A-13",
           "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

@@ -26,8 +26,6 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | backlog after a 1 h downstream outage | 83.33 applications | rate × outage seconds | 2,000 (R-8); outage length assumed |
 | concurrent handlers to sustain the rate (applications) | 0 | Little's law: rate × mean service time | 2,000 (R-8); mean service time assumed 200 ms |
 | in-flight items at the latency target | 0.05 | rate × latency target (Little's law upper bound) | 2,000 (R-8) × 2 s (R-8) |
-| number of pending | 1 k | stated | 1,000 pending (R-8) |
-| average rate per pending (if evenly spread) | 0/s | rate ÷ count | 2,000 ÷ 1,000 |
 
 - Assumption: Record size: 2 KB stated in R-15.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -109,7 +107,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-6 | functional | must | audit_log | — | — |
 | R-7 | functional | must | compliance_data | compliance | — |
 | R-8 | nonfunctional | must | — | performance | p95 latency at 2,000, 1,000 <= 2 s |
-| R-9 | nonfunctional | must | — | consistency, durability | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-9 | nonfunctional | must | — | consistency, durability | occurrences of the forbidden action (record) = 0 occurrences |
 | R-10 | nonfunctional | should | — | security | time 7 years |
 | R-11 | nonfunctional | must | observability | availability, operability | ratio 99.9 % |
 | R-12 | constraint | must | file_storage | scalability, simplicity | — |
@@ -123,4 +121,5 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “A digital lender takes personal-loan applications online, checks identity and cr” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “A digital lender takes personal-loan applications online, checks identity and credit, and hands approved loans to the core banking system.” — introduction before the first heading

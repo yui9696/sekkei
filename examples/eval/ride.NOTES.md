@@ -9,7 +9,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | # | topic | question answered | engine's answer | basis | if the real answer differs |
 |---|---|---|---|---|---|
-| 1 | load | Q-rate | 400 updates/s sustained (derived), 10x at peak. | evidence: 2,000 online (R-7) ÷ every 5 s (R-3) — Derived from the text: 2,000 online (R-7) ÷ every 5 s (R-3). | State the measured rate; capacity estimates and the queue decision change. |
+| 1 | load | Q-rate | 400 updates/s sustained (derived), 10x at peak. | evidence: 2,000 drivers (R-7) ÷ every 5 s (R-3) — Derived from the text: 2,000 drivers (R-7) ÷ every 5 s (R-3). | State the measured rate; capacity estimates and the queue decision change. |
 | 2 | load | Q-payload | 2 KB typical, 256 KB maximum per record. | default — Typical JSON record sizes; the maximum bounds request bodies. | State the sizes; storage growth and body limits change. |
 | 3 | quality | Q-availability | 99.9 % monthly; during an outage work is delayed, nothing accepted is lost. | default — Three nines is achievable with two instances and health-based restarts; anything higher needs multi-region. | State the target and what may be lost; topology and queue durability change. |
 | 4 | data | Q-retention | Domain records kept indefinitely; logs and audit history 1 year, then deleted by a nightly job. | default — Deleting domain data is never a safe default; bounded retention for logs and history limits growth and satisfies most data-minimisation rules. | State the retention per record class; the deletion job and capacity change. |
@@ -29,9 +29,9 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| implied update rate | 400/s | count ÷ interval | 2,000 online (R-7) ÷ every 5 s (R-3) |
-| implied updates per day | 34.56 M | implied rate × 86,400 s | 2,000 online (R-7) ÷ every 5 s (R-3) |
-| storage growth per day (updates) | 70.78 GB | implied rate × 86,400 × record size | 2,000 online (R-7) ÷ every 5 s (R-3); 2 KB stated in R-14 |
+| implied update rate | 400/s | count × items per report ÷ interval | 2,000 drivers (R-7) ÷ every 5 s (R-3) |
+| implied updates per day | 34.56 M | implied rate × 86,400 s | 2,000 drivers (R-7) ÷ every 5 s (R-3) |
+| storage growth per day (updates) | 70.78 GB | implied rate × 86,400 × record size | 2,000 drivers (R-7) ÷ every 5 s (R-3); 2 KB stated in R-14 |
 | updates per day | 34.56 M | rate × 86,400 s | 400 (R-13) |
 | storage growth per day (updates) | 70.78 GB | rate × 86,400 × record size | 400 (R-13); 2 KB stated in R-14 |
 | storage after 30 days (updates) | 2.12 TB | daily growth × 30 | same inputs |
@@ -39,12 +39,10 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | concurrent handlers to sustain the rate (updates) | 80 | Little's law: rate × mean service time | 400 (R-13); mean service time assumed 200 ms |
 | in-flight items at the latency target | 800 | rate × latency target (Little's law upper bound) | 400 (R-13) × 2 s (R-7) |
 | concurrent handlers at the stated peak (updates) | 800 | Little's law: peak rate × mean service time | 4,000 (R-13); mean service time assumed 200 ms |
-| number of concurrent | 300 | stated | 300 concurrent (R-7) |
-| average rate per concurrent (if evenly spread) | 1.33/s | rate ÷ count | 400 ÷ 300 |
-| number of online | 2 k | stated | 2,000 online (R-7) |
-| average rate per online (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
-| number of online | 2 k | stated | 2,000 online (R-13) |
-| average rate per online (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
+| number of drivers | 2 k | stated | 2,000 drivers (R-7) |
+| average rate per driver (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
+| number of drivers | 2 k | stated | 2,000 drivers (R-13) |
+| average rate per driver (if evenly spread) | 0.2/s | rate ÷ count | 400 ÷ 2,000 |
 
 - Assumption: Record size: 2 KB stated in R-14.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -120,7 +118,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-5 | functional | must | **none** | operability | — |
 | R-6 | functional | must | **none** | performance, operability | — |
 | R-7 | nonfunctional | must | — | consistency, performance | p95 latency at 300, 2,000 <= 2 s |
-| R-8 | nonfunctional | should | — | durability | records lost across a process crash = 0 records |
+| R-8 | nonfunctional | should | — | durability | occurrences of the forbidden action (request) = 0 occurrences |
 | R-9 | nonfunctional | should | — | — | time 30 days |
 | R-10 | constraint | must | geo | simplicity | — |
 | R-11 | constraint | must | auth | security | — |
@@ -135,4 +133,5 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “A city taxi cooperative needs a backend that matches ride requests to nearby dri” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “A city taxi cooperative needs a backend that matches ride requests to nearby drivers and tracks each trip.” — introduction before the first heading

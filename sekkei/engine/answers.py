@@ -148,7 +148,8 @@ def answer(q: Question, an: Analysis) -> Answer | None:
                      ["named regime + deletion + audit", "no regime", "HIPAA/PCI controls"], "The requirements name a data-protection regime or a deletion right.", "compliance_data pattern",
                      "State the statutory deadline; the deletion job's deadline changes.", ["data_protection", "audit"], ["compliance_data"])
         return A(q.id, q.topic, "Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged.", [("functional", "Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine).")],
-                 ["GDPR-style deletion + audit", "no regime", "HIPAA/PCI controls"], "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.", "personal data mentioned",
+                 ["GDPR-style deletion + audit", "no regime", "HIPAA/PCI controls"], "Email addresses or names are personal data almost everywhere; deletion on request is the common denominator.",
+                 "personal data mentioned" if _has(an, r"\bpersonal data\b|\bpii\b|\bgdpr\b|\bemail address|\bnames?\b|\bcustomer data\b|\bpatient") else "",
                  "State the regime; audit and deletion paths change.", ["audit", "store"], ["audit_log"])
     if q.id == "Q-alerting":
         return A(q.id, q.topic, "Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes.", [("nonfunctional", "An alert is raised when the error rate exceeds 1 % for 5 minutes or the queue depth grows for 10 minutes (assumed by the engine).")],

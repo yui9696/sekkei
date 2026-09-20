@@ -132,7 +132,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
         print(json.dumps({"changes": [c.__dict__ for c in changes], "affected": affected}, indent=2))
     else:
         sys.stdout.write(DF.format_diff(changes, affected))
-    return 1 if changes else 0
+    return 1 if any(c.kind != "renumbered" for c in changes) else 0
 
 
 def cmd_plan(args: argparse.Namespace) -> int:

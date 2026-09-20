@@ -107,6 +107,15 @@ def place(u: ReqUnit, d: Design, layout: K.Layout, cid: dict[str, str], iid: dic
     if scored and scored[0][0] >= 2:
         score, comp = scored[0]
         return Placement(u.id, [comp.id], f"matched (score {score})", f"shared tokens with {comp.name}: {', '.join(sorted(stoks & _tokens_of(comp, d, u.id)))}")
+    # a prohibition, a statement without a verb, or one whose verbs only state a need: a rule the core enforces,
+    # never a new component named after a stray noun ("Apac processor", "Slow processor")
+    from .text import STATIVE_VERBS
+    real_verbs = [v for v in verbs if v not in STATIVE_VERBS]
+    if u.sentence.prohibition or not real_verbs:
+        owners = [cid["core"]] if "core" in cid else ([cid[surfaces[0]]] if surfaces else [])
+        if owners:
+            why = "a prohibition: a rule the core enforces" if u.sentence.prohibition else "no operation-like verb: a rule/property the core carries"
+            return Placement(u.id, owners, "core rule", why)
     # synthesise
     verb = next((v for v in verbs if v in READ_VERBS | CONTROL_VERBS | COMPUTE_VERBS), verbs[0] if verbs else "")
     obj = _object_phrase(verb, u) if verb else ""

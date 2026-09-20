@@ -140,7 +140,8 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Patients during outside mobile app from so that bookings. Accept.” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “Patients during outside mobile app from so that bookings. Accept.” — introduction before the first heading
 
 ## 7. Input normalisation (Japanese → canonical English)
 

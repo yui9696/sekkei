@@ -55,7 +55,8 @@ ACTORS = {
     "教師": "teachers", "講師": "teachers", "学生": "students", "生徒": "students", "受講者": "learners", "保護者": "guests",
     "ドライバー": "drivers", "運転手": "drivers", "乗客": "passengers", "配送員": "drivers", "配達員": "drivers",
     "訪問者": "visitors", "ゲスト": "guests", "閲覧者": "readers", "読者": "readers", "編集者": "editors", "著者": "authors",
-    "主治医": "attending physicians", "看護師": "nurses", "患者本人": "patients", "審査者": "reviewers", "承認者": "managers", "申請者": "requesters", "市民": "citizens", "住民": "citizens", "経理": "accounting staff",
+    "主治医": "attending physicians", "看護師": "nurses", "患者本人": "patients", "生産者": "growers", "営農指導員": "farm advisors", "提案者": "bidders",
+    "当連合": "the federation", "運用担当者": "operators", "事業者": "vendors", "審査者": "reviewers", "承認者": "managers", "申請者": "requesters", "市民": "citizens", "住民": "citizens", "経理": "accounting staff",
     "経理担当": "accounting staff", "情シス": "it staff", "総務": "staff", "人事": "hr staff", "営業": "sales staff", "店舗オーナー": "store owners", "オーナー": "owners",
     "外部サービス": "external services", "外部システム": "external services", "内部サービス": "internal services",
     "他システム": "external services", "連携先": "external services", "基幹システム": "external services",
@@ -136,6 +137,14 @@ NOUNS = {
     "状態": "state", "ステータス": "status", "進捗": "progress", "タスク": "tasks", "プロジェクト": "projects", "マイルストーン": "milestones",
     "モデル": "model", "埋め込み": "embeddings", "要約": "summaries", "翻訳": "translations", "言語": "language",
     "顧客": "customers", "利用者": "users", "ユーザー": "users", "管理者": "admins",   # as objects: 「利用者を招待できる」
+    "圃場": "fields", "施設園芸": "greenhouses", "ハウス": "greenhouses", "センサーノード": "sensor nodes", "ノード": "nodes",
+    "圃場ゲートウェイ": "field gateways", "土壌水分": "soil moisture", "地温": "soil temperature", "気温": "air temperature", "日射": "solar radiation",
+    "灌水バルブ": "irrigation valves", "灌水": "irrigation", "バルブ": "valves", "制御指示": "control commands", "自動制御": "automatic control",
+    "営農管理システム": "farm management system", "日次集計": "daily aggregates", "永年": "indefinitely", "先行運用": "pilot operation",
+    "デバイス証明書": "per-device certificates", "個人情報保護法": "the personal data protection law (APPI)", "回線": "link", "山間部": "mountainous areas",
+    "通信途絶": "connectivity loss", "途絶": "connectivity loss", "数時間": "several hours", "遅延なく": "without delay", "同時送信": "simultaneous sends",
+    "有効・無効": "enable or disable", "切り替え": "switch", "切り替えられる": "can switch", "交換": "replacement", "廃止": "decommissioning",
+    "調達": "procurement", "ハードウェア": "hardware", "ソフトウェア": "software", "画像診断": "image diagnosis", "病害虫": "pests and diseases", "提出物": "deliverables", "提案書": "proposal",
     "測定値": "readings", "測定": "measurement", "機器": "devices", "医療機器": "medical devices", "血圧計": "blood pressure monitors", "体重計": "scales",
     "パルスオキシメータ": "pulse oximeters", "ゲートウェイ": "gateway", "主治医": "attending physicians", "訪問看護ステーション": "home nursing stations",
     "閾値": "thresholds", "上限": "upper limit", "下限": "lower limit", "所見": "findings", "電子カルテ": "electronic health record", "訂正履歴": "correction history",
@@ -205,7 +214,7 @@ QUALITIES = {
     "下回る": "falls below", "下回った": "falls below", "上回る": "exceeds", "超える": "exceeds", "超えた": "exceeds",
     "発注点": "reorder level", "在庫切れ": "out of stock", "欠品": "out of stock", "遅い": "slow", "遅くても": "at most",
     "に従って": "in accordance with", "に従い": "in accordance with", "委ねる": "delegated to", "委ね": "delegated to",
-    "把握": "track", "背後": "behind", "既存": "existing", "同一": "same", "順番": "order", "順序通り": "in order", "一度だけ": "exactly once", "少なくとも一度": "at least once",
+    "以降": "onwards", "以下「": "", "把握": "track", "背後": "behind", "既存": "existing", "同一": "same", "順番": "order", "順序通り": "in order", "一度だけ": "exactly once", "少なくとも一度": "at least once",
     "取りこぼさない": "must never be lost", "取りこぼし": "lost", "落とさない": "must never be lost", "確実に": "reliably",
     "エラー": "errors", "例外": "errors", "タイムアウト": "timeout", "接続数": "connections", "同時接続": "concurrent connections",
     "レスポンス": "response", "処理時間": "latency", "処理速度": "throughput", "秒間": "per second", "毎秒": "per second",
@@ -302,7 +311,8 @@ _COUNTER = {"件": "requests", "回": "requests", "リクエスト": "requests",
             "レコード": "records", "ファイル": "files", "枚": "images", "本": "items", "個": "items", "点": "items", "件数": "items",
             "ユーザー": "users", "利用者": "users", "顧客": "customers", "デバイス": "devices", "センサー": "sensors", "端末": "devices",
             "車両": "vehicles", "商品": "products", "注文": "orders", "文書": "documents", "ドキュメント": "documents", "テナント": "tenants",
-            "店": "stores", "端末台": "devices", "エンドポイント": "endpoints", "接続": "connections", "同時接続": "concurrent connections"}
+            "店": "stores", "端末台": "devices", "エンドポイント": "endpoints", "接続": "connections", "同時接続": "concurrent connections",
+            "箇所": "sites", "カ所": "sites", "ヶ所": "sites", "か所": "sites", "圃場": "fields", "ノード": "nodes", "センサーノード": "sensor nodes", "ゲートウェイ": "gateways", "種": "kinds"}
 
 
 def _num(m: re.Match) -> str:
@@ -342,6 +352,7 @@ def _restore_times(en: str) -> str:
 
 
 def _numbers_core(s: str) -> str:
+    s = re.sub(r"(?:開発体制|体制|チーム)\s*(?:は|が|:|：)?\s*(\d+)\s*(?:名|人)\s*以上", r"Team of \1", s)
     s = re.sub(r"チーム\s*(?:は|が|:|：)?\s*(\d+)\s*(?:名|人)", r"Team of \1", s)
     s = re.sub(r"(?:開発者|エンジニア|メンバー|開発メンバー)\s*(?:は|が|:|：)?\s*(\d+)\s*(?:名|人)", r"Team of \1", s)
     s = re.sub(r"(\d+)\s*(?:名|人)\s*(?:の|で)?\s*(?:チーム|体制|開発体制|開発)", r"Team of \1", s)
@@ -445,7 +456,7 @@ def _tokenise_list(s: str) -> list[Token]:
             continue
         if ch.isascii():
             j = i
-            while j < n and s[j].isascii() and not s[j].isspace() and s[j] not in ",;:()":
+            while j < n and s[j].isascii() and not s[j].isspace() and (s[j] not in ",;:()" or (s[j] == "," and s[i:j].isdigit() and s[j + 1:j + 4].isdigit())):
                 j += 1
             out.append(Token(s[i:j], "ascii"))
             i = j
@@ -534,7 +545,7 @@ def rewrite_sentence(src: str) -> Rewrite:
         return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
     s0 = unicodedata.normalize("NFKC", src).strip().rstrip("。.")
     # "F-1 …" row ids from a requirements table: not words
-    s0 = re.sub(r"^[A-Za-z]{1,4}-?\d{1,4}\s+", "", s0)
+    s0 = re.sub(r"^(?:[A-Za-z]{1,4}-?\d{1,4}|\d+-\d+)\s+", "", s0)
     # "(must)" / "(should)" / "(could)" appended by the structure pass → the sentence's modality
     forced = ""
     fm = re.search(r"\s*\((must|should|could)\)\s*$", s0)

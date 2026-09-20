@@ -28,20 +28,72 @@ def _by_id(design: Design, coll: str) -> dict[str, dict[str, Any]]:
     return {o["id"]: o for o in to_dict(getattr(design, coll))}
 
 
+#: the field that identifies an element across regenerations (ids are positional and renumber)
+NATURAL_KEY = {"requirements": "statement", "components": "name", "interfaces": "name", "entities": "name",
+               "flows": "name", "decisions": "title", "risks": "description", "work_packages": "title"}
+
+
+def _natural(coll: str, obj: dict[str, Any]) -> str:
+    return " ".join(str(obj.get(NATURAL_KEY[coll], "")).split()).lower()
+
+
+def id_map(old: Design, new: Design) -> dict[str, str]:
+    """old id -> new id for elements that are the same thing under a different number (matched by their natural key;
+    a key that occurs more than once on either side is matched in order)."""
+    out: dict[str, str] = {}
+    for coll in COLLECTIONS:
+        a = to_dict(getattr(old, coll))
+        b = to_dict(getattr(new, coll))
+        b_by_key: dict[str, list[dict[str, Any]]] = {}
+        for o in b:
+            b_by_key.setdefault(_natural(coll, o), []).append(o)
+        for o in a:
+            cands = b_by_key.get(_natural(coll, o))
+            if cands:
+                out[o["id"]] = cands.pop(0)["id"]
+    return out
+
+
+def _remap(obj: Any, mapping: dict[str, str]) -> Any:
+    """Replace every id string in ``obj`` according to ``mapping`` (ids only appear as whole strings)."""
+    if isinstance(obj, dict):
+        return {k: _remap(v, mapping) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_remap(v, mapping) for v in obj]
+    if isinstance(obj, str) and obj in mapping:
+        return mapping[obj]
+    return obj
+
+
 def diff(old: Design, new: Design) -> list[Change]:
-    """Element-level changes between two designs, in collection order then by id."""
+    """Element-level changes between two designs. Elements are matched by content (a requirement by its statement,
+    a component by its name, a package by its title), so a design regenerated after one bullet was added reports
+    the new element and the packages it touched — not every element that was renumbered. Renumberings are
+    reported as ``renumbered`` changes carrying ``old-id -> new-id``; they do not by themselves affect briefs."""
+    mapping = id_map(old, new)
     out: list[Change] = []
     for coll in COLLECTIONS:
-        a, b = _by_id(old, coll), _by_id(new, coll)
-        for id_ in sorted(set(a) | set(b)):
-            if id_ not in b:
-                out.append(Change(coll, id_, "removed"))
-            elif id_ not in a:
-                out.append(Change(coll, id_, "added"))
-            elif a[id_] != b[id_]:
-                out.append(Change(coll, id_, "changed", [k for k in b[id_] if a[id_].get(k) != b[id_].get(k)]))
+        a_objs = to_dict(getattr(old, coll))
+        b = _by_id(new, coll)
+        seen_new: set[str] = set()
+        for o in a_objs:
+            new_id = mapping.get(o["id"])
+            if new_id is None:
+                out.append(Change(coll, o["id"], "removed"))
+                continue
+            seen_new.add(new_id)
+            remapped = _remap(o, mapping)
+            remapped["id"] = new_id
+            target = b[new_id]
+            fields = [k for k in target if remapped.get(k) != target.get(k)]
+            if fields:
+                out.append(Change(coll, new_id, "changed", fields))
+            if new_id != o["id"]:
+                out.append(Change(coll, new_id, "renumbered", [f"{o['id']} -> {new_id}"]))
+        for id_ in sorted(set(b) - seen_new):
+            out.append(Change(coll, id_, "added"))
     for name in ("conventions", "goals", "non_goals", "name", "version", "summary"):
-        if to_dict(getattr(old, name)) != to_dict(getattr(new, name)):
+        if _remap(to_dict(getattr(old, name)), mapping) != to_dict(getattr(new, name)):
             out.append(Change("$", name, "changed"))
     return out
 
@@ -49,7 +101,7 @@ def diff(old: Design, new: Design) -> list[Change]:
 def affected_packages(new: Design, changes: list[Change]) -> dict[str, list[str]]:
     """Work package id -> reasons its brief is affected by ``changes`` (evaluated on ``new``)."""
     out: dict[str, list[str]] = {}
-    changed = {(c.collection, c.id): c for c in changes}
+    changed = {(c.collection, c.id): c for c in changes if c.kind != "renumbered"}
 
     def hit(wp_id: str, reason: str) -> None:
         out.setdefault(wp_id, []).append(reason)
@@ -89,7 +141,13 @@ def affected_packages(new: Design, changes: list[Change]) -> dict[str, list[str]
 def format_diff(changes: list[Change], affected: dict[str, list[str]]) -> str:
     if not changes:
         return "no changes\n"
-    lines = [f"{c.kind:8} {c.collection}/{c.id}" + (f" ({', '.join(c.fields)})" if c.fields else "") for c in changes]
+    real = [c for c in changes if c.kind != "renumbered"]
+    renum = [c for c in changes if c.kind == "renumbered"]
+    lines = [f"{c.kind:8} {c.collection}/{c.id}" + (f" ({', '.join(c.fields)})" if c.fields else "") for c in real]
+    if renum:
+        lines.append(f"renumbered (same content, new id; briefs not affected): " + ", ".join(c.fields[0] for c in renum))
+    if not real:
+        lines.insert(0, "no content changes")
     if affected:
         lines.append("affected work packages (their briefs are stale):")
         for wp, reasons in affected.items():

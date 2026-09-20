@@ -107,9 +107,9 @@
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "lost or duplicate updates under concurrent writes to one record",
+        "name": "occurrences of the forbidden action (record)",
         "target": "= 0",
-        "unit": "updates"
+        "unit": "occurrences"
       },
       "rationale": ""
     },
@@ -1619,7 +1619,7 @@
           "errors": [],
           "pre": "",
           "post": "",
-          "description": "deletes or anonymises across every store; audit entry per subject"
+          "description": "deletes or anonymises the subject's personal data in every store except append-only audit/chain-of-custody records, which are pseudonymised; audit entry per subject"
         },
         {
           "name": "export",
@@ -2235,6 +2235,16 @@
           ]
         },
         {
+          "name": "Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)",
+          "pros": [
+            "fits clients without a browser",
+            "revocable per device"
+          ],
+          "cons": [
+            "a token service to run"
+          ]
+        },
+        {
           "name": "Email one-time code / magic link (no account needed)",
           "pros": [
             "no password, no sign-up",
@@ -2247,7 +2257,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). OAuth2 / OIDC with the platform's identity provi: 2.23; API keys per customer, hashed at rest, sent as a: 1.38; Mutual TLS: 1.10; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-10"
@@ -2278,6 +2288,17 @@
           ],
           "cons": [
             "weaker JSON and DDL ergonomics than PostgreSQL"
+          ]
+        },
+        {
+          "name": "Redis for the hot state (as stated) with a relational store for durable records",
+          "pros": [
+            "the stated home of the hot data",
+            "sub-millisecond reads"
+          ],
+          "cons": [
+            "two stores to keep consistent",
+            "Redis durability depends on AOF/fsync"
           ]
         },
         {
@@ -2324,7 +2345,7 @@
         }
       ],
       "choice": "PostgreSQL",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). PostgreSQL: 3.14; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required). stated in the constraints",
       "consequences": "",
       "affects": [
         "C-1"
@@ -2506,10 +2527,21 @@
             "coupled to the legacy schema",
             "capture tooling to operate"
           ]
+        },
+        {
+          "name": "Events over the existing message topics (the stated integration points); no new synchronous calls",
+          "pros": [
+            "decoupled",
+            "already operated"
+          ],
+          "cons": [
+            "at-least-once: consumers must be idempotent",
+            "schema of the topics to govern"
+          ]
         }
       ],
       "choice": "Scheduled batch file exchange (CSV/fixed format) through a shared drop",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41. stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), availability (weight 0.78). Scheduled batch file exchange: 2.65; API façade: 1.71; Change data capture from the legacy database: 1.41; Events over the existing message topics: unavailable (needs broker, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.",
       "affects": [
         "C-17"
@@ -3152,7 +3184,7 @@
         },
         {
           "id": "A-4",
-          "description": "R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "description": "R-9: occurrences of the forbidden action (record) = 0 occurrences",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
@@ -3227,13 +3259,6 @@
           "kind": "test",
           "command": "python -m pytest -q tests/test_data_protection.py",
           "metric": ""
-        },
-        {
-          "id": "A-8",
-          "description": "R-10: time 7 years",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-10"
         }
       ],
       "notes": "family: compliance_data"
@@ -3268,18 +3293,11 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-8",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
           "metric": ""
-        },
-        {
-          "id": "A-10",
-          "description": "R-10: time 7 years",
-          "kind": "metric",
-          "command": "",
-          "metric": "R-10"
         }
       ],
       "notes": "family: infra"
@@ -3308,7 +3326,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-9",
           "description": "unit tests of Identity and credit checks pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_verifier.py",
@@ -3342,7 +3360,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-10",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -3386,15 +3404,15 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-11",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
           "metric": ""
         },
         {
-          "id": "A-14",
-          "description": "R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "id": "A-12",
+          "description": "R-9: occurrences of the forbidden action (record) = 0 occurrences",
           "kind": "metric",
           "command": "",
           "metric": "R-9"
@@ -3428,7 +3446,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-13",
           "description": "unit tests of Workflow engine pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_workflow.py",
@@ -3460,7 +3478,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-14",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_exporter.py",
@@ -3492,7 +3510,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-15",
           "description": "unit tests of Legacy system adapter pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_legacy_adapter.py",
@@ -3527,7 +3545,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-18",
+          "id": "A-16",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_batch.py",
@@ -3566,14 +3584,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-19",
+          "id": "A-17",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_surface_api.py",
           "metric": ""
         },
         {
-          "id": "A-20",
+          "id": "A-18",
           "description": "R-8: p95 latency at 2,000, 1,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

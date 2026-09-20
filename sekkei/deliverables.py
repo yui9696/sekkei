@@ -127,10 +127,11 @@ def adrs(design: Design) -> dict[str, str]:
              f"- Affects: {', '.join(names.get(a, a) for a in d.affects) or '—'}", "",
              "## Context\n", d.context or "(no context recorded)", "", "## Options considered\n"]
         for o in d.options:
-            s.append(f"### {o.name}" + (" ← chosen" if o.name == d.choice else ""))
+            s.append(f"### {o.name}" + (" ← chosen" if o.name == d.choice and d.status != "rejected" else " ← rejected" if d.status == "rejected" else ""))
             s += [f"- (+) {p}" for p in o.pros] + [f"- (−) {c}" for c in o.cons]
             s.append("")
-        s += ["## Decision\n", f"**{d.choice}**", "", d.rationale or "", "", "## Consequences\n", d.consequences or "(none recorded)", ""]
+        decided = f"**{d.choice}**" if d.status != "rejected" else "**Rejected** — not part of the design (recorded so the reasoning survives)."
+        s += ["## Decision\n", decided, "", d.rationale or "", "", "## Consequences\n", d.consequences or "(none recorded)", ""]
         if d.status == "proposed":
             s.append("> Proposed from an assumption the engine made; confirm or override by stating the answer in the requirements.\n")
         out[f"ADR-{n:04d}-{_slug(d.title)}.md"] = "\n".join(s).rstrip() + "\n"
@@ -275,7 +276,7 @@ def roadmap(design: Design, effort) -> str:
     for n, (wave, length) in enumerate(zip(effort.waves, effort.phase_days), 1):
         pd = sum(SIZE_DAYS.get(wps[w].size, 5) for w in wave)
         rows.append([f"Phase {n}", f"day {day + 1}–{day + length}", str(pd), ", ".join(f"{w} {wps[w].title} ({wps[w].size})" for w in wave),
-                     "; ".join(sorted({a.description for w in wave for a in wps[w].acceptance if a.kind == "metric"}))[:200] or "all acceptance checks green"])
+                     "; ".join(sorted({a.description for w in wave for a in wps[w].acceptance if a.kind == "metric" and re.search(r"latency|availab|lost|duplicate|unauthenticated|retention|occurrences|metrics exposed", a.description)}))[:200] or "all acceptance checks green"])
         day += length
     s.append(_table(["phase", "calendar", "person-days", "packages (parallel within the phase)", "exit criterion"], rows))
     s.append(f"\nTotal: {effort.person_days} person-days, {day} working days end to end (critical path {effort.critical_path_days} days).\n")

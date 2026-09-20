@@ -28,12 +28,12 @@ _version 0.1.0 · schema sekkei/1_
 | R-5 | functional | must | Riders can rate a trip and see their trip history; operators can view all active trips on a dashboard. | — |
 | R-6 | functional | must | Operators receive an alert when no driver accepts a request within 2 minutes. | — |
 | R-7 | nonfunctional | must | 300 concurrent trips and 2,000 online drivers at peak; position updates must be visible to the rider within 2 s p95. | p95 latency at 300, 2,000 <= 2 s |
-| R-8 | nonfunctional | should | No accepted ride request or completed trip is lost on a crash. | records lost across a process crash = 0 records |
+| R-8 | nonfunctional | should | No accepted ride request or completed trip is lost on a crash. | occurrences of the forbidden action (request) = 0 occurrences |
 | R-9 | nonfunctional | should | A driver's position history is kept 30 days for dispute handling, then deleted. | time 30 days |
 | R-10 | constraint | must | Go 1.22, PostgreSQL with PostGIS available, Redis available. Team of 4. Kubernetes cluster in a single region. | — |
 | R-11 | constraint | must | Riders and drivers authenticate with the company's OIDC provider; operators use the same provider with an operator role. | — |
 | R-12 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
-| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 online (R-7) ÷ every 5 s (R-3)). | sustained rate at 4,000, 2,000, 5 s 400 updates /s |
+| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 drivers (R-7) ÷ every 5 s (R-3)). | sustained rate at 4,000, 2,000, 5 s 400 updates /s |
 | R-14 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
 | R-15 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
 | R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
@@ -234,8 +234,6 @@ graph LR
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `receive_alert` | `alert`: Alert \| id | Alert \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
 | | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
-| `accept_request` | `request`: Request \| id | Request \| None | ValidationError, NotFound | stated values: 2 minutes (R-6) |
-| | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 
 ### I-4 — Observability interface
 
@@ -332,8 +330,6 @@ graph LR
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
 | `GET /trips` | `filter`: query, `page`: cursor | 200 [trips], next cursor | 401 unauthenticated | — |
 | | from R-5: Riders can rate a trip and see their trip history; operators can view all active trips on | | | |
-| `POST /requests/{id}/accept` | `id`: str | 202 accept accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | stated values: 2 minutes (R-6) |
-| | from R-6: Operators receive an alert when no driver accepts a request within 2 minutes. | | | |
 
 ### I-12 — Push gateway interface
 
@@ -419,13 +415,17 @@ sequenceDiagram
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -444,6 +444,11 @@ _Affects:_ C-5
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -463,7 +468,7 @@ _Affects:_ C-5
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required). stated in the constraints
 
 _Affects:_ C-1
 
@@ -540,13 +545,13 @@ _Affects:_ C-11, C-12
 
 ### D-6 — Assumed answer: load (Q-rate) (proposed)
 
-**Context.** The requirements do not say. Question: Q-rate. Evidence: 2,000 online (R-7) ÷ every 5 s (R-3).
+**Context.** The requirements do not say. Question: Q-rate. Evidence: 2,000 drivers (R-7) ÷ every 5 s (R-3).
 
 - ✔ **400 updates/s**
 - ✘ **4,000 updates/s**
 - ✘ **40 updates/s**
 
-**Rationale.** Derived from the text: 2,000 online (R-7) ÷ every 5 s (R-3).
+**Rationale.** Derived from the text: 2,000 drivers (R-7) ÷ every 5 s (R-3).
 
 **Consequences.** If the real answer differs: State the measured rate; capacity estimates and the queue decision change.
 
@@ -715,7 +720,7 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **write scope**: `internal/store/store.go`, `internal/store/store_test.go`, `internal/observability/observability.go`, `internal/observability/observability_test.go`
 - **acceptance**:
   - A-1 (test) unit tests of Store, Observability pass — `go test ./internal/store/`
-  - A-2 (metric) R-8: records lost across a process crash = 0 records — crash/kill test: no accepted item is lost and none is delivered without a durable record — metric R-8
+  - A-2 (metric) R-8: occurrences of the forbidden action (request) = 0 occurrences — metric R-8
   - A-3 (metric) R-15: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-15
 - **notes**: family: infra
 
@@ -795,7 +800,6 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **acceptance**:
   - A-10 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
   - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-7
-  - A-12 (metric) R-9: time 30 days — metric R-9
 - **notes**: family: infra
 
 ### WP-9 — Push gateway (S)
@@ -806,7 +810,7 @@ Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out even
 - **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-10
 - **write scope**: `internal/push/push.go`, `internal/push/push_test.go`
 - **acceptance**:
-  - A-13 (test) unit tests of Push gateway pass — `go test ./internal/push/`
+  - A-12 (test) unit tests of Push gateway pass — `go test ./internal/push/`
 - **notes**: family: realtime
 
 ## Traceability
@@ -815,20 +819,20 @@ Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out even
 |---|---|---|---|---|
 | R-1 | must | C-3, C-6 | WP-3, WP-6 | A-5, A-8 |
 | R-2 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
-| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-4, A-8, A-13 |
+| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-4, A-8, A-12 |
 | R-4 | must | C-2, C-7 | WP-5 | A-7 |
-| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11, A-12 |
-| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11, A-12 |
-| R-7 | must | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11 |
+| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11 |
+| R-7 | must | C-11 | WP-8 | A-10, A-11 |
 | R-8 | should | C-1 | WP-1 | A-1, A-2, A-3 |
-| R-9 | should | C-11 | WP-8 | A-10, A-11, A-12 |
-| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-8, A-10, A-11, A-12, A-13 |
+| R-9 | should | C-11 | WP-8 | A-10, A-11 |
+| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-8, A-10, A-11, A-12 |
 | R-11 | must | C-5 | WP-4 | A-6 |
 | R-12 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
-| R-13 | must | C-11 | WP-8 | A-10, A-11, A-12 |
-| R-14 | must | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-13 | must | C-11 | WP-8 | A-10, A-11 |
+| R-14 | must | C-11 | WP-8 | A-10, A-11 |
 | R-15 | must | C-4 | WP-1 | A-1, A-2, A-3 |
-| R-16 | should | C-11 | WP-8 | A-10, A-11, A-12 |
+| R-16 | should | C-11 | WP-8 | A-10, A-11 |
 | R-17 | should | C-1 | WP-1 | A-1, A-2, A-3 |
 | R-18 | must | C-3 | WP-6 | A-8 |
 | R-19 | must | C-3 | WP-6 | A-8 |

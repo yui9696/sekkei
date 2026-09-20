@@ -37,7 +37,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-8 | nonfunctional | must | Videos files up to 2 GB. The system must complete upload within 10 min. | latency at 2 GB <= 10 min |
 | R-9 | nonfunctional | must | The system must view videos concurrently 2000 users playback must not stall. | number of users 2000 users |
 | R-10 | nonfunctional | must | The system must respond courses list within 300 ms (p95). | p95 latency <= 300 ms |
-| R-11 | nonfunctional | must | Grades must never be lost. Grades must not record double-applied. | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-11 | nonfunctional | must | Grades must never be lost. Grades must not record double-applied. | occurrences of the forbidden action (record) = 0 occurrences |
 | R-12 | nonfunctional | must | Monthly availability at least 99.9 %. The system must export Prometheus for metrics. | ratio >= 99.9 % |
 | R-13 | constraint | must | The system can use object storage TypeScript (Node 20) PostgreSQL S3. Team of 4. | — |
 | R-14 | constraint | must | Employees authenticate internal SSO (OIDC). Containers existing ingress behind. | — |
@@ -511,6 +511,11 @@ _Affects:_ C-14
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -530,7 +535,7 @@ _Affects:_ C-14
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). PostgreSQL: 3.37; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required). stated in the constraints
 
 _Affects:_ C-1
 
@@ -550,13 +555,17 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -855,7 +864,6 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
 - **acceptance**:
   - A-2 (test) unit tests of File storage pass — `npx vitest run tests/files.test.ts`
   - A-3 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-4 (metric) R-9: number of users 2000 users — metric R-9
 - **notes**: family: file_storage
 
 ### WP-3 — Localisation (S)
@@ -866,7 +874,7 @@ Implement Localisation: Resolves locale, timezone and currency per request; form
 - **depends on**: — · **satisfies**: R-7
 - **write scope**: `src/i18n.ts`, `tests/i18n.test.ts`
 - **acceptance**:
-  - A-5 (test) unit tests of Localisation pass — `npx vitest run tests/i18n.test.ts`
+  - A-4 (test) unit tests of Localisation pass — `npx vitest run tests/i18n.test.ts`
 - **notes**: family: i18n
 
 ### WP-4 — Store + Observability (M)
@@ -877,10 +885,9 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
 - **depends on**: — · **satisfies**: R-9, R-11, R-12, R-13, R-18, R-19
 - **write scope**: `src/store.ts`, `tests/store.test.ts`, `src/observability.ts`, `tests/observability.test.ts`
 - **acceptance**:
-  - A-6 (test) unit tests of Store, Observability pass — `npx vitest run tests/store.test.ts tests/observability.test.ts`
-  - A-7 (metric) R-9: number of users 2000 users — metric R-9
-  - A-8 (metric) R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
-  - A-9 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
+  - A-5 (test) unit tests of Store, Observability pass — `npx vitest run tests/store.test.ts tests/observability.test.ts`
+  - A-6 (metric) R-11: occurrences of the forbidden action (record) = 0 occurrences — metric R-11
+  - A-7 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: infra
 
 ### WP-5 — Authentication + Scheduler (M)
@@ -891,7 +898,7 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-4 · **satisfies**: R-5, R-14, R-15
 - **write scope**: `src/auth.ts`, `tests/auth.test.ts`, `src/scheduler.ts`, `tests/scheduler.test.ts`
 - **acceptance**:
-  - A-10 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
+  - A-8 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
 - **notes**: family: infra
 
 ### WP-6 — Notifier (S)
@@ -902,7 +909,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-4 · **satisfies**: R-5, R-7
 - **write scope**: `src/notifier.ts`, `tests/notifier.test.ts`
 - **acceptance**:
-  - A-11 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
+  - A-9 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
 - **notes**: family: notification
 
 ### WP-7 — Search index (S)
@@ -913,9 +920,9 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-4 · **satisfies**: R-2, R-8, R-10, R-16
 - **write scope**: `src/search.ts`, `tests/search.test.ts`
 - **acceptance**:
-  - A-12 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
-  - A-13 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-14 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-10 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
+  - A-11 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-12 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: search
 
 ### WP-8 — Domain core (S)
@@ -926,9 +933,8 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-4, R-9, R-11, R-13, R-20, R-21
 - **write scope**: `src/core.ts`, `tests/core.test.ts`
 - **acceptance**:
-  - A-15 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
-  - A-16 (metric) R-9: number of users 2000 users — metric R-9
-  - A-17 (metric) R-11: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-11
+  - A-13 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
+  - A-14 (metric) R-11: occurrences of the forbidden action (record) = 0 occurrences — metric R-11
 - **notes**: family: crud_api
 
 ### WP-9 — Import/export (S)
@@ -939,8 +945,8 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-8 · **satisfies**: R-4, R-12
 - **write scope**: `src/exporter.ts`, `tests/exporter.test.ts`
 - **acceptance**:
-  - A-18 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
-  - A-19 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
+  - A-15 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-16 (metric) R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target — metric R-12
 - **notes**: family: import_export
 
 ### WP-10 — Public HTTP API (S)
@@ -951,37 +957,36 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-4, WP-5, WP-7, WP-8, WP-9 · **satisfies**: R-3, R-8, R-9, R-10, R-14, R-16, R-17
 - **write scope**: `src/surface_api.ts`, `tests/surface_api.test.ts`
 - **acceptance**:
-  - A-20 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
-  - A-21 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-22 (metric) R-9: number of users 2000 users — metric R-9
-  - A-23 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
+  - A-17 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
+  - A-18 (metric) R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-19 (metric) R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-10
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-5 | WP-2 | A-2, A-3, A-4 |
-| R-2 | must | C-3, C-5, C-10 | WP-2, WP-7 | A-2, A-3, A-4, A-12, A-13, A-14 |
-| R-3 | must | C-6, C-14 | WP-8, WP-10 | A-15, A-16, A-17, A-20, A-21, A-22, A-23 |
-| R-4 | must | C-6, C-11 | WP-8, WP-9 | A-15, A-16, A-17, A-18, A-19 |
-| R-5 | must | C-2, C-7, C-13 | WP-5, WP-6 | A-10, A-11 |
+| R-1 | must | C-3, C-5 | WP-2 | A-2, A-3 |
+| R-2 | must | C-3, C-5, C-10 | WP-2, WP-7 | A-2, A-3, A-10, A-11, A-12 |
+| R-3 | must | C-6, C-14 | WP-8, WP-10 | A-13, A-14, A-17, A-18, A-19 |
+| R-4 | must | C-6, C-11 | WP-8, WP-9 | A-13, A-14, A-15, A-16 |
+| R-5 | must | C-2, C-7, C-13 | WP-5, WP-6 | A-8, A-9 |
 | R-6 | must | C-4 | WP-1 | A-1 |
-| R-7 | must | C-2, C-7, C-12 | WP-3, WP-6 | A-5, A-11 |
-| R-8 | must | C-3, C-5, C-10, C-14 | WP-2, WP-7, WP-10 | A-2, A-3, A-4, A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
-| R-9 | must | C-1, C-3, C-5, C-6, C-14 | WP-2, WP-4, WP-8, WP-10 | A-2, A-3, A-4, A-6, A-7, A-8, A-9, A-15, A-16, A-17, A-20, A-21, A-22, A-23 |
-| R-10 | must | C-10, C-14 | WP-7, WP-10 | A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
-| R-11 | must | C-1, C-6 | WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15, A-16, A-17 |
-| R-12 | must | C-8, C-11 | WP-4, WP-9 | A-6, A-7, A-8, A-9, A-18, A-19 |
-| R-13 | must | C-1, C-6 | WP-4, WP-8 | A-6, A-7, A-8, A-9, A-15, A-16, A-17 |
-| R-14 | must | C-9, C-14 | WP-5, WP-10 | A-10, A-20, A-21, A-22, A-23 |
-| R-15 | could | C-9 | WP-5 | A-10 |
-| R-16 | must | C-10, C-14 | WP-7, WP-10 | A-12, A-13, A-14, A-20, A-21, A-22, A-23 |
-| R-17 | should | C-14 | WP-10 | A-20, A-21, A-22, A-23 |
-| R-18 | should | C-1 | WP-4 | A-6, A-7, A-8, A-9 |
-| R-19 | must | C-8 | WP-4 | A-6, A-7, A-8, A-9 |
-| R-20 | must | C-6 | WP-8 | A-15, A-16, A-17 |
-| R-21 | must | C-6 | WP-8 | A-15, A-16, A-17 |
+| R-7 | must | C-2, C-7, C-12 | WP-3, WP-6 | A-4, A-9 |
+| R-8 | must | C-3, C-5, C-10, C-14 | WP-2, WP-7, WP-10 | A-2, A-3, A-10, A-11, A-12, A-17, A-18, A-19 |
+| R-9 | must | C-1, C-3, C-5, C-6, C-14 | WP-2, WP-4, WP-8, WP-10 | A-2, A-3, A-5, A-6, A-7, A-13, A-14, A-17, A-18, A-19 |
+| R-10 | must | C-10, C-14 | WP-7, WP-10 | A-10, A-11, A-12, A-17, A-18, A-19 |
+| R-11 | must | C-1, C-6 | WP-4, WP-8 | A-5, A-6, A-7, A-13, A-14 |
+| R-12 | must | C-8, C-11 | WP-4, WP-9 | A-5, A-6, A-7, A-15, A-16 |
+| R-13 | must | C-1, C-6 | WP-4, WP-8 | A-5, A-6, A-7, A-13, A-14 |
+| R-14 | must | C-9, C-14 | WP-5, WP-10 | A-8, A-17, A-18, A-19 |
+| R-15 | could | C-9 | WP-5 | A-8 |
+| R-16 | must | C-10, C-14 | WP-7, WP-10 | A-10, A-11, A-12, A-17, A-18, A-19 |
+| R-17 | should | C-14 | WP-10 | A-17, A-18, A-19 |
+| R-18 | should | C-1 | WP-4 | A-5, A-6, A-7 |
+| R-19 | must | C-8 | WP-4 | A-5, A-6, A-7 |
+| R-20 | must | C-6 | WP-8 | A-13, A-14 |
+| R-21 | must | C-6 | WP-8 | A-13, A-14 |
 
 ## Conventions
 

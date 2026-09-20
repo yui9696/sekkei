@@ -16,14 +16,34 @@ def test_issues_cover_every_package_in_dependency_order():
     ids = [w.id for w in r.design.work_packages]
     assert all(f"issues/{i}.md" in files for i in ids)
     script = files["issues/create_issues.sh"]
-    order = [ln.split("'")[1].split(":")[0] for ln in script.splitlines() if ln.startswith("gh issue create")]
+    import re as _re
+    order = [_re.search(r"\b(WP-\d+)\.md", ln).group(1) for ln in script.splitlines() if ln.startswith("upsert '")]
     pos = {w: n for n, w in enumerate(order)}
     for w in r.design.work_packages:
         for dep in w.depends_on:
             assert pos[dep] < pos[w.id]
     body = files[f"issues/{ids[0]}.md"]
-    assert "**Acceptance**" in body and "- [ ]" in body
-    assert files["issues/issues.csv"].splitlines()[0] == "id,title,size,depends_on,components,requirements"
+    assert "**Acceptance**" in body and "- [ ]" in body and "sekkei-key:" in body
+    assert files["issues/issues.csv"].splitlines()[0] == "key,title,size,depends_on,components,requirements"
+    assert "find_issue()" in script and any(ln.startswith("blocked_by ") for ln in script.splitlines())
+
+
+def test_diff_and_issues_survive_a_two_bullet_change():
+    from sekkei import diff as DF
+    base = (REAL.parent / "real3" / "05_postmortem_ediscovery.md").read_text(encoding="utf-8")
+    v2 = base.replace("Constraints noted in the meeting", "AI-10 (must): Quarantined files shall be listed on the dashboard with their error.\nAI-11 (should): A quarantined file can be retried by a case manager.\n\nConstraints noted in the meeting")
+    d1, d2 = design(base).design, design(v2).design
+    changes = DF.diff(d1, d2)
+    real = [c for c in changes if c.kind != "renumbered"]
+    assert any(c.kind == "added" and c.collection == "requirements" for c in real)
+    changed_reqs = [c for c in real if c.collection == "requirements" and c.kind == "changed"]
+    assert not changed_reqs, [str(c) for c in changed_reqs]            # renumbering is not a change
+    affected = DF.affected_packages(d2, changes)
+    assert len(affected) < len(d2.work_packages)                        # not every brief is stale
+    i1, i2 = X.issues(d1), X.issues(d2)
+    keys1 = {ln.split("'")[1] for ln in i1["issues/create_issues.sh"].splitlines() if ln.startswith("upsert '")}
+    keys2 = {ln.split("'")[1] for ln in i2["issues/create_issues.sh"].splitlines() if ln.startswith("upsert '")}
+    assert keys1 & keys2 and len(keys1 & keys2) >= len(keys1) - 3        # the same tickets are found again by key
 
 
 def test_openapi_from_the_returns_portal_is_valid_shaped_and_sane():

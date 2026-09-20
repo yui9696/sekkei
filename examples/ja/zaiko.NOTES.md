@@ -15,7 +15,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | 4 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
 | 5 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
 | 6 | security | Q-auth | Single sign-on with the company's identity provider (OIDC). | evidence: staff/employees mentioned — Internal staff systems normally sit behind the company's SSO. | State the scheme; the authentication decision is rescored. |
-| 7 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | evidence: personal data mentioned — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
+| 7 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | default — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
 | 8 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 | 9 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
 | 10 | security | Q-authz | Callers see only resources they own; an admin role may see everything. | default — Ownership scoping is the minimum that prevents cross-tenant access. | State the roles; core operations and acceptance checks change. |
@@ -101,7 +101,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: crud_api, notification, observability, search, import_export, batch_pipeline, auth, audit_log
 - Quality attributes (weight): consistency 0.78, durability 0.78, performance 0.78, availability 0.78, operability 1.0, simplicity 0.8, compliance 0.62
-- Constraint tokens: containers, durable_required, idp, nightly_batch, postgres; languages: typescript; team: 2
+- Constraint tokens: containers, durable_required, idp, nightly_batch, postgres, rest_api; languages: typescript; team: 2
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -129,7 +129,9 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Staff can record stock movements warehouses stock.” (introduction before the first heading); “Managers can track out of stock service.” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “Staff can record stock movements warehouses stock.” — introduction before the first heading
+    - “Managers can track out of stock service.” — introduction before the first heading
 
 ## 7. Input normalisation (Japanese → canonical English)
 

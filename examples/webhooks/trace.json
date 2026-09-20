@@ -5,7 +5,7 @@
     "event_ingest": 6,
     "async_delivery": 13,
     "webhook_delivery": 8,
-    "signing": 6,
+    "signing": 8,
     "notification": 4,
     "health_policy": 7,
     "observability": 6,
@@ -31,6 +31,7 @@
     "nightly_batch",
     "postgres",
     "redis",
+    "rest_api",
     "single_region"
   ],
   "languages": [

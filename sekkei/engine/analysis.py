@@ -60,7 +60,7 @@ class Analysis:
     stated_constraints: set[str] = field(default_factory=set)      # constraint tokens from the author's text only (no assumed bullets)
 
 
-_TEAM_RE = re.compile(r"team of (\d+)|(\d+)[- ]person team|(\d+) (?:platform |backend |frontend |data |software )?(?:engineers|developers)|team (?:is|=|:)\s*(\d+)\b", re.I)
+_TEAM_RE = re.compile(r"team of (\d+)(?=\s*(?:[.,;)(]|$|engineers?\b|developers?\b|devs?\b|people\b|persons?\b|for\b|plus\b|\+|\(|and\b))|(\d+)[- ]person team|\(?(\d+)\)? (?:platform |backend |frontend |data |software )?(?:engineers|developers)\b|team (?:is|=|:)\s*(\d+)\b", re.I)
 _TEAM_NAMES_RE = re.compile(r"\bteam (?:is|=|:)\s*(?:me|myself|I)(?:\s*(?:\+|,|and|&)\s*[A-Z][a-z]+)+", re.I)
 
 
@@ -129,6 +129,9 @@ def _looks_like_requirement(s: T.Sentence) -> bool:
     """Prose that reads as a use case or a target: 'Traders submit orders …', 'Fills are booked within 500 ms'."""
     if any(q.comparator or q.percentile for q in s.quantities if q.kind in ("latency", "duration", "rate", "percent", "count", "size")):
         return True
+    if any(q.kind in ("duration", "rate", "percent", "size", "count") for q in s.quantities) and \
+            re.search(r"\bretain|\bretention|\bkept\b|\bkeep\b|\bmax\b|\blimit|\bbudget|\bsla\b|\bpeak|\bper (?:day|hour|second)|\bexpir|\bwindow\b|\bat least\b", s.lower):
+        return True
     if s.actors and s.verbs:
         words = s.words
         first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))
@@ -174,8 +177,9 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
     top = max(qw.values(), default=1)
     qualities = {q: round(min(1.0, 0.4 + 0.6 * w / top), 2) for q, w in qw.items()}
     h1 = next((l.lstrip("# ").strip() for l in text.splitlines() if l.startswith("# ")), "")
-    constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low + " " + h1.lower())}
-    low_stated = (h1 + " " + " ".join(s.text for s in sentences if s.section != "nongoal" and not s.assumed)).lower()
+    low_env = low + " " + h1.lower() + " " + " ".join(s.text for s in sentences if s.section == "nongoal").lower()
+    constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low_env)}
+    low_stated = (h1 + " " + " ".join(s.text for s in sentences if not s.assumed)).lower()
     stated_constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low_stated)}
     if "cli_tool" in active:
         stated_constraints.add("cli_tool")
@@ -187,7 +191,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
             and not re.search(r"\bGo (?:to|through|live|back|ahead|down|up|into|out|over|with|the|a|an)\b", text) \
             and not re.search(r"\bGo for (?:it|the|a|an)\b", text) or re.search(r"\bGo for (?:services|the backend|apis|microservices|the api|everything)\b", text):
         languages.append("go")
-    m = _TEAM_RE.search(text)
+    ms = [x for x in _TEAM_RE.finditer(text) if not text[max(0, x.start() - 1):x.start()] == "("]   # "(team of 45)" describes a user segment
+    m = next((x for x in ms if text[x.end():x.end() + 1] == "."), ms[0] if ms else None)   # the structure pass writes "Team of N."
     team = int(next(g for g in m.groups() if g)) if m else None
     if team is None:
         mn = _TEAM_NAMES_RE.search(text)
@@ -214,6 +219,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
             continue
         strong_modal = bool(s.modality) and not (s.intro and s.modality == "should")   # "needs" in an introduction is scene-setting
         is_req = s.is_bullet or strong_modal or s.section in ("functional", "nonfunctional", "constraint") or (prose_only and not s.assumed) or s.assumed
+        if s.section == "background" and not s.assumed and not (s.modality in ("must",) and not s.is_bullet):
+            is_req = False          # a timeline entry, a root cause, "what went well": read, listed, not designed
         if not is_req and s.section != "background" and not s.intro:
             # prose in a structured document: a use case (actor as subject + verb) or a stated target (bounded number) is a requirement
             if len(s.words) >= 5 and _looks_like_requirement(s):
@@ -227,6 +234,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
             continue
         sq = _sentence_qualities(s)
         kind = _kind(s, sq)
+        if s.prohibition and kind == "functional":
+            kind = "nonfunctional"          # "shall not delete alarms": a rule to enforce and test, not a use case
         if kind == "constraint" and s.section != "constraint" and (s.verbs and s.modality != "must"):
             kind = "functional"
         prio = s.modality or ("should" if kind == "nonfunctional" and not any(q.comparator or q.kind in ("latency", "percent", "rate") for q in s.quantities) else "must")
@@ -243,6 +252,8 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
             # a quality statement without a number: a default metric for the quality, else a review-visible target
             order = (["compliance"] if "compliance_data" in pats else []) + sq
             unit.metric = next((DEFAULT_METRICS[q] for q in order if q in DEFAULT_METRICS), ("target to be agreed", "review", ""))
+            if s.prohibition:
+                unit.metric = (f"occurrences of the forbidden action ({', '.join(s.negated_verbs[:2])})", "= 0", "occurrences")
         if kind == "functional" and not unit.patterns:
             unit.recognised = False
             unrec.append(unit)

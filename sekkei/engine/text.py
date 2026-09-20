@@ -47,6 +47,12 @@ ACTORS = (
     "support agent", "support agents", "warehouse operator", "warehouse operators", "data scientist", "data scientists", "scientist", "scientists",
     "researcher", "researchers", "underwriter", "underwriters", "applicant", "applicants", "borrower", "borrowers", "office staff", "sre", "sres",
     "model owner", "model owners", "reviewer", "reviewers", "on-call", "the desk", "desk", "back office", "front office", "accounting staff", "requester", "requesters",
+    "policyholder", "policyholders", "vet clinic", "vet clinics", "clinic", "clinics", "case manager", "case managers", "participant", "participants",
+    "investigator", "investigators", "coordinator", "coordinators", "study coordinator", "study coordinators", "sponsor", "sponsors", "statistician", "statisticians",
+    "medical monitor", "control room operator", "control room operators", "data analyst", "data analysts", "duty engineer", "authority", "contractor",
+    "grower", "growers", "farmer", "farmers", "player", "players", "game client", "game clients", "handler", "handlers", "claims handler", "claims handlers",
+    "fraud analyst", "fraud analysts", "adjuster", "adjusters", "site", "sites", "site user", "site users", "depot", "matter team", "custodian", "custodians",
+    "administrator", "administrators", "claimant", "claimants", "insurer", "insurers", "broker", "brokers", "resident", "residents", "warden", "wardens",
     "applicant", "applicants", "borrower", "borrowers", "underwriter", "underwriters", "senior underwriter", "auditor", "auditors",
     "regulator", "regulators", "accountant", "accountants", "recruiter", "recruiters", "candidate", "candidates", "contractor", "contractors",
     "supplier", "suppliers", "vendor", "vendors", "partner", "partners", "physician", "physicians", "pharmacist", "pharmacists",
@@ -128,6 +134,19 @@ about against among until while because whether we our us you your they them he 
 manually automatically continuously directly only also then later again currently immediately already
 """.split())
 
+_IRREGULAR_PARTICIPLES = {"paid", "held", "sent", "made", "done", "kept", "built", "met", "lost", "won", "sold", "bought", "taken", "given", "seen",
+    "shown", "known", "found", "told", "thought", "brought", "spent", "left", "felt", "dealt", "meant", "begun", "become", "gone", "come", "written",
+    "chosen", "hidden", "driven", "withdrawn", "drawn", "worn", "torn", "born", "led", "fed", "fought", "caught", "taught", "sought", "bound", "hung",
+    "stuck", "struck", "dug", "spun", "swept", "slept", "learnt", "burnt", "lit", "slid", "understood", "withheld", "upheld", "overridden", "forbidden",
+    "rewritten", "undertaken", "overtaken", "mistaken", "forgotten", "gotten", "quarantined", "escalated", "age", "ages", "aged"}
+#: nouns that are counted things (populations to divide a rate by, items per report)
+COUNTABLE_NOUNS = {"endpoints", "users", "tenants", "customers", "items", "records", "devices", "sensors", "clients", "subscribers", "orders",
+                   "products", "accounts", "files", "warehouses", "stores", "sites", "nodes", "services", "queues", "topics", "channels", "rows",
+                   "documents", "events", "messages", "jobs", "rtus", "substations", "gateways", "loggers", "meters", "vehicles", "trucks", "drivers",
+                   "participants", "patients", "players", "matches", "tickets", "claims", "policies", "greenhouses", "farms", "fields", "stations",
+                   "terminals", "kiosks", "machines", "cameras", "turbines", "assets", "shipments", "parcels", "repos", "tests", "points", "values",
+                   "readings", "measurements", "samples", "metrics", "signals", "requests", "transactions", "payments", "engineers", "developers"}
+
 #: tokens that are never the object of an operation (formats, adjectives, participles)
 NON_OBJECTS = {"json", "csv", "xml", "http", "https", "signed", "valid", "matching", "current", "new", "old", "same",
                "existing", "named", "large", "small", "whole", "own", "each", "every", "other", "day", "days", "hour",
@@ -135,7 +154,10 @@ NON_OBJECTS = {"json", "csv", "xml", "http", "https", "signed", "valid", "matchi
                "ms", "time", "times", "way", "ways", "thing", "things", "code", "codes", "twice", "ever", "once", "again", "given", "then",
                "original", "partial", "clear", "background", "older", "less", "more", "most", "first", "last", "next", "later", "sometimes",
                "always", "never", "still", "already", "also", "only", "just", "even", "here", "there", "now", "today", "tomorrow", "yesterday",
-               "business", "working", "monthly", "daily", "weekly", "hourly", "nightly", "system", "web", "online", "offline"}
+               "business", "working", "monthly", "daily", "weekly", "hourly", "nightly", "system", "web", "online", "offline",
+               "complete", "completed", "mobile", "previous", "full", "multiple", "single", "further", "additional", "other", "several", "various",
+               "eu", "na", "apac", "emea", "uk", "us", "japan", "region", "regions", "then", "later", "manual", "manually", "internal", "external",
+               "public", "private", "local", "remote", "live", "raw", "final", "initial", "primary", "secondary", "own", "any", "every", "each", "all"} | _IRREGULAR_PARTICIPLES
 
 _PASSIVE_AUX = {"is", "are", "be", "been", "was", "were", "get", "gets", "got", "being"}
 
@@ -213,6 +235,9 @@ class Sentence:
     assumed: bool = False      # came from an engine-generated "(Assumed by the engine)" section
     intro: bool = False        # prose before the first heading (the document's introduction)
     row_id: str = ""           # "R-01" / "F-3": the id the author gave this row in a requirements table
+    negated_verbs: list[str] = field(default_factory=list)   # verbs under a "not/never/cannot": forbidden actions, never operations
+    prohibition: bool = False  # the sentence only forbids (no positive verb): a rule, not a use case
+    passive_verbs: list[str] = field(default_factory=list)   # "is booked", "are kept": properties, not operations
 
     @property
     def lower(self) -> str:
@@ -301,11 +326,15 @@ def _units(text: str) -> list[tuple[str, bool]]:
 
 def modality(text: str) -> str:
     low = text.lower()
-    if re.search(r"\bmay not\b|\bmay never\b|\bmust not\b|\bshall not\b|\bno \w+(?: \w+)? (?:may|can|should) (?:be|ever)\b|\bnever\b", low):
+    if re.search(r"\bmay not\b|\bmay never\b|\bmust not\b|\bshall not\b|\bno \w+(?: \w+)? (?:may|can|should) (?:be|ever)\b|\bnever\b|^\s*do(?:es)? not\b|^\s*don't\b", low):
         return "must"          # a prohibition is a hard requirement, not an option
+    # "could not decide", "may not" inside a subordinate clause are not the sentence's modality
+    low = re.sub(r"\b(?:could|may|might) not\b", "", low)
     for kind in ("must", "should", "could"):
         for cue in MODALITY[kind]:
             if re.search(r"\b" + re.escape(cue) + r"\b", low):
+                if kind == "could" and re.search(r"\b(?:that|which|the rules|cannot decide|not decide)\b.{0,30}\b" + re.escape(cue) + r"\b", low):
+                    continue   # "claims the rules could not decide": a relative clause
                 return kind
     return ""
 
@@ -347,6 +376,8 @@ def quantities(text: str) -> list[Quantity]:
                 second = (nm.group(2) or "").lower()
                 if nm.group(3) and second and second not in STOPWORDS:
                     noun = second                      # "return requests/day": the counted thing is requests
+                elif second and second not in STOPWORDS and second not in VERBS and (noun in NON_OBJECTS or (second in COUNTABLE_NOUNS and noun not in COUNTABLE_NOUNS)):
+                    noun = second                      # "2,000 online drivers", "40 analogue points": skip the adjective
                 if nm.group(3) and (not second or second not in STOPWORDS):
                     kind, unit = "rate", noun + " " + nm.group(3).strip()
                 else:
@@ -401,6 +432,7 @@ def verb_of(word: str) -> str:
     return ""
 
 
+_NEGATIONS = {"not", "never", "cannot", "no", "nobody", "neither", "nor", "without", "n't", "don't", "doesn't", "won't", "shouldn't", "mustn't", "can't"}
 _NOUN_VERBS = {"order", "request", "offer", "return", "report", "review", "change", "update", "schedule", "search", "filter", "export", "import",
                "sync", "charge", "match", "rate", "comment", "index", "tag", "share", "book", "load", "record", "process", "trigger", "run", "check",
                "count", "sign", "log", "measure", "scan", "set", "print", "ship", "cancel", "refund", "split", "trim", "clip", "halt", "replay"}
@@ -410,7 +442,7 @@ _DETERMINERS = {"a", "an", "the", "each", "every", "per", "their", "own", "of", 
                 "original", "new", "existing", "current", "delivered", "returned", "first", "last", "next", "all", "its", "his", "her", "our", "my", "your", "another"}
 
 
-_ROW_ID = re.compile(r"^\s*([A-Za-z]{1,4}-?\d{1,4})\s+(?=\S)")
+_ROW_ID = re.compile(r"^\s*([A-Za-z]{1,4}-?\d{1,4}|\d+-\d+)\s+(?=\S)")
 _FORCED = re.compile(r"\s*\((must|should|could)\)\s*$")
 
 
@@ -439,9 +471,22 @@ def analyse_sentence(index: int, text: str, section: str, is_bullet: bool) -> Se
     # a noun-verb ("order", "request", "report", …) is a verb only in a verb position: after a modal/actor/"to"/"and",
     # or before a determiner ("order the", "request a")
     verbs = []
+    negated: list[str] = []
+    passive_verbs: list[str] = []
     for i, w in enumerate(words):
         v = verb_of(w)
         if not v or (i > 0 and words[i - 1] in _DETERMINERS) or i in in_actor:
+            continue
+        # "is booked", "are kept", "defined in the protocol": passive — a property of the system, not an operation it offers
+        prev = words[i - 1] if i > 0 else ""
+        nxt = words[i + 1] if i + 1 < len(words) else ""
+        if w.endswith("ed") and (prev in _PASSIVE_AUX or (nxt in ("in", "by", "at", "from", "into", "to", "as") and prev not in _VERB_LEADERS and prev not in ACTORS)):
+            passive_verbs.append(v)
+            continue
+        # "shall not discard", "must never see", "do not store", "cannot delete", "not be able to delete": the verb is forbidden
+        window = words[max(0, i - 5): i]
+        if any(x in _NEGATIONS for x in window) and not any(x in ("only", "unless") for x in window):
+            negated.append(v)
             continue
         if v in _NOUN_VERBS:
             prev = words[i - 1] if i > 0 else ""
@@ -454,6 +499,9 @@ def analyse_sentence(index: int, text: str, section: str, is_bullet: bool) -> Se
              and not w.replace(".", "").isdigit()]
     sent = Sentence(index, text, section, forced or modality(text), is_bullet, quantities(text), actors, verbs, nouns, words)
     sent.row_id = rid.group(1) if rid else ""
+    sent.negated_verbs = negated
+    sent.passive_verbs = passive_verbs
+    sent.prohibition = bool(negated) and not verbs
     return sent
 
 

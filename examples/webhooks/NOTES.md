@@ -15,7 +15,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 | 4 | data | Q-backup | Daily backups; RPO 24 h, RTO 4 h. | default — The store's own daily backup is the cheapest credible baseline. | State RPO/RTO; the store decision and a restore drill change. |
 | 5 | data | Q-migration | Greenfield; no existing data to migrate. | default — Nothing in the text names an existing system. | Name the existing system; a migration package and risk are added. |
 | 6 | security | Q-auth | API keys per customer, hashed at rest, sent as a bearer token. | evidence: customers/visitors mentioned — External callers without a stated identity provider are simplest to serve with per-customer keys. | State the scheme; the authentication decision is rescored. |
-| 7 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | evidence: personal data mentioned — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
+| 7 | compliance | Q-compliance | Personal data handled under GDPR-style rules: deletion on request within 30 days; access logged. | default — Email addresses or names are personal data almost everywhere; deletion on request is the common denominator. | State the regime; audit and deletion paths change. |
 | 8 | operations | Q-alerting | Alert the team channel when the error rate exceeds 1 % for 5 minutes or a queue grows for 10 minutes. | default — Two alerts catch most incidents without paging on noise. | State the rules and the on-call; observability conventions change. |
 | 9 | cost | Q-budget | Existing infrastructure only; no new managed services. | default — The cheapest assumption; every decision already prefers the option needing no new infrastructure. | State the budget; options adding infrastructure become available. |
 
@@ -112,7 +112,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 - Patterns recognised: crud_api, admin_api, event_ingest, async_delivery, webhook_delivery, signing, notification, health_policy, observability, batch_pipeline, auth, audit_log
 - Quality attributes (weight): durability 1.0, performance 0.82, isolation 0.82, availability 0.63, security 0.54, operability 0.77, scalability 0.63, simplicity 0.8, compliance 0.54
-- Constraint tokens: containers, durable_required, multi_instance, nightly_batch, postgres, redis, single_region; languages: python; team: 3
+- Constraint tokens: containers, durable_required, multi_instance, nightly_batch, postgres, redis, rest_api, single_region; languages: python; team: 3
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -141,5 +141,6 @@ Every requirement was recognised and every active quality has a tactic. Review t
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “We run a SaaS.” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “We run a SaaS.” — introduction before the first heading
 - **Structure folded by the engine**: speaker label dropped: Ops

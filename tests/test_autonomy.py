@@ -91,7 +91,7 @@ def test_a_sentence_no_pattern_knows_is_still_placed():
     r = design(text)
     p = next((p for p in r.placements if "health score" in next(q.statement for q in r.design.requirements if q.id == p.requirement)), None)
     assert p is not None and p.owners and all(r.design.component(o) is not None for o in p.owners)
-    assert p.how.startswith(("matched", "synthesised"))
+    assert p.how.startswith(("matched", "synthesised", "core rule"))
 
 
 def test_autonomous_design_is_still_deterministic_and_lint_clean():

@@ -117,7 +117,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-8 | nonfunctional | must | file_storage, media | performance | latency at 2 GB <= 10 min |
 | R-9 | nonfunctional | must | media | consistency, scalability | number of users 2000 users |
 | R-10 | nonfunctional | must | — | performance | p95 latency <= 300 ms |
-| R-11 | nonfunctional | must | — | consistency, durability | lost or duplicate updates under concurrent writes to one record = 0 updates |
+| R-11 | nonfunctional | must | — | consistency, durability | occurrences of the forbidden action (record) = 0 occurrences |
 | R-12 | nonfunctional | must | observability, import_export | availability, operability | ratio >= 99.9 % |
 | R-13 | constraint | must | file_storage | simplicity | — |
 | R-14 | constraint | must | auth | security, scalability | — |
@@ -131,7 +131,9 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Employees can take video courses.” (introduction before the first heading); “Managers can track tests and progress system. Japanese English.” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “Employees can take video courses.” — introduction before the first heading
+    - “Managers can track tests and progress system. Japanese English.” — introduction before the first heading
 
 ## 7. Input normalisation (Japanese → canonical English)
 

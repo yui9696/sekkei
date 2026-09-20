@@ -307,8 +307,6 @@ graph LR
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
 | `get_truck` | `truck`: Truck \| id | Truck \| None | ValidationError, NotFound | stated values: 24-hour (R-3) |
 | | from R-3: Fleet managers view the latest reading per truck and a 24-hour chart per sensor. | | | |
-| `notify_sms` | `sms`: Sms \| id | Sms \| None | ValidationError, NotFound | stated values: 5 minutes (R-4) |
-| | from R-4: When engine temperature exceeds a threshold for more than 5 minutes the fleet manager is n | | | |
 | `aggregate_readings` | `readings`: Readings \| id | Readings \| None | ValidationError, NotFound | — |
 | | from R-5: A nightly job aggregates readings into daily statistics per truck and exports them as CSV | | | |
 | `export_server` | `server`: Server \| id | Server \| None | ValidationError, NotFound | — |
@@ -511,13 +509,17 @@ sequenceDiagram
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -536,6 +538,11 @@ _Affects:_ C-10
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -555,7 +562,7 @@ _Affects:_ C-10
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). PostgreSQL: 3.25; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required, on_prem). stated in the constraints
 
 _Affects:_ C-1
 
@@ -906,7 +913,6 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **write scope**: `src/main/java/app/Auth.java`, `src/test/java/app/AuthTest.java`, `src/main/java/app/Scheduler.java`, `src/test/java/app/SchedulerTest.java`
 - **acceptance**:
   - A-4 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
-  - A-5 (metric) R-8: time at 5 years 90 days — metric R-8
 - **notes**: family: infra
 
 ### WP-3 — Notifier (S)
@@ -917,7 +923,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-1 · **satisfies**: R-4
 - **write scope**: `src/main/java/app/Notifier.java`, `src/test/java/app/NotifierTest.java`
 - **acceptance**:
-  - A-6 (test) unit tests of Notifier pass — `./gradlew test --tests app.NotifierTest`
+  - A-5 (test) unit tests of Notifier pass — `./gradlew test --tests app.NotifierTest`
 - **notes**: family: notification
 
 ### WP-4 — Readings processor (S)
@@ -928,7 +934,7 @@ Implement Readings processor: Computes over readings on behalf of the core. Synt
 - **depends on**: WP-1 · **satisfies**: R-2
 - **write scope**: `src/main/java/app/ReadingsProcessor.java`, `src/test/java/app/ReadingsProcessorTest.java`
 - **acceptance**:
-  - A-7 (test) unit tests of Readings processor pass — `./gradlew test --tests app.ReadingsProcessorTest`
+  - A-6 (test) unit tests of Readings processor pass — `./gradlew test --tests app.ReadingsProcessorTest`
 - **notes**: family: synthesised:readings_processor
 
 ### WP-5 — Domain core (S)
@@ -939,8 +945,8 @@ Implement Domain core: Business rules and validation for the domain entities; th
 - **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-7, R-9, R-10, R-19, R-20
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
-  - A-8 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
-  - A-9 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+  - A-7 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
+  - A-8 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
 - **notes**: family: mqtt_ingest
 
 ### WP-6 — MQTT consumer (S)
@@ -951,7 +957,7 @@ Implement MQTT consumer: Subscribes to the broker's topics, validates and de-dup
 - **depends on**: WP-1, WP-5 · **satisfies**: R-1
 - **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`
 - **acceptance**:
-  - A-10 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.MqttConsumerTest`
+  - A-9 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.MqttConsumerTest`
 - **notes**: family: mqtt_ingest
 
 ### WP-7 — Import/export (S)
@@ -962,7 +968,7 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-5 · **satisfies**: R-5
 - **write scope**: `src/main/java/app/Exporter.java`, `src/test/java/app/ExporterTest.java`
 - **acceptance**:
-  - A-11 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
+  - A-10 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
 - **notes**: family: sftp_export
 
 ### WP-8 — Batch job (S)
@@ -973,8 +979,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
 - **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-8, R-11
 - **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`
 - **acceptance**:
-  - A-12 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
-  - A-13 (metric) R-8: time at 5 years 90 days — metric R-8
+  - A-11 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
 - **notes**: family: batch_pipeline
 
 ### WP-9 — Public HTTP API (S)
@@ -985,34 +990,34 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 - **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-9, R-13, R-15
 - **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
 - **acceptance**:
-  - A-14 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.SurfaceApiTest`
-  - A-15 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
+  - A-12 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.SurfaceApiTest`
+  - A-13 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
 - **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-8, A-9, A-10, A-12, A-13 |
-| R-2 | must | C-16 | WP-4 | A-7 |
-| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-8, A-9, A-14, A-15 |
-| R-4 | must | C-3, C-6, C-8 | WP-3 | A-6 |
-| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-5, A-8, A-9, A-11, A-12, A-13 |
-| R-6 | must | C-14 | WP-9 | A-14, A-15 |
-| R-7 | must | C-1, C-7 | WP-1, WP-5 | A-1, A-2, A-3, A-8, A-9 |
-| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-12, A-13 |
-| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-8, A-9, A-14, A-15 |
-| R-10 | must | C-7 | WP-5 | A-8, A-9 |
-| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-5, A-12, A-13 |
-| R-12 | could | C-10 | WP-2 | A-4, A-5 |
-| R-13 | must | C-14 | WP-9 | A-14, A-15 |
+| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-7, A-8, A-9, A-11 |
+| R-2 | must | C-16 | WP-4 | A-6 |
+| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-7, A-8, A-12, A-13 |
+| R-4 | must | C-3, C-6, C-8 | WP-3 | A-5 |
+| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-7, A-8, A-10, A-11 |
+| R-6 | must | C-14 | WP-9 | A-12, A-13 |
+| R-7 | must | C-1, C-7 | WP-1, WP-5 | A-1, A-2, A-3, A-7, A-8 |
+| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-11 |
+| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-7, A-8, A-12, A-13 |
+| R-10 | must | C-7 | WP-5 | A-7, A-8 |
+| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-11 |
+| R-12 | could | C-10 | WP-2 | A-4 |
+| R-13 | must | C-14 | WP-9 | A-12, A-13 |
 | R-14 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
-| R-15 | should | C-14 | WP-9 | A-14, A-15 |
+| R-15 | should | C-14 | WP-9 | A-12, A-13 |
 | R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
 | R-17 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
-| R-18 | must | C-10 | WP-2 | A-4, A-5 |
-| R-19 | must | C-7 | WP-5 | A-8, A-9 |
-| R-20 | must | C-7 | WP-5 | A-8, A-9 |
+| R-18 | must | C-10 | WP-2 | A-4 |
+| R-19 | must | C-7 | WP-5 | A-7, A-8 |
+| R-20 | must | C-7 | WP-5 | A-7, A-8 |
 
 ## Conventions
 

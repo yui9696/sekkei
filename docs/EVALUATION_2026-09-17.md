@@ -193,3 +193,49 @@ timers) are unavailable whenever durability is required; Japanese rewrites that 
 negation are flagged. Not re-scored by the reviewer; the honest statement is that the
 listed failures no longer reproduce, not that the scores are now higher.
 
+## Third independent red team (2026-09-20): a consultancy deciding whether to use it with clients
+
+The third reviewer wrote a government tender annex (`B.2.4 The Platform shall …`, "is excluded
+from this Contract", "for information only, not a requirement"), a PRD with a KPI table and user
+segments ("Claims handlers (team of 45)"), a Japanese 提案依頼書 with 第N章 headings and 全角
+numbers, a platform RFC with stated routes, an incident post-mortem whose action items are the
+requirements, and a Notion page with emoji headings, callouts, `<details>` blocks and a "🚫 Not in
+scope" line — plus eight accidental-input tests. Scores on the engine as it stood: **1 / 4 / 2 /
+4 / 5 / 2 out of 20**; on re-scoring the previous six specs with fresh eyes: 10 / 7 / 2 / 9 / 2 /
+5. Verdict: not client-facing; usable internally as a coverage checklist and a boilerplate
+generator for the generic layer.
+
+The blockers, all reproduced and all now regression tests in `tests/test_real3.py`:
+
+- **Prohibitions inverted into operations.** "shall not discard any measurement" produced
+  `discard_measurement`; "Operators shall not be able to delete alarms" produced `delete_alarms`;
+  "Do not store bank account numbers" produced an *Account processor* with `store_account`. A
+  verb under *not / never / cannot / shall not* is now a forbidden action: it never becomes an
+  operation, the sentence becomes a non-functional rule the core enforces, and no component is
+  synthesised from it.
+- **One stray word re-architected the system.** "Remote **Terminal** Units" made the platform a
+  CLI with SQLite; "screen-failure reasons" a local UI; "drawn **signature**" an HMAC signer with
+  a secret store; "payments" in a payout system a `POST /charges`. The signals are narrower now
+  and a payouts pattern exists.
+- **In-memory primary store under a durability requirement** (the exclusion existed for the
+  queue and the timers, not the store).
+- **Fabricated load** — "IEC 60870 specialist" read as 60,870 people and turned into 2.7 TB/day.
+  Populations must be countable nouns, never a standard's number; the rate now multiplies by the
+  items per report (4,200 RTUs × 64 points ÷ 4 s).
+- **Exclusions designed in** — "Metering for billing purposes is excluded" became a component
+  and a ticket; the post-mortem's timeline and root causes were requirements; the Notion page's
+  raw `<details>` HTML was a requirement. Exclusion clauses are filed under out of scope,
+  reference-only sections are skipped, timelines/root causes/what-went-well are background,
+  HTML and emoji are stripped, and action items in a post-mortem are the requirements.
+- **Positional ids** — two added bullets renumbered every requirement, `diff` reported 15 of 16
+  packages stale and every ticket body changed. `diff` now matches elements by content and
+  reports renumbering separately; issue bodies carry a `sekkei-key` marker and the script
+  upserts.
+
+Also fixed from the majors: KPI-table cells that were not the widest column (the targets) were
+lost; "team of 45" (a user segment) was the team; "could not decide" made a requirement
+optional; an existing RabbitMQ lost to a PostgreSQL queue; a rejected alternative was rendered
+as chosen; stated `GET /v2/queue/{ticket}` routes were renamed; Japanese 第N章 headings and the
+agricultural glossary; passive verbs ("is booked", "defined in the protocol") were operations.
+As before: not re-scored by the reviewer — the failures no longer reproduce.
+

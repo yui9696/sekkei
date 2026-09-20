@@ -153,14 +153,25 @@ deterministically, a fuzz test mutates them (deleted, duplicated, truncated, nes
 lines) and requires the same, and every finding of that review is a test
 ([`tests/test_real2.py`](tests/test_real2.py)). The notes list every sentence the engine read
 but did not take as a requirement, and every Japanese rewrite that may have lost a negation.
+A third reviewer (a consultancy tech lead) added a tender annex with `B.2.4`-style clauses and
+"is excluded" sentences, a PRD with a KPI table and user segments, a Japanese 提案依頼書 with
+第N章 headings, an RFC with stated routes, an incident post-mortem whose action items are the
+requirements, and a Notion page with emoji headings, callouts and `<details>` blocks
+([`examples/real3/`](examples/real3/), [`tests/test_real3.py`](tests/test_real3.py)). What that
+round changed: a verb under *not / never / shall not* is a rule the core enforces and never an
+operation; a stray "terminal", "screen" or "signature" no longer activates the CLI, UI or HMAC
+patterns; exclusions and reference-only sections are filed, not designed; post-mortem timelines
+and root causes are background; `diff` matches elements by content so a two-bullet change
+reports two additions instead of renumbering everything; `issues` are keyed by a marker in the
+body and the script upserts them.
 
 ## Into the tools the team already uses
 
 | command | what you get |
 |---|---|
-| `sekkei issues -o .` | one Markdown issue body per work package (goal, requirements verbatim, components, interfaces, write scope, acceptance checklist, blockers), `issues/create_issues.sh` for the GitHub CLI in dependency order, `issues/issues.csv` for Jira/Linear import |
+| `sekkei issues -o .` | one Markdown issue body per work package (goal, requirements verbatim, components, interfaces, write scope, acceptance checklist, blockers) with a `sekkei-key` marker; `issues/create_issues.sh` **upserts** through the GitHub CLI in dependency order (an existing issue is found by its key and edited, blockers are commented once the numbers are known); `issues/issues.csv` keyed the same way for Jira/Linear import |
 | `sekkei openapi -o openapi.json` | an OpenAPI 3.0 skeleton from the design's HTTP interfaces: stated `POST /orders/{id}/cancel` operations become path items, other operations get conventional paths, inputs become bodies or query parameters, listed error codes become responses, entities become schemas (field names only) |
-| CI | `sekkei lint` and `sekkei check --root .` on every pull request; `sekkei diff old.json design.json` names the packages whose briefs a design change invalidates. See [docs/CI.md](docs/CI.md) |
+| CI | `sekkei lint` and `sekkei check --root .` on every pull request; `sekkei diff old.json design.json` matches elements by content (a requirement by its statement, a package by its title), reports renumbering separately and names only the packages whose briefs a real change invalidates. See [docs/CI.md](docs/CI.md) |
 
 ## Japanese input
 
@@ -245,11 +256,11 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 279 (incl. 11 real-world specs, 13 specs written by an independent red team, and a mutation fuzz) |
+| tests | 298 (incl. 11 real-world specs, 20 specs written by two independent red teams, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 43 patterns (one more: webhook delivery split from asynchronous delivery), 56 archetypes, 28 decision points / 84 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
+| catalogue | 44 patterns, 57 archetypes, 28 decision points / 87 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
 | `sekkei deliver` on the SaaS fixture | 32 files (18 ADRs) in about 0.5 s |
 | `sekkei redteam` on the SaaS fixture | 18 engine runs in 1–3 s (one engine run per stated sentence, capped at 80) |
 

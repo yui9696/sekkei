@@ -358,6 +358,15 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
             continue  # behaviour statements ("each event is delivered ...") are contracts, not use cases
         if not _actor_is_subject(u.sentence):
             continue  # "Email the customer …": the actor is the object; a notification, not a use case
+        stated = re.findall(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9_{}/.-]+)", u.sentence.text)
+        if stated and surface_kind == "http":
+            for method_, path_ in stated:
+                name = f"{method_} {path_}"
+                if name not in seen:
+                    seen[name] = Operation(name, [Param("id", "str")] if "{" in path_ else [Param("body", "json")], "200" if method_ == "GET" else "202 accepted",
+                                           ["401 unauthenticated", "404 unknown id"] if "{" in path_ else ["400 invalid body", "401 unauthenticated"],
+                                           description=f"stated in {u.id}: {u.sentence.text[:90].rstrip()}")
+            continue          # the author named the routes; do not invent others from the same sentence
         for v in dict.fromkeys(u.sentence.verbs):
             if v in T.STATIVE_VERBS:
                 continue
@@ -773,6 +782,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
             if req is not None and req.kind == "nonfunctional" and req.metric and req.metric.target != "review":
                 unit = next((u for u in an.requirements if u.id == r), None)
                 mq = _metric_quality(unit) if unit else []
+                if req.metric.name.startswith(("value", "number of", "factor", "size", "time")) and not mq:
+                    continue          # a bare number is not an acceptance check
                 if req.rationale.startswith("assumed") and not (mq and mq[0] in ("performance", "availability") and ("latency" in req.metric.name or re.search(r"\b9\d(?:\.\d+)? ?%", req.metric.target))):
                     continue          # engine assumptions become acceptance checks only for the latency and availability targets
                 acc_n += 1

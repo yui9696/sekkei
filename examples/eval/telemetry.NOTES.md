@@ -109,7 +109,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 - Patterns recognised: notification, batch_pipeline, mqtt_ingest, sftp_export, sms_notification, import_export, auth
 - Quality attributes (weight): consistency 0.6, durability 1.0, performance 0.9, availability 0.9, operability 0.8, simplicity 0.7
-- Constraint tokens: broker, containers, durable_required, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
+- Constraint tokens: broker, containers, durable_required, existing_broker, idp, nightly_batch, on_prem, postgres, timeseries_db; languages: java; team: 5
 
 | id | kind | priority | patterns | qualities | metric |
 |---|---|---|---|---|---|
@@ -136,4 +136,5 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ## 6b. What the structure pass found
 
-- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): “Trucks send sensor readings to a central service that keeps the fleet manager in” (introduction before the first heading)
+- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):
+    - “Trucks send sensor readings to a central service that keeps the fleet manager informed.” — introduction before the first heading

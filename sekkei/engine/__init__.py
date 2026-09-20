@@ -84,8 +84,8 @@ def _alternatives(d: Design, can: structure.Canonical) -> None:
     for alt in can.alternatives:
         n += 1
         head = alt.split(":")[0].strip()[:60]
-        d.decisions.append(Decision(f"D-{n}", f"Alternative considered: {head}", alt, [Option(head, [], [])], head,
-                                    "Rejected in the requirements text: " + alt, "", [], "rejected"))
+        d.decisions.append(Decision(f"D-{n}", f"Alternative considered: {head}", alt, [Option(head, [], ["rejected in the requirements text"])], "",
+                                    "Rejected in the requirements text: " + alt, "The design does not include it.", [], "rejected"))
 
 
 def design(text: str, assume: bool = True, overrides: Overrides | None = None) -> EngineResult:

@@ -121,7 +121,8 @@ def structure_markdown(an: Analysis, eff: Effort) -> str:
     if st.alternatives:
         s.append("- **Alternatives the text already rejected** (recorded as rejected decisions): " + "; ".join(a[:70] for a in st.alternatives))
     if an.dropped:
-        s.append("- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement): " + "; ".join(f"“{t[:80]}” ({w})" for t, w in an.dropped[:12]) + (f"; … {len(an.dropped) - 12} more" if len(an.dropped) > 12 else ""))
+        s.append("- **Sentences read but not taken as requirements** (make one a bullet if it is a requirement):")
+        s.extend(f"    - “{t}” — {w}" for t, w in an.dropped)
     folded = [n for n in st.notes if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without", "front matter", "metadata", "list intro", "speaker", "checked", "nested"))]
     if folded:
         s.append("- **Structure folded by the engine**: " + "; ".join(folded))

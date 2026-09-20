@@ -387,7 +387,7 @@ graph LR
 |---|---|---|---|---|
 | `request_deletion` | `subject_id`: str, `requested_by`: Principal | DeletionRequest | — | request recorded with a deadline |
 | `run_due` | `now`: datetime | int completed | — | — |
-| | deletes or anonymises across every store; audit entry per subject | | | |
+| | deletes or anonymises the subject's personal data in every store except append-only audit/chain-of-custody records, which are pseudonymised; audit entry per subject | | | |
 | `export` | `subject_id`: str | archive | — | — |
 | | everything held about the subject, machine readable | | | |
 
@@ -594,6 +594,11 @@ _Affects:_ C-15
   - + transactions
   - + already operated by the team
   - − weaker JSON and DDL ergonomics than PostgreSQL
+- ✘ **Redis for the hot state (as stated) with a relational store for durable records**
+  - + the stated home of the hot data
+  - + sub-millisecond reads
+  - − two stores to keep consistent
+  - − Redis durability depends on AOF/fsync
 - ✘ **Managed document store (DynamoDB/MongoDB, as stated)**
   - + scales without operations
   - + flexible records
@@ -613,7 +618,7 @@ _Affects:_ C-15
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.15; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). PostgreSQL: 3.15; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); SQLite: unavailable (ruled out by containers); Files: unavailable (ruled out by containers); In-memory: unavailable (ruled out by containers, postgres, durable_required). stated in the constraints
 
 _Affects:_ C-1
 
@@ -633,13 +638,17 @@ _Affects:_ C-1
   - + strong
   - + no secrets in headers
   - − certificate lifecycle for every customer
+- ✘ **Session tokens issued by the platform's own account service to game/mobile clients (device-bound, short-lived, refreshable)**
+  - + fits clients without a browser
+  - + revocable per device
+  - − a token service to run
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -712,8 +721,13 @@ _Affects:_ C-14, C-1
   - + no legacy code changes
   - − coupled to the legacy schema
   - − capture tooling to operate
+- ✘ **Events over the existing message topics (the stated integration points); no new synchronous calls**
+  - + decoupled
+  - + already operated
+  - − at-least-once: consumers must be idempotent
+  - − schema of the topics to govern
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.58; API façade: 1.62; Change data capture from the legacy database: 1.41. stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). Scheduled batch file exchange: 2.58; API façade: 1.62; Change data capture from the legacy database: 1.41; Events over the existing message topics: unavailable (needs broker, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API façade' gives up: legacy schema never leaks in, quirks isolated in one module. Not choosing 'Change data capture from the legacy database' gives up: near real time, no legacy code changes.
 
