@@ -69,7 +69,7 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 
 - D-1 API style: **REST/JSON over HTTP**
 - D-2 Primary store: **PostgreSQL**
-- D-3 Caller authentication: **API keys per customer, hashed at rest, sent as a bearer token**
+- D-3 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-4 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-5 Concurrency control for conflicting writes: **Row locks inside a short transaction (SELECT ... FOR UPDATE)**
 - D-6 Redundancy for the availability target: **Two or more interchangeable instances per role behind the ingress, health checks, rolling deploys**

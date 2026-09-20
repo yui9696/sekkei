@@ -278,7 +278,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 346 (incl. 11 real-world specs, 41 specs written by six independent red teams, and a mutation fuzz) |
+| tests | 354 (incl. 11 real-world specs, 41 specs written by seven independent red teams — the seventh held out, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |

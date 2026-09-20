@@ -594,7 +594,7 @@ _Affects:_ C-6
   - + trivial
   - − lost on restart
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 2.56; SQLite: 1.69; Files: 1.11; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); In-memory: unavailable (ruled out by durable_required)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). PostgreSQL: 2.56; SQLite: 1.69; Files: 1.11; MySQL / MariaDB: unavailable (needs mysql, not in the constraints); Redis for the hot state: unavailable (needs redis_primary, not in the constraints); Managed document store: unavailable (needs document_db, not in the constraints); In-memory: unavailable (ruled out by durable_required). chosen in the interview
 
 **Consequences.** Not choosing 'SQLite' gives up: zero operations, single file. Not choosing 'Files' gives up: no dependencies, human readable.
 
@@ -630,7 +630,7 @@ _Affects:_ C-1
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.87; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 1.0). API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.87; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). chosen in the interview
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 

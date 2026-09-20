@@ -1700,9 +1700,9 @@
           ]
         }
       ],
-      "choice": "API keys per customer, hashed at rest, sent as a bearer token",
-      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)",
-      "consequences": "Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
+      "choice": "OAuth2 / OIDC with the platform's identity provider",
+      "rationale": "Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). chosen in the interview",
+      "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-7"
       ],

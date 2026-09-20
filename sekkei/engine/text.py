@@ -213,7 +213,7 @@ def interval_seconds(text: str) -> float | None:
     n = _WORD_NUM.get(m.group(1).lower()) or float(m.group(1))
     unit = m.group(2).lower()
     return n * (60 if unit.startswith("min") else 3600 if unit.startswith("h") else 1)
-_COMPARATOR_RE = re.compile(r"\b(not (?:add |take |exceed )?more than|not exceed|no more than|under|below|less than|at most|within|up to|at least|more than|over|exactly|sustained)\b|(<=|<|>=|>)(?=\s*$)", re.I)
+_COMPARATOR_RE = re.compile(r"\b(not (?:add |take |exceed )?more than|not exceed|no more than|under|below|less than|at most|within|up to|at least|more than|over|exactly|sustained)\b|(<=|<|>=|>|≤|≥)(?=\s*$)", re.I)
 
 
 @dataclass
@@ -231,7 +231,7 @@ class Quantity:
         low = self.comparator.lower()
         if low.startswith("not ") and "more than" in low or low == "not exceed":
             return f"<= {int(self.value) if float(self.value).is_integer() else self.value} {self.unit if self.unit and self.kind != 'count' else self.noun}".strip()
-        cmp = {"under": "<", "below": "<", "less than": "<", "at most": "<=", "no more than": "<=",
+        cmp = {"≤": "<=", "≥": ">=", "under": "<", "below": "<", "less than": "<", "at most": "<=", "no more than": "<=",
                "within": "<=", "up to": "<=", "<=": "<=", "<": "<", "at least": ">=", "more than": ">",
                "over": ">", ">=": ">=", ">": ">", "exactly": "=", "sustained": ">="}.get(self.comparator.lower(), "")
         num = int(self.value) if float(self.value).is_integer() else self.value

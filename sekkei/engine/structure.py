@@ -52,7 +52,8 @@ _STORY = re.compile(r"^\s*(?:[A-Z][A-Z0-9]+-\d+\s*[—–:-]?\s*)?as an? (?P<act
 _TICKET = re.compile(r"^\s*(?P<key>[A-Z][A-Z0-9]+-\d+)\s*[—–:-]\s*(?P<rest>.+)$")
 _TODO = re.compile(r"^\s*(?:todo|fixme|question|q|open question|要確認|未定|要検討|宿題)\b\s*[:：]?\s*", re.I)
 _TENTATIVE = re.compile(r"\b(?:maybe|later maybe|perhaps|not sure|tbd|tbc|to be decided|to be confirmed)\b|\?\s*$|未定|検討中|かも", re.I)
-_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|対象外|スコープ外|やらないこと)[^:：]{0,20}[:：]\s*(?P<body>.+)$", re.I)
+_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|not in this(?: release| phase| version| sprint| scope| project)?|we will not(?: do| build)?|won't do|will not do|対象外|スコープ外|やらないこと|やらなくていいこと|今回はやらない|範囲外)[^:：]{0,20}[:：]\s*(?P<body>.+)$", re.I)
+_WILL_NOT = re.compile(r"^\s*(?:we|the team|this project|this release|this phase)\s+(?:will|shall|do|does)\s+not\s+(?:build|do|include|cover|support|ship|deliver|provide|implement)\s+(?P<body>.+)$", re.I)
 _DECIDED = re.compile(r"^\s*(?:decided|decision|agreed|決定|確定)\s*[:：]\s*(?P<body>.+)$", re.I)
 _SPEAKER = re.compile(r"^\s*(?P<name>[A-Z][a-z]{1,15})\s*:\s+(?P<body>.+)$")
 _SEPARATOR_ROW = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
@@ -83,6 +84,7 @@ class Canonical:
     alternatives: list[str] = field(default_factory=list)  # "Alternatives considered" items
     deadline: str = ""                                    # a stated release date / horizon, verbatim
     rationales: dict[str, str] = field(default_factory=dict)  # sentence -> "so that …" from a user story
+    sources: dict[str, str] = field(default_factory=dict)     # folded sentence -> the source line(s) it came from (for the red team's deletion attack)
 
 
 def _section_of(title: str) -> str | None:
@@ -285,6 +287,7 @@ def canonicalise(text: str) -> Canonical:
     title_written = False
     story_actor_now = ""
     gwt: list[str] = []                        # Given/When/Then lines being collected
+    gwt_raw: list[str] = []                    # their source lines
     in_actions = False
 
     def emit_section(canon: str) -> None:
@@ -299,9 +302,12 @@ def canonicalise(text: str) -> Canonical:
         if gwt:
             parts = [g[0].upper() + g[1:] if n == 0 else g for n, g in enumerate(gwt)]
             sent = ", ".join(parts)
-            out.append("- " + _resolve_i(sent, story_actor_now).rstrip(".") + ".")
+            folded = _resolve_i(sent, story_actor_now).rstrip(".") + "."
+            can.sources[folded] = "\n".join(gwt_raw)
+            out.append("- " + folded)
             can.notes.append(f"Given/When/Then folded into one acceptance requirement: {sent[:50]}…")
             gwt = []
+            gwt_raw.clear()
 
     def flush_table() -> None:
         nonlocal table
@@ -376,6 +382,7 @@ def canonicalise(text: str) -> Canonical:
         gm = _GWT.match(stripped)
         if gm and (gwt or gm.group(1).lower() in ("given", "when")) and not _BULLET.match(line):
             gwt.append(stripped[0].lower() + stripped[1:] if gwt else stripped)
+            gwt_raw.append(raw.rstrip())
             continue
         flush_gwt()
         # ---- systems affected: a constraint that names the existing systems
@@ -433,6 +440,7 @@ def canonicalise(text: str) -> Canonical:
             if st:
                 out.append("")
                 out.append(_story_sentence(st))
+                can.sources[_story_sentence(st).lstrip("- ").strip()] = raw.strip()
                 story_actor_now = st.group("actor").strip()
                 can.notes.append(f"user story in heading folded into a requirement: {title[:60]}")
                 seen_content = True
@@ -561,12 +569,11 @@ def canonicalise(text: str) -> Canonical:
             forced_prio = forced_prio or section_prio
             if forced_prio and not _FORCED_TAIL.search(body):
                 body = body.rstrip() + f" ({forced_prio})"
-            om = _OUT_INLINE.match(body)
+            om = _OUT_INLINE.match(body) or _WILL_NOT.match(body)
             if om:
                 emit_section("Out of scope")
-                for part in re.split(r"[、,;]\s*", om.group("body")):
-                    if part.strip():
-                        out.append("- " + part.strip())
+                for part in _split_items(om.group("body")):
+                    out.append("- " + part)
                 out.append("")
                 out.append("## " + (section_before(out) or "Requirements"))
                 section = section_before(out) or ""
@@ -596,6 +603,7 @@ def canonicalise(text: str) -> Canonical:
             st = _STORY.match(body)
             if st:
                 body = _story_sentence(st).lstrip("- ").strip()
+                can.sources[body] = raw.strip()
                 story_actor_now = st.group("actor").strip()
             elif story_actor_now and re.search(r"\bI\b|\bmy\b", body):
                 body = _resolve_i(body, story_actor_now)
@@ -639,6 +647,7 @@ def canonicalise(text: str) -> Canonical:
             if st:
                 out.append("")
                 out.append(_story_sentence(st))
+                can.sources[_story_sentence(st).lstrip("- ").strip()] = raw.strip()
                 story_actor_now = st.group("actor").strip()
                 can.notes.append(f"user story folded into a requirement: {stripped[:60]}")
                 continue
@@ -692,8 +701,13 @@ def canonicalise(text: str) -> Canonical:
                 continue
             bad_label = re.fullmatch(r"[\d\s.:：]+", label) or re.search(r"\d$", label) and re.match(r"\d", body) or re.match(r"\d{1,2}$", label)
             if len(label.split()) <= 3 and not bad_label:
+                if re.fullmatch(r"(?:team|チーム|体制|members?|staffing|people|headcount)", label, re.I):
+                    lines.insert(i, "- " + _team_line(label + ": " + body, can))
+                    continue
                 speaker = re.fullmatch(r"[A-Z][a-z]{1,15}", label) and label.lower() not in _NOT_SPEAKERS
                 can.notes.append(f"{'speaker' if speaker else 'label'} '{label}' dropped from: {body[:40]}")
+                for sent_ in re.split(r"(?<=[.!?])\s+(?=[A-Z])", body):
+                    can.sources.setdefault(sent_.strip(), raw.strip())
                 lines.insert(i, body)       # the body goes through every branch again (out of scope:, DECIDED:, TODO …)
                 continue
         if section == "Background":
@@ -715,6 +729,14 @@ _NOT_SPEAKERS = {"auth", "team", "note", "goal", "cost", "todo", "api", "deploy"
                  "peak", "peaks", "latency", "throughput", "retention", "availability", "budget", "timeline", "impact", "severity", "date", "constraints",
                  "example", "examples", "input", "output", "inputs", "outputs", "reminder", "recap", "question", "answer", "result", "results", "rollout",
                  "migration", "monitoring", "alerting", "testing", "backup", "region", "regions", "phase", "step", "goal", "goals", "kpi", "kpis"}
+
+
+def _split_items(body: str) -> list[str]:
+    """'A, B and C' → three items; a sentence with commas inside stays one item."""
+    parts = [x.strip().rstrip(".") for x in re.split(r"[;；、]\s*|,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+", body) if x.strip()]
+    if len(parts) > 1 and all(len(x.split()) <= 6 for x in parts):
+        return [p[0].upper() + p[1:] + "." for p in parts]
+    return [body.strip()]
 
 
 def section_before(out: list[str]) -> str:
@@ -740,11 +762,16 @@ def _team_line(body: str, can: Canonical) -> str:
     """'Team: 5 engineers, 1 SRE' / 'Team of 4 backend + 2 mobile' / 'team: Bo + Chen' -> a 'Team of N' the engine reads."""
     if re.search(r"\bteam of \d+\s*(?:[.,;)(]|$)", body, re.I):
         return body
-    m = re.match(r"^(?:team|チーム|体制|members?|staffing)\s*(?:is|are|=|:|：)?\s*(?P<rest>.+)$", body, re.I) or re.search(r"\bteam of (?P<rest>\d+[^.。]*?\+[^.。]*)", body, re.I) \
-        or re.search(r"\bteam\s*(?:is|=|:|：)\s*(?P<rest>\d[^.。]*)", body, re.I)
+    m = re.match(r"^(?:team|チーム|体制|members?|staffing|people|headcount)\s*(?:is|are|=|:|：)?\s*(?P<rest>.+)$", body, re.I) or re.search(r"\bteam of (?P<rest>\d+[^.。]*?\+[^.。]*)", body, re.I) \
+        or re.search(r"\bteam\s*(?:is|=|:|：)\s*(?P<rest>\d[^.。]*)", body, re.I) \
+        or re.search(r"(?P<rest>\b\d+ people\b[^.。]*)", body, re.I) \
+        or re.search(r"(?:計|合計|全体で|総勢)\s*(?P<rest>\d+\s*(?:名|人)[^.。]*)", body)
     if not m:
         return body
     rest = re.split(r"[.。;]", m.group("rest"))[0]
+    if re.match(r"^\s*\d+\s*(?:people|persons?|名|人)\b", rest, re.I):
+        rest = re.sub(r"\([^)]*\)", "", rest)             # "6 people (4 backend, 2 mobile)": the parenthesis is a breakdown
+        rest = re.split(r",", rest)[0]
     rest = re.sub(r"\([^)]*\)", "", rest)
     # every "<n> <word>" pair is people, unless the word is a unit of time/size ("2 days a week", "40 %")
     pairs = re.findall(r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:x\s*)?(?!(?:days?|weeks?|months?|years?|hours?|h|%|percent|fte|tb|gb|mb|k)\b)([A-Za-z][A-Za-z-]*)", rest)

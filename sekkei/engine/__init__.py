@@ -65,6 +65,26 @@ class EngineResult:
         }
 
 
+#: constraint tokens the author wrote that already decide a point (the answer must not override them)
+_DECIDING_TOKENS = {"auth_scheme": {"idp", "no_account_auth", "email_auth", "game_client", "mtls"}, "store_tech": {"postgres", "mysql", "sqlite", "redis_primary", "no_database"}}
+_ANSWER_DECISIONS = {
+    "Q-auth": ("auth_scheme", {"OIDC": "OAuth2 / OIDC", "API keys": "API keys", "mTLS": "Mutual TLS", "none": "", "No account": "No account"}),
+    "Q-store": ("store_tech", {"SQLite": "SQLite", "PostgreSQL": "PostgreSQL", "MySQL": "MySQL"}),
+}
+
+
+def _decision_of_answer(a: Answer) -> tuple[str, str]:
+    """(decision key, option prefix) named by an engine answer, or ('', '')."""
+    key, table = _ANSWER_DECISIONS.get(a.question_id, ("", {}))
+    if not key:
+        return "", ""
+    chosen = a.options[0] if a.options else ""
+    for k, prefix in table.items():
+        if k.lower() in chosen.lower() and prefix:
+            return key, prefix
+    return "", ""
+
+
 def _assumed_decisions(d: Design, ans: list[Answer]) -> None:
     """One proposed decision per engine answer, so a human can override it in the design."""
     n = len(d.decisions)
@@ -120,7 +140,14 @@ def design(text: str, assume: bool = True, overrides: Overrides | None = None) -
             full = augment(text, ans)
             an = analyse(full, hints={b: a.patterns for a in ans for _, b in a.bullets}, structure=can)
             an.normalisation = norm
-    syn = synthesise(an, overrides.decisions, overrides.owners)
+    # an assumed answer that names an option of a decision point *is* that decision: never assume OIDC and then choose API keys
+    forced = dict(overrides.decisions)
+    stated = an.stated_constraints
+    for a in ans:
+        key, opt = _decision_of_answer(a)
+        if key and key not in forced and not any(k.lower() == key for k in forced) and not (stated & _DECIDING_TOKENS.get(key, set())):
+            forced[key] = opt
+    syn = synthesise(an, forced, overrides.owners)
     _assumed_decisions(syn.design, ans)
     for x in syn.design.decisions:
         syn.trace.setdefault(x.id, {"sentences": [], "rules": ["assumed-answer"]})

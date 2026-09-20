@@ -177,7 +177,15 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
         text = norm.text
     sentences = T.segment(text)
     low = " ".join(s.text for s in sentences if s.section != "nongoal").lower()
-    active = _match_patterns(" ".join(s.text for s in sentences if s.section != "nongoal" and not s.assumed).lower())
+    # capability patterns come from the sentences that will be requirements — never from background prose
+    # ("search and messaging already exist"), non-goals, or dropped sentences
+    prose_only_pre = not any(s.is_bullet or s.modality or s.section for s in sentences if not s.assumed)
+
+    def _will_be_req(s: T.Sentence) -> bool:
+        if s.section in ("nongoal", "background") or s.assumed:
+            return False
+        return prose_only_pre or s.is_bullet or bool(s.modality) or s.section in ("functional", "nonfunctional", "constraint") or _looks_like_requirement(s)
+    active = _match_patterns(" ".join(s.text for s in sentences if _will_be_req(s)).lower())
     for pats in hints.values():
         for p in pats:
             active[p] = max(active.get(p, 0), 2)
@@ -217,6 +225,15 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
     ms = [x for x in _TEAM_RE.finditer(text) if not text[max(0, x.start() - 1):x.start()] == "("]   # "(team of 45)" describes a user segment
     m = next((x for x in ms if text[x.end():x.end() + 1] == "."), ms[0] if ms else None)   # the structure pass writes "Team of N."
     team = int(next(g for g in m.groups() if g)) if m else None
+    if team is not None and m is not None and not re.match(r"team of \d+\.", m.group(0), re.I):
+        # "3 platform engineers, 1 SRE" on one line: every role count on that line is people
+        nl = text.find("\n", m.end())
+        line = text[max(0, text.rfind("\n", 0, m.start()) + 1): nl if nl > 0 else len(text)]
+        outside = re.sub(r"\([^)]*\)", "", line)
+        counts = [int(n) for n, w in re.findall(r"(?<![\d.])(\d+)\s*(?!(?:days?|weeks?|months?|years?|hours?|%|percent|tb|gb|mb|k)\b)([A-Za-z][A-Za-z-]*)", outside)
+                  if w.lower() not in ("x", "of", "and", "plus", "or", "per", "to", "in", "on", "at", "team") and int(n) < 100]
+        if len(counts) > 1 and sum(counts) >= team:
+            team = sum(counts)
     if team is None:
         mn = _TEAM_NAMES_RE.search(text)
         if mn:

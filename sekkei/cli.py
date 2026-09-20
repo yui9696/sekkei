@@ -24,6 +24,8 @@ def _load(path: str) -> M.Design:
         return load(path)
     except FileNotFoundError:
         sys.exit(f"error: {path} not found (run `sekkei init` to create one)")
+    except IsADirectoryError:
+        sys.exit(f"error: {path} is a directory; pass the design file (e.g. {path.rstrip('/')}/design.json)")
     except M.DesignError as exc:
         sys.exit(f"error: {path}: {exc}")
 

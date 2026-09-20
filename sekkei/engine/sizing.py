@@ -20,6 +20,14 @@ _PER_REPORT_NOUNS = {"points", "values", "readings", "measurements", "samples", 
 _STANDARD_RE = re.compile(r"\b(?:iec|iso|rfc|ieee|din|en|ansi|itu|nist|fips|pci|ietf|jis|bs)[- ]?$", re.I)
 
 
+def _is_money(u, q) -> bool:
+    """'$4 per day', 'a fee of 2 EUR/day': money per period is not a request rate."""
+    low = u.sentence.lower
+    i = low.find(q.raw.lower())
+    window = low[max(0, i - 16): i + len(q.raw) + 16]
+    return bool(re.search(r"[$€£¥]|\b(?:usd|eur|gbp|jpy|yen|dollars?|euros?|pounds?|fee|price|cost|charge)\b", window))
+
+
 def _is_population(q, an: Analysis) -> bool:
     """A count that can be divided by an interval: a population noun (users, devices, rtus, sites …), never a standard's
     number ('IEC 60870 specialist') and never a noun that appears once with a number that reads as an identifier."""
@@ -56,7 +64,7 @@ def implied_rate(an: Analysis) -> tuple[float, str] | None:
     per_txt = ""
     for u in an.requirements:
         secs = interval_seconds(u.sentence.text)
-        if secs:
+        if secs and not re.search(r"\breconcil|\bbackup|\bretry|\brefresh(?:es|ed)? the (?:cache|token)|\bpoll(?:s|ed)? the (?:queue|status)|\bhealth ?check|\brotat", u.sentence.lower):
             interval, src = secs, u.id
             # "reports 40 analogue points and 24 digital points every 4 seconds": items per report multiply the rate
             per = [q for q in u.sentence.quantities if q.kind == "count" and q.noun in _PER_REPORT_NOUNS]
@@ -145,7 +153,7 @@ def _fmt(n: float) -> str:
 def capacity(an: Analysis) -> Capacity:
     cap = Capacity()
     qs = [(u, q) for u in an.requirements for q in u.sentence.quantities]
-    rates = [(u, q, _per_second(q)) for u, q in qs if q.kind == "rate"]
+    rates = [(u, q, _per_second(q)) for u, q in qs if q.kind == "rate" and not _is_money(u, q)]
     rates = [(u, q, r) for u, q, r in rates if r]
     # a peak/burst figure sizes concurrency, never storage or daily volume
     def is_peak(u, q):

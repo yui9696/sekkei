@@ -389,3 +389,41 @@ requirement table, numbers, team size, non-goals, open questions, the generic la
 dropped/assumed lists are reliable; the domain decomposition, data model, routes and work
 packages are drafts a person rewrites.
 
+## Seventh red team (2026-09-21): held out
+
+Eight specifications the engine's authors never saw (a cold-chain WMS RFP, a school timetable
+in non-engineer Japanese, a reconciliation change request as a Slack thread, an urgent-care
+intake with a from/trigger/to state table, an IDP RFC with YAML, a marketplace escrow with
+arithmetic invariants, user stories with acceptance criteria only, a laundromat IoT spec in
+mixed ja/en), written, scored and deleted by the reviewer; only scores and defect classes were
+reported. **Mean 6.75 / 20, median 7** — the same number as rounds 4–6 on non-overfitted specs,
+which is the point: the held-out number is the true one. Per criterion: decisions, notes and
+threats 1.0 everywhere; numbers 0.88; honesty 0.88 (silent loss near zero — every fact was in
+the design or in §6b — but invented components carry no "assumed" label); data model 0.63;
+components 0.38; interfaces 0.25; **work packages 0.00 on all eight**.
+
+Defect classes by how many of the eight they hit, and what was done — by rule, only classes
+reported by more than one independent round get a structural fix, never a phrasing for the
+reviewer's sentences: state machine not read (8/8; a state list on its own line now attaches
+to the entity of the previous sentence, and from/to rows and "From A, … to B" sentences are
+transitions); team line wrong (6/8; a "Team:" label no longer strips itself before the team
+reader runs, "N people" and 「計 N 名」 read, role counts on one line are summed, a breakdown in
+parentheses is not added); component invented from a stray token (6/8; capability patterns
+now activate only from sentences that become requirements, never from background prose or
+non-goals); an assumed OIDC next to an API-key decision (4/8; an engine answer that names an
+option *is* that decision unless the author stated one); non-goal phrasings "NOT in this
+release:", "We will NOT build …" (4/8; and a non-goal sentence is no longer chopped at commas);
+fabricated capacity (4/8; a reconcile/backup/retry interval is not a reporting interval, money
+per day is not a request rate); fields "is identified by … and carries …" with a two-word
+subject (4/8); modal words seeding entities (3/8); `≤`/`≥` comparators; folded user stories
+and Given/When/Then blocks are now located by the red team's deletion attack; `issues -d
+<dir>` says what it wants instead of a traceback. Not done: Japanese prose from a
+non-engineer (2/2 at 4/20) — the glossary approach has no answer for it and the README says
+so; a Slack thread or a YAML-bearing RFC is cleaned by hand first.
+
+Verdict adopted: a team can rely on what is a copy of its own text (the requirement table,
+the dropped/assumed lists, the numbers that survived, non-goals under a heading) and on the
+generic layer with its ADR/runbook/SLO boilerplate; it rewrites the state machines, most
+entities, all invariants, every route, the component list for the real hot path, the work
+packages, and the schedule.
+

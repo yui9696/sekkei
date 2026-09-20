@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import subprocess
+import sys
 
 from sekkei import deliverables as DV
 from sekkei import diff as DF
@@ -198,3 +200,64 @@ def test_nbsp_numbers_html_comments_and_images():
     m = next(q.metric for q in r.design.requirements if q.metric and "latency" in q.metric.name)
     assert "2000" in m.target
     assert not any("mockup" in o.name for i in r.design.interfaces for o in i.operations)
+
+
+# ---- seventh red team (held-out): recurring defect classes, fixed structurally ------------------
+
+def test_assumed_answer_is_the_decision():                              # class 4
+    t = "# Portal\n## Requirements\n- Applicants can submit a form and see its status.\n- Staff can review a form and approve or reject it.\n## Constraints\n- Python, PostgreSQL. Team of 3.\n"
+    r = design(t)
+    auth = {d.title: d.choice for d in r.design.decisions}["Caller authentication"]
+    assumed = next(a for a in r.answers if a.question_id == "Q-auth").options[0]
+    assert ("OIDC" in assumed) == auth.startswith("OAuth2 / OIDC"), (assumed, auth)
+
+
+def test_patterns_do_not_activate_from_background_prose():             # class 3
+    t = "# Market\n\n## Background\nSearch, messaging and push notifications already exist and are not part of this work.\n\n## Requirements\n- Sellers can list an item with a title and a price.\n- Buyers can pay for an item; the money is held in escrow until delivery is confirmed.\n## Constraints\n- Python, PostgreSQL. Team of 4.\n"
+    r = design(t)
+    names = {c.name for c in r.design.components}
+    assert "Search index" not in names and "Push gateway" not in names and "Chat provider" not in names, names
+
+
+def test_team_from_label_line_and_people_count():                       # class 2
+    r = design("# T\n## Requirements\n- Users can create a note.\n\nTeam: 3 platform engineers, 1 SRE, 1 designer.\n")
+    assert r.analysis.team_size == 5
+    r2 = design("# T\n## Requirements\n- Users can create a note.\n## Constraints\n- 6 people (4 backend, 2 mobile), Kotlin.\n")
+    assert r2.analysis.team_size == 6
+
+
+def test_not_in_this_lines_are_non_goals_and_not_chopped():              # class 5
+    t = "# T\n## Requirements\n- Users can create a note.\n- NOT in this release: sharing notes with other users, and exporting to PDF.\n- We will NOT build a mobile app, a browser extension or an API.\n## Constraints\n- Python. Team of 2.\n"
+    r = design(t)
+    assert len(r.design.non_goals) >= 2 and not any("sharing notes" in q.statement for q in r.design.requirements)
+    assert any("mobile app" in g for g in r.design.non_goals)
+
+
+def test_state_list_on_its_own_line_and_from_to_rows():                  # class 1
+    from sekkei.engine import domain
+    t = "# T\n## Requirements\n- Coordinators can register a patient visit with a chief complaint and an acuity.\n- Lifecycle: waiting -> in_triage -> in_treatment -> discharged.\n- From waiting, a nurse can start triage, which moves the visit to in_triage.\n## Constraints\n- Python. Team of 2.\n"
+    r = design(t)
+    visit = next(e for e in domain.extract(r.analysis) if e.name == "visit")
+    assert {"waiting", "in_triage", "in_treatment", "discharged"} <= set(visit.states)
+    assert ("waiting", "in_triage") in {(a, b) for a, b, _ in visit.edges}
+
+
+def test_capacity_not_from_reconcile_interval_or_money_per_day():         # class 6
+    t = "# T\n## Requirements\n- The ledger reconciles every 30 seconds against 400 accounts.\n- A listing fee of $4 per day is charged.\n- Users can create a listing.\n## Constraints\n- Python. Team of 2.\n"
+    r = design(t)
+    assert not any("implied" in e.name for e in r.notes.capacity.estimates)
+    assert not any("per day" in e.name and "4" == e.value for e in r.notes.capacity.estimates)
+
+
+def test_multiword_subject_and_identified_by_fields():                   # class 7
+    from sekkei.engine import domain
+    t = "# T\n## Requirements\n- Warehouse staff can create a receipt.\n- A goods receipt is identified by a receipt number and carries a supplier, a delivery date and a pallet count.\n## Constraints\n- Python. Team of 2.\n"
+    r = design(t)
+    rec = next(e for e in domain.extract(r.analysis) if e.name == "receipt")
+    assert {"receipt_number", "supplier", "delivery_date", "pallet_count"} <= {f[0] for f in rec.fields}
+
+
+def test_unicode_comparators_and_directory_arg(tmp_path):
+    assert [q.comparator for q in T.quantities("p95 ≤ 400 ms")] == ["≤"]
+    r = subprocess.run([sys.executable, "-m", "sekkei.cli", "issues", "-d", str(tmp_path)], capture_output=True, text=True)
+    assert r.returncode != 0 and "is a directory" in (r.stderr + r.stdout) and "Traceback" not in r.stderr

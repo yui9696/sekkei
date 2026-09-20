@@ -514,11 +514,11 @@ sequenceDiagram
 
 **Context.** Management operations must be attributable to a customer or operator.
 
-- ✔ **API keys per customer, hashed at rest, sent as a bearer token**
+- ✘ **API keys per customer, hashed at rest, sent as a bearer token**
   - + simple
   - + scriptable
   - − no delegation or expiry unless added
-- ✘ **OAuth2 / OIDC with the platform's identity provider**
+- ✔ **OAuth2 / OIDC with the platform's identity provider**
   - + single sign-on
   - + expiry and scopes
   - − integration effort
@@ -540,9 +540,9 @@ sequenceDiagram
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.9). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). chosen in the interview
 
-**Consequences.** Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
+**Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
 _Affects:_ C-10
 

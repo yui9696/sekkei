@@ -9,4 +9,5 @@
 
 ## info
 
-- **RT02** [constraint R-14 removed (Employees authenticate internal SSO (OIDC). Containers exist)] 1 decision(s) change: Caller authentication: OAuth2 / OIDC with the platform's identity provider → API keys per customer, hashed at rest, sent as a bearer token
+- **RT01** [R-14] deleting this constraint changes nothing: it coincides with what the engine assumes by default (still worth stating)
+  - evidence: Employees authenticate internal SSO (OIDC). Containers existing ingress behind.

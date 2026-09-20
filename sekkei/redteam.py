@@ -93,6 +93,11 @@ def _remove_sentence(text: str, sentence: str, source: str | None) -> str | None
     sentence is the bullet, a table row when it came from a table, else the substring. Row ids ("2-1", "R-01",
     "#101"), a prepended "(must)" and a "Label: " from a titled table cell are ignored when matching."""
     needle = (source or sentence).strip()
+    if "\n" in needle:                       # a Given/When/Then block: remove its lines
+        lines_ = text.splitlines()
+        drop = {l.strip() for l in needle.splitlines()}
+        kept = [l for l in lines_ if l.strip() not in drop]
+        return "\n".join(kept) if len(kept) < len(lines_) else None
     core = re.sub(r"^\s*(?:[A-Za-z]{1,4}-?\d{1,6}|\d+-\d+|N-\d+)\s+", "", needle)
     core = re.sub(r"\s*\((?:must|should|could)\)\s*$", "", core).strip().rstrip("。.")
     cands = [needle.rstrip("。."), core, re.sub(r"^[^:：]{1,24}[:：]\s*", "", core)]
@@ -150,6 +155,9 @@ RT01_CAP = 80   # engine runs for the deletion attack; beyond this the attack sa
 def _inert(text: str, base: EngineResult, rt: RedTeam) -> None:
     ref = shape(base.design)
     sources = dict(base.analysis.normalisation.sources) if base.analysis.normalisation else {}
+    if base.analysis.structure:
+        for folded, src in base.analysis.structure.sources.items():
+            sources.setdefault(folded, src)
     # a requirement's statement may carry the row id the structure pass kept; its source line carries it too
     for u in base.analysis.requirements:
         if u.sentence.row_id and u.sentence.text not in sources:

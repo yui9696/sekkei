@@ -84,7 +84,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ### Decisions taken (scored trade-offs)
 
-- D-1 Caller authentication: **API keys per customer, hashed at rest, sent as a bearer token**
+- D-1 Caller authentication: **OAuth2 / OIDC with the platform's identity provider**
 - D-2 Primary store: **PostgreSQL**
 - D-3 Process topology: **One image, role by flag: `api` and `worker` processes scale independently**
 - D-4 Work queue technology: **Managed broker (SQS/RabbitMQ/Kafka)**

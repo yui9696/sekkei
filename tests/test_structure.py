@@ -37,7 +37,7 @@ def test_user_stories_and_acceptance_criteria():
 def test_meeting_notes_labels_todo_out_of_scope_decided():
     c = S.canonicalise((REAL / "slack_notes.md").read_text(encoding="utf-8"))
     assert c.todos == ["Ana: ask data-eng about a read-only role"]
-    assert "## Out of scope\n- writing back to Snowflake\n- any BI-tool replacement" in c.text
+    assert "## Out of scope\n- Writing back to Snowflake.\n- Any BI-tool replacement." in c.text
     assert "## Constraints\n- Python, we already have the FastAPI template." in c.text
     assert "Team of 2 (Bo, Chen)." in c.text
     assert c.deadline == "MVP in 6 weeks"
