@@ -39,7 +39,7 @@ def _max_count(an: Analysis) -> float:
 
 
 def answer(q: Question, an: Analysis) -> Answer | None:
-    cli = "cli_tool" in an.patterns or "no_network" in an.constraints
+    cli = "cli_tool" in an.stated_constraints or "no_network" in an.constraints
     internal_users = _has(an, r"\bstaff\b|\bemployees?\b|\bmanagers?\b|\binternal\b|\bcompany\b|\btraders?\b|\brisk officers?\b|\bcompliance\b|\banalysts?\b|\beditors?\b|\bnurses?\b|\bdoctors?\b|\bphysicians?\b|\binspectors?\b|\boperators?\b|\bdesk\b|\bthe bank\b|\bour (?:team|engineers|analysts)\b")
     external_users = _has(an, r"\bcustomers?\b|\bvisitors?\b|\bsubscribers?\b|\bpublic (?:api|users?|site|website|internet|portal)\b|\bthe public\b")
     big = _max_count(an) >= 10000
@@ -81,8 +81,8 @@ def answer(q: Question, an: Analysis) -> Answer | None:
         imp = implied_rate(an)
         if imp:
             rate = max(1, int(round(imp[0])))
-            return A(q.id, q.topic, f"{rate:,} updates/s sustained (derived), 10x at peak.", [("nonfunctional", f"The system sustains {rate:,} updates/s with peaks of {rate * 10:,} updates/s (assumed by the engine: {imp[1]}).")],
-                     [f"{rate:,} updates/s", f"{rate * 10:,} updates/s", f"{max(1, rate // 10):,} updates/s"], f"Derived from the text: {imp[1]}.", imp[1],
+            return A(q.id, q.topic, f"{rate:,} updates/s sustained (derived); no peak factor assumed for a fixed-interval feed.", [("nonfunctional", f"The system sustains {rate:,} updates/s (assumed by the engine: {imp[1]}; a fixed reporting interval has no peak factor).")],
+                     [f"{rate:,} updates/s", f"{rate * 2:,} updates/s", f"{max(1, rate // 2):,} updates/s"], f"Derived from the text: {imp[1]}.", imp[1],
                      "State the measured rate; capacity estimates and the queue decision change.", ["queue", "surface_api"])
         # a stated count is a size, not a rate: never turn 200,000 items into requests per second
         rate = 100

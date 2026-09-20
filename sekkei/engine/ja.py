@@ -152,7 +152,7 @@ NOUNS = {
     "アクセスログ": "access logs", "在宅": "at home", "患者本人": "patients themselves", "担当患者": "assigned patients", "担当看護師": "assigned nurses",
     "通信不能": "without connectivity", "改ざん": "tampered with", "復旧後": "after recovery", "即時": "immediately", "改ざん": "tampering", "改ざん不可": "tamper-proof",
     "不可": "not allowed", "不可能": "not possible", "確認済み": "acknowledged", "確認されない": "unacknowledged", "未確認": "unacknowledged",
-    "国内リージョン": "domestic region", "国内": "domestic", "リージョン": "region", "限定": "restricted to", "夜間バッチ": "nightly batch",
+    "国内リージョン": "domestic region", "国内": "domestic", "リージョン": "region", "東京リージョン": "Tokyo region", "東京": "Tokyo", "大阪": "Osaka", "限定": "restricted to", "夜間バッチ": "nightly batch",
     "同一技術": "the same technology", "優先": "preferred", "初回リリース": "first release", "月末": "end of month", "初年度": "first year",
     "薬機法": "PMD Act", "医療法": "Medical Care Act", "準拠": "in compliance with", "認める": "allowed", "以下": "at most",
     "経費": "expenses", "交通費": "travel expenses", "立替経費": "reimbursable expenses", "立替": "reimbursement", "費目": "expense category",
@@ -545,7 +545,7 @@ def rewrite_sentence(src: str) -> Rewrite:
         return Rewrite(src.strip(), clean + ("." if clean and not clean.endswith((".", "!", "?")) else ""), [])
     s0 = unicodedata.normalize("NFKC", src).strip().rstrip("。.")
     # "F-1 …" row ids from a requirements table: not words
-    s0 = re.sub(r"^(?:[A-Za-z]{1,4}-?\d{1,4}|\d+-\d+)\s+", "", s0)
+    s0 = re.sub(r"^(?:[A-Za-z]{1,4}-?\d{1,6}|\d+-\d+)\s+", "", s0)
     # "(must)" / "(should)" / "(could)" appended by the structure pass → the sentence's modality
     forced = ""
     fm = re.search(r"\s*\((must|should|could)\)\s*$", s0)

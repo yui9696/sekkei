@@ -25,16 +25,10 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 8.64 M | rate × 86,400 s | 100 (R-14) |
-| storage growth per day (requests) | 17.69 GB | rate × 86,400 × record size | 100 (R-14); 2 KB stated in R-15 |
-| storage after 30 days (requests) | 530.84 GB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-14); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-14); mean service time assumed 200 ms |
-| in-flight items at the latency target | 30 | rate × latency target (Little's law upper bound) | 100 (R-14) × 300 ms (R-5) |
-| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-14); mean service time assumed 200 ms |
+| concurrent handlers at the stated peak (requests) | 20 | Little's law: peak rate × mean service time | 100 (R-14); mean service time assumed 200 ms |
 | number of items | 200 k | stated | 200000 items (R-5) |
-| average rate per item (if evenly spread) | 0/s | rate ÷ count | 100 ÷ 200000 |
 
+- Missing: no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated.
 - Assumption: Record size: 2 KB stated in R-15.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
 
@@ -117,7 +111,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-10 | constraint | must | — | scalability | — |
 | R-11 | functional | must | batch_pipeline | operability, compliance | — |
 | R-12 | functional | must | audit_log | performance, compliance | — |
-| R-13 | functional | could | auth | operability | — |
+| R-13 | functional | must | auth | operability | — |
 | R-14 | nonfunctional | must | — | performance | sustained rate at 1,000 100 requests /s |
 | R-15 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
 | R-16 | nonfunctional | should | — | — | time at 4 h 24 h |

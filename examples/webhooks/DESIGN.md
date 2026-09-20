@@ -775,13 +775,17 @@ _Affects:_ C-1
   - + fits clients without a browser
   - + revocable per device
   - − a token service to run
+- ✘ **No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged**
+  - + no credentials to manage for occasional users
+  - + meets 'no account or email required'
+  - − a reference number can be shared; scope what it unlocks
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.82). API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 1.04; OAuth2 / OIDC with the platform's identity provi: unavailable (needs idp, not in the constraints); Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 

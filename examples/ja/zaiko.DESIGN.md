@@ -35,7 +35,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-10 | constraint | must | Containers existing ingress behind run. | — |
 | R-11 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
 | R-12 | functional | must | Personal data is deleted on request within 30 days and access to it is logged (assumed by the engine). | — |
-| R-13 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
+| R-13 | functional | must | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
 | R-14 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
 | R-15 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
 | R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
@@ -515,13 +515,17 @@ _Affects:_ C-1
   - + fits clients without a browser
   - + revocable per device
   - − a token service to run
+- ✘ **No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged**
+  - + no credentials to manage for occasional users
+  - + meets 'no account or email required'
+  - − a reference number can be shared; scope what it unlocks
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
+**Rationale.** Scored against the active qualities; decided by operability (weight 1.0), simplicity (weight 0.8). API keys per customer, hashed at rest, sent as a: 1.29; OAuth2 / OIDC with the platform's identity provi: 1.00; Mutual TLS: 0.86; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints)
 
 **Consequences.** Not choosing 'OAuth2 / OIDC with the platform's identity provi' gives up: single sign-on, expiry and scopes. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -930,7 +934,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 | R-10 | must | C-12 | WP-9 | A-15, A-16 |
 | R-11 | must | C-10, C-11 | WP-3, WP-8 | A-6, A-14 |
 | R-12 | must | C-3 | WP-1 | A-1 |
-| R-13 | could | C-7 | WP-3 | A-6 |
+| R-13 | must | C-7 | WP-3 | A-6 |
 | R-14 | must | C-8, C-12 | WP-5, WP-9 | A-8, A-9, A-15, A-16 |
 | R-15 | must | C-12 | WP-9 | A-15, A-16 |
 | R-16 | should | C-12 | WP-9 | A-15, A-16 |

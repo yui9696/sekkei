@@ -31,14 +31,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| readings per day | 1.73 G | rate × 86,400 s | 20,000 (R-6) |
-| storage growth per day (readings) | 3.54 TB | rate × 86,400 × record size | 20,000 (R-6); 2 KB stated in R-13 |
-| storage after 30 days (readings) | 106.17 TB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 72 M readings | rate × outage seconds | 20,000 (R-6); outage length assumed |
-| concurrent handlers to sustain the rate (readings) | 4 k | Little's law: rate × mean service time | 20,000 (R-6); mean service time assumed 200 ms |
-| in-flight items at the latency target | 200 k | rate × latency target (Little's law upper bound) | 20,000 (R-6) × 10 s (R-6) |
+| implied update rate | 166.67/s | count × items per report ÷ interval | 5,000 trucks (R-6) ÷ every 30 s (R-1) |
+| implied updates per day | 14.4 M | implied rate × 86,400 s | 5,000 trucks (R-6) ÷ every 30 s (R-1) |
+| storage growth per day (updates) | 29.49 GB | implied rate × 86,400 × record size | 5,000 trucks (R-6) ÷ every 30 s (R-1); 2 KB stated in R-13 |
+| concurrent handlers at the stated peak (readings) | 4 k | Little's law: peak rate × mean service time | 20,000 (R-6); mean service time assumed 200 ms |
 | number of trucks | 5 k | stated | 5,000 trucks (R-6) |
-| average rate per truck (if evenly spread) | 4/s | rate ÷ count | 20,000 ÷ 5,000 |
 
 - Assumption: Record size: 2 KB stated in R-13.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
@@ -124,7 +121,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-9 | constraint | must | — | simplicity | — |
 | R-10 | constraint | must | mqtt_ingest | — | — |
 | R-11 | functional | must | batch_pipeline | operability, compliance | — |
-| R-12 | functional | could | auth | operability | — |
+| R-12 | functional | must | auth | operability | — |
 | R-13 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
 | R-14 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
 | R-15 | nonfunctional | should | — | — | time at 4 h 24 h |

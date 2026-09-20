@@ -75,6 +75,8 @@ def shape(d: M.Design) -> dict:
     return {
         "components": sorted((c.name, c.kind, tuple(sorted(c.requires))) for c in d.components),
         "interfaces": sorted((i.owner, i.name, tuple(sorted(o.name for o in i.operations))) for i in d.interfaces),
+        # contract preconditions carry the stated numbers (retry schedules, windows): losing one is a change
+        "contracts": sorted(re.sub(r"\bR-\d+\b", "R-?", f"{i.name}:{o.name}:{o.pre}:{o.post}") for i in d.interfaces for o in i.operations if o.pre or o.post),
         "entities": sorted((e.name, tuple(f.name for f in e.fields)) for e in d.entities),
         "flows": sorted((f.name, len(f.steps)) for f in d.flows),
         "decisions": sorted((x.title, x.choice) for x in d.decisions if x.status == "accepted"),
@@ -87,15 +89,50 @@ def shape(d: M.Design) -> dict:
 
 
 def _remove_sentence(text: str, sentence: str, source: str | None) -> str | None:
-    """Delete one requirement from the text: the whole bullet line when the sentence is the line, else the substring."""
-    needle = source or sentence
+    """Delete one requirement from the text: the whole bullet (including its wrapped continuation lines) when the
+    sentence is the bullet, a table row when it came from a table, else the substring. Row ids ("2-1", "R-01",
+    "#101"), a prepended "(must)" and a "Label: " from a titled table cell are ignored when matching."""
+    needle = (source or sentence).strip()
+    core = re.sub(r"^\s*(?:[A-Za-z]{1,4}-?\d{1,6}|\d+-\d+|N-\d+)\s+", "", needle)
+    core = re.sub(r"\s*\((?:must|should|could)\)\s*$", "", core).strip().rstrip("。.")
+    cands = [needle.rstrip("。."), core, re.sub(r"^[^:：]{1,24}[:：]\s*", "", core)]
+    if "; " in core and ":" in core:                       # every-cell table row: match on its longest cell
+        cells = [re.sub(r"^[^:：]{1,24}[:：]\s*", "", c).strip() for c in core.split("; ")]
+        cands.append(max(cells, key=len))
+    cands = [c for c in dict.fromkeys(cands) if len(c) >= 12]
+    norm = lambda t: " ".join(t.split())
     lines = text.splitlines()
-    for n, line in enumerate(lines):
-        body = re.sub(r"^\s*(?:[-*•・●]|\d+[.)])\s*", "", line).strip()
-        if body == needle.strip() or body.rstrip("。.") == needle.strip().rstrip("。."):
-            return "\n".join(lines[:n] + lines[n + 1:])
-        if needle.strip() in line:
-            return "\n".join(lines[:n] + [line.replace(needle.strip(), "", 1)] + lines[n + 1:])
+    # group bullets with their wrapped continuation lines
+    units: list[tuple[int, int]] = []
+    n = 0
+    while n < len(lines):
+        if re.match(r"^\s*(?:[-*+•・●]|\d+[.)])\s+", lines[n]):
+            m = n + 1
+            while m < len(lines) and lines[m].strip() and not re.match(r"^\s*(?:[-*+•・●]|\d+[.)])\s+|^\s*#|^\s*\|", lines[m]) and (lines[m].startswith((" ", "\t")) or not lines[m - 1].rstrip().endswith((".", "。", ":"))):
+                m += 1
+            units.append((n, m))
+            n = m
+        elif lines[n].strip() and not re.match(r"^\s*#|^\s*\|", lines[n]):
+            m = n + 1          # a prose paragraph: consecutive non-empty, non-bullet, non-heading lines
+            while m < len(lines) and lines[m].strip() and not re.match(r"^\s*(?:[-*+•・●]|\d+[.)])\s+|^\s*#|^\s*\|", lines[m]):
+                m += 1
+            units.append((n, m))
+            n = m
+        else:
+            units.append((n, n + 1))
+            n += 1
+    for a, b in units:
+        block = " ".join(lines[a:b])
+        body = norm(re.sub(r"^\s*(?:[-*+•・●]|\d+[.)]|[A-Z]?\d+(?:\.\d+)+|第\s*\d+\s*[条項])\s*", "", block)).rstrip("。.")
+        for cand in cands:
+            nc = norm(cand)
+            if body == nc or body == norm(needle).rstrip("。."):
+                return "\n".join(lines[:a] + lines[b:])
+            if nc in norm(block):
+                if block.strip().startswith("|"):
+                    return "\n".join(lines[:a] + lines[b:])       # a table row is one requirement: drop the row
+                nb = norm(block).replace(nc, "", 1)
+                return "\n".join(lines[:a] + [nb] + lines[b:])
     return None
 
 
@@ -112,15 +149,21 @@ RT01_CAP = 80   # engine runs for the deletion attack; beyond this the attack sa
 
 def _inert(text: str, base: EngineResult, rt: RedTeam) -> None:
     ref = shape(base.design)
-    sources = base.analysis.normalisation.sources if base.analysis.normalisation else {}
+    sources = dict(base.analysis.normalisation.sources) if base.analysis.normalisation else {}
+    # a requirement's statement may carry the row id the structure pass kept; its source line carries it too
+    for u in base.analysis.requirements:
+        if u.sentence.row_id and u.sentence.text not in sources:
+            sources[u.sentence.text] = u.sentence.row_id + " " + u.sentence.text
     units = [u for u in base.analysis.requirements if not u.sentence.assumed]
     if len(units) > RT01_CAP:
         rt.findings.append(Finding("RT01", "info", "sampling", f"{len(units)} stated requirements; the deletion attack ran on the first {RT01_CAP} only (one engine run each)"))
         units = units[:RT01_CAP]
+    skipped: list[str] = []
     for u in units:
         src = sources.get(u.sentence.text)
         cut = _remove_sentence(text, u.sentence.text, src)
         if cut is None:
+            skipped.append(u.id)
             continue
         r2 = design(cut)
         rt.runs += 1
@@ -132,6 +175,10 @@ def _inert(text: str, base: EngineResult, rt: RedTeam) -> None:
             sev = "high" if u.kind == "functional" and u.priority == "must" else "medium"
             rt.findings.append(Finding("RT01", sev, u.id, "deleting this sentence changes nothing in the design: it is recorded as a requirement but not honoured",
                                        u.sentence.text[:160]))
+    if skipped:
+        sev = "high" if len(skipped) > len(units) // 2 else "medium"
+        rt.findings.append(Finding("RT01", sev, "coverage", f"{len(skipped)} of {len(units)} stated requirements could not be located in the source text and were NOT tested by the deletion attack "
+                                   f"({', '.join(skipped[:8])}{'…' if len(skipped) > 8 else ''}); a green result covers only the rest"))
 
 
 def _fragile(text: str, base: EngineResult, rt: RedTeam) -> None:
@@ -187,6 +234,20 @@ def _verb_obj(m: re.Match, low: str) -> tuple[str, str] | None:
     return (v, after[0]) if after else None
 
 
+_CONTRADICTION_PAIRS = [
+    ("retention vs deletion", r"\b(?:retained|kept|stored) (?:indefinitely|forever|permanently)\b|\bnever (?:be )?deleted\b|\bmust not be deleted\b|永年|削除しない",
+     r"\bdelet(?:e|ed|es|ion) (?:after|within|on request|when)\b|\bpurged? after\b|\bexpire(?:s|d)? after\b|\b削除\b"),
+    ("residency vs hosting", r"\b(?:stay|stays|remain|remains|kept|processed|hosted) (?:in|within) (?:the )?(?:uk|eu|europe|japan|germany|sweden|finland|nordic|canada|australia)\b|\bmust not leave\b|国内",
+     r"\b(?:hosted|hosting|run|runs|processed|stored) (?:in|on) (?:the )?(?:us|usa|united states|us-east|us-west|virginia|singapore|india)\b|\bus[- ]hosted\b|\bamerican\b"),
+    ("anonymity vs identifiers", r"\bno identifiable\b|\banonymi[sz]ed\b|\bde-?identified\b|\bpseudonymi[sz]ed\b|匿名",
+     r"\bemail address(?:es)?\b|\bfull names?\b|\bdate of birth\b|\bnational (?:id|insurance)\b|\bphone numbers?\b"),
+    ("forbidden practice vs current practice", r"\b(?:forbidden|prohibited|not allowed|must not) .{0,40}\b(?:download|extract|export|copy)|\bmust not (?:download|extract|export|copy)\b",
+     r"\b(?:download|extract|export|copy)(?:s|ed)? .{0,40}\b(?:laptops?|usb|local (?:disk|machine)|desktop)\b|\bhappens today\b"),
+    ("single region vs several", r"\bsingle region\b|\bone region\b", r"\btwo regions\b|\bmulti-?region\b|\bboth regions\b|\bper region\b|\beach region\b"),
+    ("one store vs another", r"\bpostgres(?:ql)?\b.{0,30}\b(?:primary|main|the) (?:store|database)\b|\bstore(?:d)? in postgres", r"\bparquet\b|\bduckdb\b|\bstored as files\b|\bflat files\b"),
+]
+
+
 def _contradictions(base: EngineResult, rt: RedTeam) -> None:
     pos: dict[tuple[str, str], str] = {}
     neg: dict[tuple[str, str], str] = {}
@@ -209,9 +270,18 @@ def _contradictions(base: EngineResult, rt: RedTeam) -> None:
     for r in base.design.requirements:
         if r.metric and r.kind == "nonfunctional":
             k = r.metric.name
-            if k in seen and seen[k][1] != r.metric.target and "target to be agreed" not in k:
+            if k in seen and seen[k][1] != r.metric.target and "target to be agreed" not in k and k not in ("time", "value", "size"):
                 rt.findings.append(Finding("RT05", "medium", f"{seen[k][0]}/{r.id}", f"metric '{k}' has two targets: {seen[k][1]} and {r.metric.target}"))
             seen.setdefault(k, (r.id, r.metric.target))
+    # sentence pairs that usually cannot both hold: reported as candidates, the reader decides
+    stated = [(r.id, r.statement) for r in base.design.requirements if not r.rationale.startswith("assumed")] + [("non-goal", g) for g in base.design.non_goals]
+    for label, rx_a, rx_b in _CONTRADICTION_PAIRS:
+        a = [(i, s) for i, s in stated if re.search(rx_a, s, re.I)]
+        b = [(i, s) for i, s in stated if re.search(rx_b, s, re.I)]
+        for ia, sa in a[:2]:
+            for ib, sb in b[:2]:
+                if ia != ib:
+                    rt.findings.append(Finding("RT05", "medium", f"{ia}/{ib}", f"possible contradiction ({label})", f"{sa[:110]} ⟷ {sb[:110]}"))
 
 
 def _assumption_load(base: EngineResult, rt: RedTeam) -> None:

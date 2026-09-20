@@ -112,7 +112,7 @@ Every requirement was recognised and every active quality has a tactic. Review t
 | R-11 | nonfunctional | must | observability | availability, operability | ratio 99.9 % |
 | R-12 | constraint | must | file_storage | scalability, simplicity | — |
 | R-13 | constraint | must | auth | security | — |
-| R-14 | functional | could | auth | operability | — |
+| R-14 | functional | must | auth | operability | — |
 | R-15 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
 | R-16 | nonfunctional | should | — | — | time at 4 h 24 h |
 | R-17 | nonfunctional | must | — | operability | ratio at 5 minutes, 10 minutes 1 % |

@@ -38,7 +38,7 @@ _NUMBERED = re.compile(r"^\s*(?:[A-Z]?\d+(?:\.\d+)*[.)]?|[A-Z]\.\d+(?:\.\d+)*|[I
 _CLAUSE_NUM = re.compile(r"^\s*(?:[A-Z]\.\d+(?:\.\d+)+|\d+(?:\.\d+)+|第\s*\d+\s*[条項]|\(\d+\)|\d+\))\s+(?=\S)")
 _EMOJI = re.compile(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D▶◀◆◇■□●○★☆]+")
 _HTML_TAG = re.compile(r"</?(?:details|summary|div|span|p|br|b|i|u|em|strong|code|pre|table|tr|td|th|ul|ol|li|a|img)\b[^>]*>", re.I)
-_EXCLUDED_INLINE = re.compile(r"\b(?:is|are) (?:excluded|out of scope|not in scope|not part of this)\b|\bfor information only\b|\bnot a requirement\b|\bnot (?:in|within) (?:the )?scope\b|は?対象外|はスコープ外|含まない", re.I)
+_EXCLUDED_INLINE = re.compile(r"\b(?:is|are) excluded\b(?! from (?!(?:this |the )?(?:contract|project|scope|release|work|phase|mvp|engagement|delivery|this|tender|proposal|statement of work)))|\b(?:is|are) (?:out of scope|not in scope|not part of this)\b|\bfor information only\b|\bnot a requirement\b|\bnot (?:in|within) (?:the )?scope\b|は?対象外|はスコープ外|含まない", re.I)
 _LABELLED = re.compile(r"^\s*(?:\d+(?:\.\d+)*[.)]?\s+)?(?P<label>[^:：。.]{1,24})\s*[:：]\s*(?P<body>\S.*)$")
 _ID_PRIORITY = re.compile(r"^\s*(?P<id>[A-Za-z]{1,4}-?\d{1,4})\s*\((?P<prio>must|should|could|may|p0|p1|p2|p3)\)\s*[:：]?\s*", re.I)
 _OWNER_DUE = re.compile(r"\s*(?:Owner|Due|Assignee|担当|期限)\s*[:：]\s*[^.。]*[.。]?", re.I)
@@ -64,9 +64,13 @@ PRIORITY_WORDS = {
     "should": ("should", "推奨", "medium", "s", "important", "p2", "中", "重要"),
     "could": ("could", "任意", "low", "c", "optional", "nice to have", "nice-to-have", "p3", "低", "あれば"),
 }
-_CONTENT_HEADERS = ("内容", "要件", "説明", "詳細", "requirement", "description", "content", "detail", "details", "story", "criteria", "acceptance", "text", "statement", "機能要件", "要求")
+_CONTENT_HEADERS = ("内容", "要件", "説明", "詳細", "requirement", "description", "content", "detail", "details", "story", "criteria", "acceptance", "text", "statement", "機能要件", "要求",
+                    "answer", "response", "回答", "change", "changes", "変更内容", "capability", "feature description", "clause text")
 _PRIORITY_HEADERS = ("優先度", "優先", "priority", "moscow", "importance", "重要度", "必須")
-_ID_HEADERS = ("no", "no.", "#", "id", "番号", "項番", "key", "req", "req id", "識別子")
+_STATUS_HEADERS = ("status", "state", "ステータス", "状態", "区分", "type", "種別", "kind")
+_NOT_WORK = {"current", "existing", "done", "delivered", "n/a", "na", "not applicable", "out of scope", "std", "standard", "config", "configuration",
+             "既存", "対応済", "済", "現状", "対象外", "任意"}
+_ID_HEADERS = ("no", "no.", "#", "id", "番号", "項番", "key", "req", "req id", "識別子", "ref", "clause", "row")
 _TITLE_HEADERS = ("機能", "項目", "名称", "feature", "title", "name", "function", "分類", "カテゴリ", "category")
 
 
@@ -119,18 +123,26 @@ def _table_to_bullets(rows: list[list[str]], notes: list[str]) -> list[str]:
     if ci is None:
         # not a requirements table (KPI | Today | Target, Metric | Value …): every cell is kept, labelled by its header
         out = []
+        si0 = col(_STATUS_HEADERS)
         for r in body:
+            if si0 is not None and si0 < len(r) and r[si0].strip().lower().strip("*") in _NOT_WORK:
+                notes.append(f"table row with status '{r[si0].strip()}' is not work: {r[0][:40]}")
+                continue
             cells = [(rows[0][k].strip() if k < len(rows[0]) else "", c.strip()) for k, c in enumerate(r) if c.strip()]
             if not cells:
                 continue
             if len(r) < len(rows[0]):
                 notes.append(f"table row with fewer cells than the header kept as text: {' | '.join(c for _, c in cells)[:50]}")
-            out.append("- " + "; ".join(f"{h}: {c}" if h and h.lower() != c.lower() else c for h, c in cells))
+            out.append("- " + "; ".join(f"{h}: {c}" if h and h.lower() != c.lower() and h != "#" else c for h, c in cells).lstrip("#").strip())
         notes.append(f"table with columns {', '.join(rows[0])}: {len(out)} rows kept with every cell")
         return out
     pi = col(_PRIORITY_HEADERS)
     ii = col(_ID_HEADERS)
     ti = col(_TITLE_HEADERS)
+    si = col(_STATUS_HEADERS)
+    if pi is None and si is not None and any(_priority_of(r[si]) for r in body if si < len(r)):
+        pi = si                                     # 区分 = 必須/任意 is a priority column
+    skipped = 0
     out = []
     for r in body:
         if ci >= len(r) or not r[ci].strip():
@@ -140,6 +152,12 @@ def _table_to_bullets(rows: list[list[str]], notes: list[str]) -> list[str]:
                 notes.append(f"table row without a content cell kept as text: {text[:50]}")
             continue
         content = r[ci].strip()
+        if si is not None and si < len(r) and si != ci:
+            status = r[si].strip().lower().strip("*")
+            if status in _NOT_WORK or any(status.startswith(w) for w in ("current", "existing", "n/a", "done", "既存", "対応済")):
+                skipped += 1
+                notes.append(f"table row with status '{r[si].strip()}' is not work: {content[:50]}")
+                continue
         rid = r[ii].strip() if ii is not None and ii < len(r) and ii != ci else ""
         prio = _priority_of(r[pi]) if pi is not None and pi < len(r) and pi != ci else ""
         title = r[ti].strip() if ti is not None and ti < len(r) and ti not in (ci, ii) else ""
@@ -148,10 +166,10 @@ def _table_to_bullets(rows: list[list[str]], notes: list[str]) -> list[str]:
         tail = ""
         if prio:
             tail = {"must": " (must)", "should": " (should)", "could": " (could)"}[prio]
-        prefix = f"{rid} " if rid and re.fullmatch(r"[A-Za-z]{0,4}-?\d{1,4}", rid) else ""
+        prefix = (f"N-{rid} " if rid.isdigit() else f"{rid} ") if rid and re.fullmatch(r"[A-Za-z]{0,4}-?\d{1,4}", rid) else ""
         out.append(f"- {prefix}{content}{tail}")
     notes.append(f"table with columns {', '.join(rows[0])}: {len(out)} rows became requirements"
-                 + (f" (priority from column '{rows[0][pi]}')" if pi is not None else ""))
+                 + (f" (priority from column '{rows[0][pi]}')" if pi is not None else "") + (f"; {skipped} rows skipped by their status column" if skipped else ""))
     return out
 
 
@@ -324,15 +342,18 @@ def canonicalise(text: str) -> Canonical:
             continue
         # ---- "X is excluded from this Contract", "for information only, not a requirement"
         if _EXCLUDED_INLINE.search(stripped) and (seen_content or _BULLET.match(line)):
-            body = _BULLET.sub("", line).strip() if _BULLET.match(line) else stripped
+            bm0 = _BULLET.match(line)
+            body = bm0.group("body").strip() if bm0 else stripped
             body = _CLAUSE_NUM.sub("", body)
-            if re.search(r"\bfor information only\b|\bnot a requirement\b", body, re.I):
+            if re.search(r"\bfor information only\b|\bnot a requirement\b", body, re.I) and len(body.split()) <= 14:
                 section, in_actions = "Aside", False       # everything under it is reference material
                 can.notes.append(f"reference-only section skipped: {body[:50]}")
                 continue
-            if len(stripped.split()) <= 6 and not re.search(r"[.。!?:]", stripped):
-                emit_section("Out of scope")                  # "Follow-ups not in scope" is a heading
+            head = re.sub(r"^\s*#+\s*|^\s*\d+(?:\.\d+)*[.)]?\s*", "", stripped)
+            if not bm0 and len(head.split()) <= 6 and not re.search(r"[。!?:]|\.(?!\s*$)", head.rstrip(".")) and not re.search(r"[.。]\s*$", head) or (_HEADING.match(line) and _section_of(head) == "Out of scope"):
+                emit_section("Out of scope")                  # "## 8. Not in scope", "Follow-ups not in scope" are headings
                 continue
+
             clauses = [c.strip() for c in re.split(r"(?<=[;。])\s*|;\s*", body) if c.strip()] or [body]
             excluded = [c for c in clauses if _EXCLUDED_INLINE.search(c)] or [body]
             kept = [c for c in clauses if not _EXCLUDED_INLINE.search(c) and c not in excluded]
@@ -516,6 +537,11 @@ def canonicalise(text: str) -> Canonical:
         if bm:
             indent = len(bm.group("indent").expandtabs(4))
             body = bm.group("body").strip()
+            hm2 = re.match(r"^#\s*(\d{1,6})\b\s*:?\s*", body)
+            if hm2:
+                body = f"N-{hm2.group(1)} " + body[hm2.end():].strip()       # "#101 Users can …": a ticket number, not a heading
+            elif body.startswith("#"):
+                body = body.lstrip("#").strip()
             cb = _CHECKBOX.match(body)
             if cb:
                 body = body[cb.end():].strip()
@@ -714,9 +740,12 @@ def _team_line(body: str, can: Canonical) -> str:
     if not m:
         return body
     rest = re.split(r"[.。;]", m.group("rest"))[0]
-    counts = [int(x) for x in _TEAM_COUNT.findall(rest)]
+    rest = re.sub(r"\([^)]*\)", "", rest)
+    # every "<n> <word>" pair is people, unless the word is a unit of time/size ("2 days a week", "40 %")
+    pairs = re.findall(r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:x\s*)?(?!(?:days?|weeks?|months?|years?|hours?|h|%|percent|fte|tb|gb|mb|k)\b)([A-Za-z][A-Za-z-]*)", rest)
+    counts = [float(n) for n, w in pairs if w.lower() not in ("x", "of", "and", "plus", "or")] or [float(x) for x in _TEAM_COUNT.findall(rest)]
     if counts:
-        n = sum(counts)
+        n = int(-(-sum(counts) // 1))
         can.notes.append(f"team size {n} read from '{rest.strip()[:40]}'")
         return f"Team of {n}. " + body
     head = re.sub(r"\b(?:half|full|part)[- ]time\b|\(.*?\)", "", rest)

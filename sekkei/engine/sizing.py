@@ -35,6 +35,19 @@ def _is_population(q, an: Analysis) -> bool:
     return q.value >= 100 and text.lower().count(q.noun.lower()) >= 2 and q.noun.endswith("s")
 
 
+_GENERIC_NOUNS = {"system", "platform", "service", "data", "users", "time", "day", "days", "second", "seconds", "minute", "minutes", "hour", "hours"}
+
+
+def _related(u, src_unit, q) -> bool:
+    """The population sentence is the interval sentence, or the two share a specific noun (RTUs … 4,200 substations /
+    Each RTU reports … every 4 seconds): a count from an unrelated sentence must not be divided by this interval."""
+    if u.id == src_unit.id:
+        return True
+    a = {w.rstrip("s") for w in u.sentence.nouns} - _GENERIC_NOUNS
+    b = {w.rstrip("s") for w in src_unit.sentence.nouns} - _GENERIC_NOUNS
+    return q.noun.rstrip("s") in b or bool(a & b)
+
+
 def implied_rate(an: Analysis) -> tuple[float, str] | None:
     """'2,000 online drivers ... every 5 seconds' -> 400/s with its derivation; None when not derivable."""
     interval = None
@@ -53,7 +66,9 @@ def implied_rate(an: Analysis) -> tuple[float, str] | None:
             break
     if not interval:
         return None
-    pops = [(q, u) for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)]
+    src_unit = next(u for u in an.requirements if u.id == src)
+    pops = [(q, u) for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)
+            and _related(u, src_unit, q)]
     if not pops:
         return None
     q, u = max(pops, key=lambda t: t[0].value)
@@ -71,7 +86,9 @@ def implied_inputs(an: Analysis) -> tuple[float, float, float]:
             break
     if not interval:
         return 0.0, 1.0, 0.0
-    pops = [q for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)]
+    src_unit = next((u for u in an.requirements if interval_seconds(u.sentence.text)), None)
+    pops = [q for u in an.requirements for q in u.sentence.quantities if q.kind == "count" and _is_population(q, an)
+            and src_unit is not None and _related(u, src_unit, q)]
     return (max(q.value for q in pops) if pops else 0.0), per, interval
 
 
@@ -133,10 +150,32 @@ def capacity(an: Analysis) -> Capacity:
     # a peak/burst figure sizes concurrency, never storage or daily volume
     def is_peak(u, q):
         i = u.sentence.text.find(q.raw)
-        return bool(re.search(r"\bpeaks? (?:of|at)?\s*$|\bburst(?:s)? (?:of|at)?\s*$|\bat peak\b", u.sentence.text[max(0, i - 24):i].lower())) or \
-            bool(re.search(r"^\s*(?:at )?peak\b|^\s*\(peak", u.sentence.text[i + len(q.raw):i + len(q.raw) + 12].lower()))
+        before = u.sentence.text[max(0, i - 40):i].lower()
+        after = u.sentence.text[i + len(q.raw):i + len(q.raw) + 60].lower()
+        return bool(re.search(r"\bpeaks?\b|\bburst|\bspike|\bsurge|\bup to\b.{0,12}$", before)) or \
+            bool(re.search(r"\bpeak|\bburst|\bspike|\bsurge|\bfor (?:a |the )?(?:few )?(?:\d+ )?(?:minutes?|seconds?|hours?)\b|\bin the (?:minute|hour|seconds?) after\b|\bat (?:the )?(?:london |market )?open\b|\bduring (?:a |the )?(?:goal|launch|event|sale)", after))
+    # "20 operations per day per lock" × 40,000 locks: a per-unit rate is multiplied by the fleet when the fleet is stated
+    def fleet_factor(u, q):
+        i = u.sentence.text.find(q.raw)
+        after = u.sentence.text[i + len(q.raw):i + len(q.raw) + 40].lower()
+        m = re.search(r"\bper (?:\w+ )?([a-z]+)\b", after)
+        if not m:
+            return 1.0, ""
+        noun = m.group(1)
+        for u2 in an.requirements:
+            for q2 in u2.sentence.quantities:
+                if q2.kind == "count" and q2.noun and (q2.noun == noun or q2.noun.rstrip("s") == noun.rstrip("s")):
+                    return q2.value, f" × {q2.raw} {q2.noun} ({u2.id})"
+        return 1.0, ""
     peaks = [(u, q, r) for u, q, r in rates if is_peak(u, q)]
     rates = [(u, q, r) for u, q, r in rates if not is_peak(u, q)]
+    scaled = []
+    for u, q, r in rates:
+        f, ftxt = fleet_factor(u, q)
+        if f > 1:
+            q.raw = q.raw + ftxt if ftxt not in q.raw else q.raw
+        scaled.append((u, q, r * f))
+    rates = scaled
     counts = [(u, q) for u, q in qs if q.kind == "count"]
     sizes = [(u, q) for u, q in qs if q.kind == "size"]
     latencies = [(u, q) for u, q in qs if q.kind == "latency"]

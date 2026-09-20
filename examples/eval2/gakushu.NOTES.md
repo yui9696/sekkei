@@ -27,16 +27,10 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 8.64 M | rate × 86,400 s | 100 (R-16) |
-| storage growth per day (requests) | 17.69 GB | rate × 86,400 × record size | 100 (R-16); assumed 2048 bytes per record |
-| storage after 30 days (requests) | 530.84 GB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-16); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-16); mean service time assumed 200 ms |
-| in-flight items at the latency target | 1 k | rate × latency target (Little's law upper bound) | 100 (R-16) × 10 min (R-8) |
-| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-16); mean service time assumed 200 ms |
+| concurrent handlers at the stated peak (requests) | 20 | Little's law: peak rate × mean service time | 100 (R-16); mean service time assumed 200 ms |
 | number of users | 2 k | stated | 2000 users (R-9) |
-| average rate per user (if evenly spread) | 0.05/s | rate ÷ count | 100 ÷ 2000 |
 
+- Missing: no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated.
 - Assumption: Record size: assumed 2048 bytes per record.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
 
@@ -121,7 +115,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-12 | nonfunctional | must | observability, import_export | availability, operability | ratio >= 99.9 % |
 | R-13 | constraint | must | file_storage | simplicity | — |
 | R-14 | constraint | must | auth | security, scalability | — |
-| R-15 | functional | could | auth | operability | — |
+| R-15 | functional | must | auth | operability | — |
 | R-16 | nonfunctional | must | — | performance | sustained rate at 1,000 100 requests /s |
 | R-17 | nonfunctional | should | — | — | time at 4 h 24 h |
 | R-18 | nonfunctional | should | — | durability | time at 5 10 s |

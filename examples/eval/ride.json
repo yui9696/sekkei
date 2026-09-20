@@ -134,11 +134,11 @@
     },
     {
       "id": "R-13",
-      "statement": "The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 drivers (R-7) ÷ every 5 s (R-3)).",
+      "statement": "The system sustains 400 updates/s (assumed by the engine: 2,000 drivers (R-7) ÷ every 5 s (R-3); a fixed reporting interval has no peak factor).",
       "kind": "nonfunctional",
       "priority": "must",
       "metric": {
-        "name": "sustained rate at 4,000, 2,000, 5 s",
+        "name": "sustained rate at 2,000, 5 s",
         "target": "400 updates /s",
         "unit": "updates /s"
       },
@@ -1485,6 +1485,16 @@
           ]
         },
         {
+          "name": "No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged",
+          "pros": [
+            "no credentials to manage for occasional users",
+            "meets 'no account or email required'"
+          ],
+          "cons": [
+            "a reference number can be shared; scope what it unlocks"
+          ]
+        },
+        {
           "name": "Email one-time code / magic link (no account needed)",
           "pros": [
             "no password, no sign-up",
@@ -1497,7 +1507,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-5"
@@ -1740,12 +1750,12 @@
           "cons": []
         },
         {
-          "name": "4,000 updates/s",
+          "name": "800 updates/s",
           "pros": [],
           "cons": []
         },
         {
-          "name": "40 updates/s",
+          "name": "200 updates/s",
           "pros": [],
           "cons": []
         }

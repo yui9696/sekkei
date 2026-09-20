@@ -29,19 +29,9 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 3 k | rate × 86,400 s | 3000 (R-12) |
-| storage growth per day (requests) | 6.14 MB | rate × 86,400 × record size | 3000 (R-12); 2 KB stated in R-17 |
-| storage after 30 days (requests) | 184.32 MB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 125 requests | rate × outage seconds | 3000 (R-12); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 0.01 | Little's law: rate × mean service time | 3000 (R-12); mean service time assumed 200 ms |
-| in-flight items at the latency target | 0.02 | rate × latency target (Little's law upper bound) | 3000 (R-12) × 500 ms (R-8) |
-| requests per day | 1.73 M | rate × 86,400 s | 20 (R-12) |
-| storage growth per day (requests) | 3.54 GB | rate × 86,400 × record size | 20 (R-12); 2 KB stated in R-17 |
-| storage after 30 days (requests) | 106.17 GB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 72 k requests | rate × outage seconds | 20 (R-12); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 4 | Little's law: rate × mean service time | 20 (R-12); mean service time assumed 200 ms |
-| in-flight items at the latency target | 10 | rate × latency target (Little's law upper bound) | 20 (R-12) × 500 ms (R-8) |
+| concurrent handlers at the stated peak (requests) | 0.01 | Little's law: peak rate × mean service time | 3000 (R-12); mean service time assumed 200 ms |
 
+- Missing: no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated.
 - Assumption: Record size: 2 KB stated in R-17.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
 
@@ -130,7 +120,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-13 | constraint | must | — | scalability, simplicity | — |
 | R-14 | constraint | must | auth | security | — |
 | R-15 | functional | must | batch_pipeline | operability, compliance | — |
-| R-16 | functional | could | auth | operability | — |
+| R-16 | functional | must | auth | operability | — |
 | R-17 | nonfunctional | must | — | — | size at 2 KB <= 256 kb |
 | R-18 | nonfunctional | should | — | — | time at 4 h 24 h |
 | R-19 | nonfunctional | should | — | durability | time at 5 10 s |

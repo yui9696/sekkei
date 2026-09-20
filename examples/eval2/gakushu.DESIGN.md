@@ -41,7 +41,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-12 | nonfunctional | must | Monthly availability at least 99.9 %. The system must export Prometheus for metrics. | ratio >= 99.9 % |
 | R-13 | constraint | must | The system can use object storage TypeScript (Node 20) PostgreSQL S3. Team of 4. | — |
 | R-14 | constraint | must | Employees authenticate internal SSO (OIDC). Containers existing ingress behind. | — |
-| R-15 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
+| R-15 | functional | must | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
 | R-16 | nonfunctional | must | The system sustains 100 requests/s with peaks of 1,000 requests/s (assumed by the engine; default, not derived from the text). | sustained rate at 1,000 100 requests /s |
 | R-17 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
 | R-18 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
@@ -559,13 +559,17 @@ _Affects:_ C-1
   - + fits clients without a browser
   - + revocable per device
   - − a token service to run
+- ✘ **No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged**
+  - + no credentials to manage for occasional users
+  - + meets 'no account or email required'
+  - − a reference number can be shared; scope what it unlocks
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -980,7 +984,7 @@ Implement Public HTTP API: Translates HTTP requests into core calls: routing, re
 | R-12 | must | C-8, C-11 | WP-4, WP-9 | A-5, A-6, A-7, A-15, A-16 |
 | R-13 | must | C-1, C-6 | WP-4, WP-8 | A-5, A-6, A-7, A-13, A-14 |
 | R-14 | must | C-9, C-14 | WP-5, WP-10 | A-8, A-17, A-18, A-19 |
-| R-15 | could | C-9 | WP-5 | A-8 |
+| R-15 | must | C-9 | WP-5 | A-8 |
 | R-16 | must | C-10, C-14 | WP-7, WP-10 | A-10, A-11, A-12, A-17, A-18, A-19 |
 | R-17 | should | C-14 | WP-10 | A-17, A-18, A-19 |
 | R-18 | should | C-1 | WP-4 | A-5, A-6, A-7 |

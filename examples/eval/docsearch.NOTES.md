@@ -127,7 +127,7 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 | R-12 | constraint | must | rate_limiting, ml_inference, semantic_search | — | — |
 | R-13 | constraint | must | auth | security | — |
 | R-14 | functional | must | batch_pipeline | operability, compliance | — |
-| R-15 | functional | could | auth | operability | — |
+| R-15 | functional | must | auth | operability | — |
 | R-16 | nonfunctional | must | — | durability, availability | ratio 99.9 % |
 | R-17 | nonfunctional | should | — | — | time at 4 h 24 h |
 | R-18 | nonfunctional | should | — | durability | time at 5 10 s |

@@ -239,3 +239,57 @@ as chosen; stated `GET /v2/queue/{ticket}` routes were renamed; Japanese 第N章
 agricultural glossary; passive verbs ("is booked", "defined in the protocol") were operations.
 As before: not re-scored by the reviewer — the failures no longer reproduce.
 
+## Fourth independent red team (2026-09-20): re-scoring, and the over-corrections
+
+The fourth reviewer first re-scored the twelve specifications of reviewers 2 and 3 with fresh
+eyes, before reading any earlier score:
+
+| spec | reviewer 2 | reviewer 3 | reviewer 4 |
+|---|---|---|---|
+| real2/01 FX options OMS | 5 | 10 | 7 |
+| real2/02 live-to-VOD epic | 3 | 7 | 4 |
+| real2/03 ML platform notes | 4 | 2 | 6 |
+| real2/04 在宅患者モニタリング (ja) | 9 | 9 | 8 |
+| real2/05 flaky-test tracker (Slack) | 8 | 2 | 6 |
+| real2/06 split payments CR | 4 | 5 | 7 |
+| real3/01 grid telemetry tender | — | 1 | 5 |
+| real3/02 pet-insurance PRD | — | 4 | 7 |
+| real3/03 農業 IoT 提案依頼書 (ja) | — | 2 | 6 |
+| real3/04 matchmaking RFC | — | 4 | 7 |
+| real3/05 e-discovery post-mortem | — | 5 | 7 |
+| real3/06 clinical-trial Notion page | — | 2 | 6 |
+
+Median 6.5, nothing above 8. The reviewer's reading of the flat zeros: on every spec the data
+model is `(id, created_at)`, the interfaces are verb–noun fragments, and the work packages are
+catalogue components at S/M/L — those three criteria are not moved by parsing fixes.
+
+Its own six specs (a security questionnaire answered in a `| # | Question | Answer | Status |`
+table, an ERP change table, a hardware+firmware+cloud product, a WCAG-heavy public-sector
+service, a bilingual ja/en live-ops spec, a diagram-heavy research platform with five deliberate
+contradictions) scored **1 / 5 / 5 / 6 / 4 / 6 / 2**. Four blockers were over-corrections of the
+round-3 fixes, all regression tests now: bullets starting with `#` (issue numbers, a `#` table
+column) were read as headings and vanished; "X are excluded from the export; the export must…"
+inside a requirement bullet deleted the bullet (`_BULLET.sub` on a regex that matches the whole
+line returned an empty string); `## 8. Not in scope` was not a heading because of the period; and
+the red team's deletion attack silently skipped every requirement it could not locate — table
+rows, numbered clauses, wrapped bullets, Japanese rows with `2.1` ids — and reported a green
+result over the rest. Also fixed: team counts summed only a fixed role list ("3 firmware, 2
+bridge, 5 cloud, 3 mobile, 1 QA, 1 security" → 4); a burst ("400/s at the London open", "120,000
+rps for 5 minutes") was extrapolated to a month; a per-lock rate was never multiplied by the
+fleet; an unrelated count was divided by an interval; a 10× peak was invented for a fixed-interval
+feed; a maintenance window was taken as the service window; `--submits-->` diagram arrows and one
+admin CLI made a whole web service a CLI with SQLite and no authentication; "support-centre
+teams" made a Microsoft Teams provider and "pays for" a payment provider; "may degrade" in a
+caveat clause made an availability target optional; CURRENT / N/A / STD rows of a status table
+were work; IEC 62443, 21 CFR Part 11 and −20 °C were quantities; a per-jurisdiction residency
+requirement got a single region. `redteam` now reports contradiction candidates (retention vs
+deletion, residency vs hosting, anonymity vs identifiers, a forbidden practice vs "happens
+today") and lists what it could not test; `diff` re-maps requirement ids inside acceptance
+descriptions so a two-bullet change stales the packages that got the bullets, not all of them.
+
+Not re-scored by this reviewer after the fixes. The honest state after four rounds: the engine
+reads what teams write far more faithfully than it did (round 3's median 5 → round 4's 6.5), it
+says what it dropped, and it is safe to use as a coverage checklist and a generator of the
+generic layer; the domain-specific decomposition, the data model, the interfaces and the effort
+remain a person's work, and every capacity table must still be checked against the text.
+

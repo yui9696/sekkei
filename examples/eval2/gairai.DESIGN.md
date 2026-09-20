@@ -42,7 +42,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-13 | constraint | must | The system can use Python 3.12 PostgreSQL. Team of 3. Containers single region. | — |
 | R-14 | constraint | must | Patients authenticate existing patient portal (OIDC). | — |
 | R-15 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
-| R-16 | functional | could | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
+| R-16 | functional | must | Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine). | — |
 | R-17 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
 | R-18 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
 | R-19 | nonfunctional | should | External calls time out after 10 s; failures are retried 5 times with exponential backoff and work waits durably meanwhile (assumed by the engine). | time at 5 10 s |
@@ -642,13 +642,17 @@ _Affects:_ C-1
   - + fits clients without a browser
   - + revocable per device
   - − a token service to run
+- ✘ **No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged**
+  - + no credentials to manage for occasional users
+  - + meets 'no account or email required'
+  - − a reference number can be shared; scope what it unlocks
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by performance (weight 1.0), availability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.22; API keys per customer, hashed at rest, sent as a: 1.36; Mutual TLS: 1.09; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -1096,7 +1100,7 @@ Implement Legacy system adapter: Anti-corruption layer in front of the existing 
 | R-13 | must | C-1, C-6, C-15 | WP-2, WP-7, WP-9 | A-3, A-4, A-5, A-6, A-14, A-15, A-17, A-18, A-19 |
 | R-14 | must | C-9 | WP-4 | A-9 |
 | R-15 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
-| R-16 | could | C-9 | WP-4 | A-9 |
+| R-16 | must | C-9 | WP-4 | A-9 |
 | R-17 | must | C-15 | WP-9 | A-17, A-18, A-19 |
 | R-18 | should | C-15 | WP-9 | A-17, A-18, A-19 |
 | R-19 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |

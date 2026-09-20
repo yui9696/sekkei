@@ -6,6 +6,7 @@ maps them to the packages whose briefs no longer match.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -51,7 +52,22 @@ def id_map(old: Design, new: Design) -> dict[str, str]:
             cands = b_by_key.get(_natural(coll, o))
             if cands:
                 out[o["id"]] = cands.pop(0)["id"]
+    # acceptance checks: matched by their description with requirement ids already mapped
+    def acc_key(desc: str) -> str:
+        return " ".join(_ID_IN_TEXT.sub(lambda m: out.get(m.group(0), m.group(0)), desc).split()).lower()
+    new_acc: dict[str, list[str]] = {}
+    for w in new.work_packages:
+        for acc in w.acceptance:
+            new_acc.setdefault(" ".join(acc.description.split()).lower(), []).append(acc.id)
+    for w in old.work_packages:
+        for acc in w.acceptance:
+            cands = new_acc.get(acc_key(acc.description))
+            if cands:
+                out[acc.id] = cands.pop(0)
     return out
+
+
+_ID_IN_TEXT = re.compile(r"\b(?:R|C|I|E|F|D|K|WP|A)-\d+\b")
 
 
 def _remap(obj: Any, mapping: dict[str, str]) -> Any:
@@ -60,8 +76,11 @@ def _remap(obj: Any, mapping: dict[str, str]) -> Any:
         return {k: _remap(v, mapping) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_remap(v, mapping) for v in obj]
-    if isinstance(obj, str) and obj in mapping:
-        return mapping[obj]
+    if isinstance(obj, str):
+        if obj in mapping:
+            return mapping[obj]
+        if _ID_IN_TEXT.search(obj):
+            return _ID_IN_TEXT.sub(lambda m: mapping.get(m.group(0), m.group(0)), obj)
     return obj
 
 

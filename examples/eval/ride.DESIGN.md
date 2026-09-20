@@ -33,7 +33,7 @@ _version 0.1.0 · schema sekkei/1_
 | R-10 | constraint | must | Go 1.22, PostgreSQL with PostGIS available, Redis available. Team of 4. Kubernetes cluster in a single region. | — |
 | R-11 | constraint | must | Riders and drivers authenticate with the company's OIDC provider; operators use the same provider with an operator role. | — |
 | R-12 | functional | must | Domain records are kept indefinitely; logs and audit history are retained for 1 year, after which a nightly job deletes them (assumed by the engine). | — |
-| R-13 | nonfunctional | must | The system sustains 400 updates/s with peaks of 4,000 updates/s (assumed by the engine: 2,000 drivers (R-7) ÷ every 5 s (R-3)). | sustained rate at 4,000, 2,000, 5 s 400 updates /s |
+| R-13 | nonfunctional | must | The system sustains 400 updates/s (assumed by the engine: 2,000 drivers (R-7) ÷ every 5 s (R-3); a fixed reporting interval has no peak factor). | sustained rate at 2,000, 5 s 400 updates /s |
 | R-14 | nonfunctional | must | Records are 2 KB on average and at most 256 KB (assumed by the engine). | size at 2 KB <= 256 kb |
 | R-15 | nonfunctional | must | Availability of 99.9 % monthly; accepted work is delayed but never lost during an outage (assumed by the engine). | ratio 99.9 % |
 | R-16 | nonfunctional | should | Backups run daily with a recovery point of 24 h and a recovery time of 4 h (assumed by the engine). | time at 4 h 24 h |
@@ -419,13 +419,17 @@ sequenceDiagram
   - + fits clients without a browser
   - + revocable per device
   - − a token service to run
+- ✘ **No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged**
+  - + no credentials to manage for occasional users
+  - + meets 'no account or email required'
+  - − a reference number can be shared; scope what it unlocks
 - ✘ **Email one-time code / magic link (no account needed)**
   - + no password, no sign-up
   - + works for occasional customers
   - − depends on email delivery
   - − weak against mailbox compromise
 
-**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
+**Rationale.** Scored against the active qualities; decided by durability (weight 1.0), performance (weight 0.83). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.33; Mutual TLS: 0.83; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints
 
 **Consequences.** Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.
 
@@ -548,8 +552,8 @@ _Affects:_ C-11, C-12
 **Context.** The requirements do not say. Question: Q-rate. Evidence: 2,000 drivers (R-7) ÷ every 5 s (R-3).
 
 - ✔ **400 updates/s**
-- ✘ **4,000 updates/s**
-- ✘ **40 updates/s**
+- ✘ **800 updates/s**
+- ✘ **200 updates/s**
 
 **Rationale.** Derived from the text: 2,000 drivers (R-7) ÷ every 5 s (R-3).
 

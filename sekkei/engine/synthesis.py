@@ -101,7 +101,7 @@ CLOSE_MARGIN = 0.15
 
 def _peak_rate(an: Analysis) -> float:
     """The largest stated rate in items per second (0 when none)."""
-    rates = [T.per_second(q) or 0.0 for u in an.requirements for q in u.sentence.quantities if q.kind == "rate"]
+    rates = [T.per_second(q) or 0.0 for u in an.requirements for q in u.sentence.quantities if q.kind == "rate" and not u.sentence.assumed]
     return max(rates, default=0.0)
 
 
@@ -433,6 +433,8 @@ def _metric_quality(u: ReqUnit) -> list[str]:
     if not u.metric:
         return []
     name = u.metric[0].lower()
+    if name.startswith("ratio") and not re.search(r"availab|uptime|of (?:requests|payments|days|the time|calls)|successful|error rate|success rate", u.sentence.lower):
+        return []            # "CPU not exceeding 60 %", "400 % zoom": a percentage, not an availability target
     return [q for k, q in _METRIC_QUALITY if k in name][:1]
 
 

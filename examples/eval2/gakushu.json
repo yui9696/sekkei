@@ -167,7 +167,7 @@
       "id": "R-15",
       "statement": "Every operation is scoped to the caller's own resources; an admin role may act on any resource (assumed by the engine).",
       "kind": "functional",
-      "priority": "could",
+      "priority": "must",
       "rationale": "assumed by the engine; confirm or override"
     },
     {
@@ -1891,6 +1891,16 @@
           ]
         },
         {
+          "name": "No account: a reference number plus a knowledge factor (date of birth) resumes a saved application; every attempt rate-limited and logged",
+          "pros": [
+            "no credentials to manage for occasional users",
+            "meets 'no account or email required'"
+          ],
+          "cons": [
+            "a reference number can be shared; scope what it unlocks"
+          ]
+        },
+        {
           "name": "Email one-time code / magic link (no account needed)",
           "pros": [
             "no password, no sign-up",
@@ -1903,7 +1913,7 @@
         }
       ],
       "choice": "OAuth2 / OIDC with the platform's identity provider",
-      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
+      "rationale": "Scored against the active qualities; decided by durability (weight 1.0), operability (weight 1.0). OAuth2 / OIDC with the platform's identity provi: 2.00; API keys per customer, hashed at rest, sent as a: 1.25; Mutual TLS: 0.88; Session tokens issued by the platform's own acco: unavailable (needs game_client, not in the constraints); No account: a reference number plus a knowledge : unavailable (needs no_account_auth, not in the constraints); Email one-time code / magic link: unavailable (needs email_auth, not in the constraints). stated in the constraints",
       "consequences": "Not choosing 'API keys per customer, hashed at rest, sent as a' gives up: simple, scriptable. Not choosing 'Mutual TLS' gives up: strong, no secrets in headers.",
       "affects": [
         "C-9"

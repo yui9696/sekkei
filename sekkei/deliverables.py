@@ -353,6 +353,8 @@ def slos(design: Design) -> str:
             window_min = 30 * 24 * 60
             note = ""
             hm = re.search(r"(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})", r.statement)
+            if hm and re.search(r"maintenance|planned downtime|excluding|outage window|計画停止", r.statement[max(0, hm.start() - 80):hm.start()], re.I):
+                hm = None                     # "excluding announced maintenance windows (Sundays 02:00–06:00)": not the service window
             if hm:
                 hours = (int(hm.group(3)) * 60 + int(hm.group(4)) - int(hm.group(1)) * 60 - int(hm.group(2))) / 60
                 if 0 < hours < 24:

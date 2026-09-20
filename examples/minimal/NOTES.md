@@ -31,20 +31,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | estimate | value | formula | inputs |
 |---|---|---|---|
-| requests per day | 8.64 M | rate × 86,400 s | 100 (R-5) |
-| storage growth per day (requests) | 17.69 GB | rate × 86,400 × record size | 100 (R-5); 2 KB stated in R-7 |
-| storage after 30 days (requests) | 530.84 GB | daily growth × 30 | same inputs |
-| backlog after a 1 h downstream outage | 360 k requests | rate × outage seconds | 100 (R-5); outage length assumed |
-| concurrent handlers to sustain the rate (requests) | 20 | Little's law: rate × mean service time | 100 (R-5); mean service time assumed 200 ms |
-| outbound deliveries per second if each event matches 1 target(s) | 100 | event rate × fan-out | 100 (R-5); fan-out 1 assumed |
-| outbound deliveries per second if each event matches 10 target(s) | 1 k | event rate × fan-out | 100 (R-5); fan-out 10 assumed |
-| in-flight items at the latency target | 30 | rate × latency target (Little's law upper bound) | 100 (R-5) × 300 ms (R-8) |
-| concurrent handlers at the stated peak (requests) | 200 | Little's law: peak rate × mean service time | 1,000 (R-5); mean service time assumed 200 ms |
+| concurrent handlers at the stated peak (requests) | 20 | Little's law: peak rate × mean service time | 100 (R-5); mean service time assumed 200 ms |
 | number of records | 10 k | stated | 10,000 records (R-6) |
-| average rate per record (if evenly spread) | 0.01/s | rate ÷ count | 100 ÷ 10,000 |
 | number of users | 1 k | stated | 1,000 users (R-6) |
-| average rate per user (if evenly spread) | 0.1/s | rate ÷ count | 100 ÷ 1,000 |
 
+- Missing: no rate stated (events/s, requests/s); throughput, storage growth and backlog cannot be estimated.
 - Assumption: Record size: 2 KB stated in R-7.
 - Assumption: Mean service time 200 ms and a 1 h outage are engine assumptions; replace with measurements.
 

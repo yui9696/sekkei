@@ -164,6 +164,16 @@ patterns; exclusions and reference-only sections are filed, not designed; post-m
 and root causes are background; `diff` matches elements by content so a two-bullet change
 reports two additions instead of renumbering everything; `issues` are keyed by a marker in the
 body and the script upserts them.
+A fourth reviewer re-scored all twelve of the earlier reviewers' specifications with fresh eyes
+(from 1–10 to 4–8 out of 20 — no spec above 8; data model, interfaces and work packages flat
+zeros everywhere) and found four over-corrections of the round-3 fixes, which are now tests in
+[`tests/test_real4.py`](tests/test_real4.py): bullets whose content starts with `#` had vanished,
+"is excluded from the export" inside a requirement had deleted the requirement, a numbered
+`## 8. Not in scope` heading became a bullet, and the red team's deletion attack had silently
+skipped every requirement it could not locate (table rows, numbered clauses, wrapped bullets)
+and reported green — it now reports what it could not test. See the evaluation document for
+the honest state: usable as a coverage checklist and a boilerplate generator for the generic
+layer; the domain decomposition, data model, interfaces and effort are still a person's job.
 
 ## Into the tools the team already uses
 
@@ -256,11 +266,11 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 298 (incl. 11 real-world specs, 20 specs written by two independent red teams, and a mutation fuzz) |
+| tests | 330 (incl. 11 real-world specs, 37 specs written by three independent red teams, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |
-| catalogue | 44 patterns, 57 archetypes, 28 decision points / 87 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
+| catalogue | 44 patterns, 57 archetypes, 28 decision points / 89 options, 12 quality tactics, 26 risks, 9 language layouts, 44 threats |
 | `sekkei deliver` on the SaaS fixture | 32 files (18 ADRs) in about 0.5 s |
 | `sekkei redteam` on the SaaS fixture | 18 engine runs in 1–3 s (one engine run per stated sentence, capped at 80) |
 

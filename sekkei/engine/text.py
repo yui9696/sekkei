@@ -330,11 +330,20 @@ def modality(text: str) -> str:
         return "must"          # a prohibition is a hard requirement, not an option
     # "could not decide", "may not" inside a subordinate clause are not the sentence's modality
     low = re.sub(r"\b(?:could|may|might) not\b", "", low)
+    # the main clause decides: "Availability 99.95 %; the planner tool may be down" is a must with a caveat
+    main = re.split(r";|\s—\s|\s–\s|\bexcept\b|\bunless\b|\bwhereas\b|\bbut\b", low)[0]
     for kind in ("must", "should", "could"):
         for cue in MODALITY[kind]:
-            if re.search(r"\b" + re.escape(cue) + r"\b", low):
-                if kind == "could" and re.search(r"\b(?:that|which|the rules|cannot decide|not decide)\b.{0,30}\b" + re.escape(cue) + r"\b", low):
+            scope = low if kind == "must" else main
+            if re.search(r"\b" + re.escape(cue) + r"\b", scope):
+                if kind == "could" and re.search(r"\b(?:that|which|the rules|cannot decide|not decide)\b.{0,30}\b" + re.escape(cue) + r"\b", scope):
                     continue   # "claims the rules could not decide": a relative clause
+                if kind == "could" and cue == "optional" and re.search(r"\boptional [a-z]", scope) and not re.search(r"\bis optional\b|\(optional\)", scope):
+                    continue   # "with optional schedules": an adjective, not the priority of the sentence
+                if kind == "could" and cue == "may" and re.search(r"\bmay (?:be entitled|apply|vary|differ|include|contain|also|choose|or may not)\b", scope):
+                    continue   # "you may be entitled": not optionality of the requirement
+                if kind == "should" and cue in ("need", "needs", "want", "wants", "require", "requires") and not re.search(r"\b(?:we|team|users?|customers?|they|it|i|you|analysts?|the (?:\w+ )?(?:team|service|system|business))\s+(?:\w+\s+)?" + cue + r"\b", scope):
+                    continue   # "projects they no longer need": not a modal
                 return kind
     return ""
 
@@ -358,6 +367,9 @@ def quantities(text: str) -> list[Quantity]:
             unit, kind = "min", "duration"
         before = text[max(0, m.start() - 24): m.start()]
         after = text[m.end(): m.end() + 32]
+        if re.search(r"\b(?:iec|iso|rfc|ieee|din|en|ansi|cfr|part|section|§|clause|nist|fips|pci dss|itu|jis|bs|version|v)\s*$", before, re.I) \
+                or re.match(r"\s*(?:°|℃|℉|degrees|cfr\b|u\.?s\.?c\.?\b|usc\b)", after, re.I) or re.search(r"[-–−]\s*$", before) and re.match(r"\s*°", after):
+            continue          # "IEC 62443", "21 CFR Part 11", "−20 °C": names and temperatures, not quantities
         if kind == "number" and int(value) in _HTTP_CODES and not mult and _CODE_CONTEXT.search(before + " " + after[:16]) \
                 and not re.match(r"\s*[a-zA-Z]+ ?(?:per |/)", after):
             kind = "code"  # "returns 429", "status 404": an HTTP status code, not a quantity ("500 requests per second" is one)
@@ -442,7 +454,7 @@ _DETERMINERS = {"a", "an", "the", "each", "every", "per", "their", "own", "of", 
                 "original", "new", "existing", "current", "delivered", "returned", "first", "last", "next", "all", "its", "his", "her", "our", "my", "your", "another"}
 
 
-_ROW_ID = re.compile(r"^\s*([A-Za-z]{1,4}-?\d{1,4}|\d+-\d+)\s+(?=\S)")
+_ROW_ID = re.compile(r"^\s*([A-Za-z]{1,4}-?\d{1,6}|\d+-\d+)\s+(?=\S)")
 _FORCED = re.compile(r"\s*\((must|should|could)\)\s*$")
 
 

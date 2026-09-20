@@ -181,12 +181,22 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
     constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low_env)}
     low_stated = (h1 + " " + " ".join(s.text for s in sentences if not s.assumed)).lower()
     stated_constraints = {tok for rx, tok in K.CONSTRAINT_TOKENS if re.search(rx, low_stated)}
-    if "cli_tool" in active:
+    # a CLI is the system only when no web/API surface is described; an admin CLI next to a web service is a side tool
+    cli_dominant = "cli_tool" in active and not any(p in active for p in ("crud_api", "admin_api", "event_ingest", "realtime", "mobile_offline", "file_storage", "search", "workflow", "payments", "notification"))
+    if cli_dominant:
         stated_constraints.add("cli_tool")
+    else:
+        stated_constraints.discard("cli_tool")
+        constraints.discard("cli_tool")
     # derived tokens: a stated durability/consistency need or an availability target rules out volatile options
     if "durability" in qualities or "consistency" in qualities or re.search(r"\b99\.\d+\s*%", low) or re.search(r"never (?:be )?lost|must never|double[- ]pay|exactly once|at[- ]least[- ]once", low):
         constraints.add("durable_required")
     languages = [tok for rx, tok in K.LANGUAGE_TOKENS if re.search(rx, low)]
+    if len(languages) > 1:
+        # "Tokyo (server): Go. Berlin (tools): TypeScript" — the server's language leads the conventions
+        server = [tok for rx, tok in K.LANGUAGE_TOKENS if tok in languages and re.search(r"(?:server|backend|service|api)[^.。]{0,40}" + rx + r"|" + rx + r"[^.。]{0,40}(?:server|backend|services?|api)\b", low)]
+        if server:
+            languages = server + [t for t in languages if t not in server]
     if "go" not in languages and re.search(r"(?<![A-Za-z])Go(?=[,./)]|\s+(?:\d|backend|service|services|binary|module|\+|and\b|for (?:services|the backend|apis|microservices)\b|on\b|$))", text, re.M) \
             and not re.search(r"\bGo (?:to|through|live|back|ahead|down|up|into|out|over|with|the|a|an)\b", text) \
             and not re.search(r"\bGo for (?:it|the|a|an)\b", text) or re.search(r"\bGo for (?:services|the backend|apis|microservices|the api|everything)\b", text):
