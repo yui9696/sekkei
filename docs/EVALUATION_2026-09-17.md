@@ -293,3 +293,29 @@ says what it dropped, and it is safe to use as a coverage checklist and a genera
 generic layer; the domain-specific decomposition, the data model, the interfaces and the effort
 remain a person's work, and every capacity table must still be checked against the text.
 
+## The three flat zeros (2026-09-20, after the fourth round)
+
+Every reviewer scored the data model, the interfaces and the work packages 0/2 on every
+specification, and the fourth said why: those criteria are not moved by parsing fixes. An
+entity was a noun with `(id, created_at)`; an operation was a verb–noun fragment (`POST
+/prices/{id}/amend`); a package was a catalogue component at S/M/L regardless of content.
+
+`engine/domain.py` reads the domain model from the sentences instead: fields from a
+parenthesised attribute list, a `with A, B and C` list after a create/submit verb, a
+possessive or an "amend the X of a Y"; types from the field names; state machines from the
+transactional verbs applied to the entity and from `a → b → c` lists; invariants (never twice,
+immutable after creation, same transaction, concealed) with the sentence that states them;
+relations from "belongs to", "per", "has N". Proper nouns, verbs, adjectives and words that never
+occur as a determined or plural noun are not entities. Related entities form an aggregate, and
+each aggregate is a component that owns its records and their transitions, with its own work
+package; sentences about its entities are owned by it instead of a synthesised "X processor".
+Operations name the entity, not its attribute (`POST /orders/{id}/amend`). Package sizes come
+from what a package carries (operations, entities, requirements).
+
+On the FX-options spec this reads `Order(instrument, notional: Money, strike: Money, expiry:
+timestamp, direction: enum, limit_price: Money, status: working → submitted → cancelled →
+rejected)`, `Fill(status: booked → retrying → rejected; immutable after creation)`, an Order
+domain and a Fill domain with `submit_order / cancel_order / book_fill / retry_fill`, and no
+"Precision processor" or "Officer controller". Not re-scored by an independent reviewer yet;
+that is the next round's job.
+

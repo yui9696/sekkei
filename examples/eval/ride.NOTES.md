@@ -22,7 +22,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-5 | C-11 Public HTTP API, C-3 Domain core | surface+core | human actor 'operator': a use case |
+| R-5 | C-13 Trip domain | aggregate | the sentence speaks of trip, owned by Trip domain |
 | R-6 | C-11 Public HTTP API, C-3 Domain core | surface+core | human actor 'driver': a use case |
 
 ## 2. Capacity estimates
@@ -48,11 +48,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **24 person-days**; critical path **12 days**; with a team of 4: **about 14 working days** (3 weeks).
+- Total effort: **50 person-days**; critical path **35 days**; with a team of 4: **about 35 working days** (7 weeks).
 - Wave 1: WP-1, WP-2
-- Wave 2: WP-3, WP-4, WP-5
-- Wave 3: WP-6
-- Wave 4: WP-7, WP-8, WP-9
+- Wave 2: WP-3, WP-4, WP-5, WP-6
+- Wave 3: WP-7
+- Wave 4: WP-10, WP-8, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 4; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -101,6 +101,15 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-11 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-12 Assumed answer: cost (Q-budget): **existing only**
 - D-13 Assumed answer: data (Q-migration): **greenfield**
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Trip | — | — | active | — | R-5 |
+| Ride | — | — | — | — | R-1 |
 
 ## 6. How the text was read
 

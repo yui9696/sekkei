@@ -654,64 +654,70 @@
         "pattern:event_ingest"
       ]
     },
-    "E-1": {
-      "sentences": [],
+    "C-19": {
+      "sentences": [
+        1,
+        2,
+        3,
+        4,
+        6
+      ],
       "rules": [
-        "entity:record"
+        "aggregate:event"
       ]
     },
-    "E-2": {
+    "I-19": {
+      "sentences": [],
+      "rules": [
+        "aggregate:event"
+      ]
+    },
+    "E-1": {
       "sentences": [],
       "rules": [
         "entity:principal"
       ]
     },
-    "E-3": {
+    "E-2": {
       "sentences": [],
       "rules": [
         "entity:event"
       ]
     },
-    "E-4": {
+    "E-3": {
       "sentences": [],
       "rules": [
         "entity:work_item"
       ]
     },
-    "E-5": {
+    "E-4": {
       "sentences": [],
       "rules": [
         "entity:attempt"
       ]
     },
-    "E-6": {
+    "E-5": {
       "sentences": [],
       "rules": [
         "entity:target"
       ]
     },
-    "E-7": {
+    "E-6": {
       "sentences": [],
       "rules": [
         "entity:secret"
       ]
     },
-    "E-8": {
+    "E-7": {
       "sentences": [],
       "rules": [
         "entity:job_run"
       ]
     },
-    "E-9": {
+    "E-8": {
       "sentences": [],
       "rules": [
         "entity:audit_entry"
-      ]
-    },
-    "E-10": {
-      "sentences": [],
-      "rules": [
-        "entity:from-text"
       ]
     },
     "F-1": {
@@ -1002,58 +1008,64 @@
     "WP-4": {
       "sentences": [],
       "rules": [
-        "package:layer1:async_delivery"
+        "package:layer1:aggregate:domain_event"
       ]
     },
     "WP-5": {
       "sentences": [],
       "rules": [
-        "package:layer1:infra"
+        "package:layer1:async_delivery"
       ]
     },
     "WP-6": {
       "sentences": [],
       "rules": [
-        "package:layer1:notification"
+        "package:layer1:infra"
       ]
     },
     "WP-7": {
       "sentences": [],
       "rules": [
-        "package:layer1:signing"
+        "package:layer1:notification"
       ]
     },
     "WP-8": {
       "sentences": [],
       "rules": [
-        "package:layer2:crud_api"
+        "package:layer1:signing"
       ]
     },
     "WP-9": {
       "sentences": [],
       "rules": [
-        "package:layer3:admin_api"
+        "package:layer2:crud_api"
       ]
     },
     "WP-10": {
       "sentences": [],
       "rules": [
-        "package:layer3:async_delivery"
+        "package:layer3:admin_api"
       ]
     },
     "WP-11": {
       "sentences": [],
       "rules": [
-        "package:layer3:batch_pipeline"
+        "package:layer3:async_delivery"
       ]
     },
     "WP-12": {
       "sentences": [],
       "rules": [
-        "package:layer3:event_ingest"
+        "package:layer3:batch_pipeline"
       ]
     },
     "WP-13": {
+      "sentences": [],
+      "rules": [
+        "package:layer3:event_ingest"
+      ]
+    },
+    "WP-14": {
       "sentences": [],
       "rules": [
         "package:layer3:health_policy"

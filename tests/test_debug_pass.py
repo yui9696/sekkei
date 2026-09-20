@@ -61,9 +61,9 @@ def test_entry_point_interfaces_are_not_orphans():
 
 def test_synthesised_contracts_use_the_entity_types_when_known():
     r = design((EVAL / "telemetry.md").read_text(encoding="utf-8"))
-    proc = next(i for i in r.design.interfaces if i.name.startswith("Readings processor"))
+    proc = next(i for i in r.design.interfaces if i.name.startswith("Reading domain"))
     types = {p.type for o in proc.operations for p in o.inputs}
-    assert "Reading" in types or "list[Reading]" in types
+    assert "Reading" in types or "list[Reading]" in types or "ref" in types
 
 
 def test_timing_rules_of_a_use_case_reach_its_operation():

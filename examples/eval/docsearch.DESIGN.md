@@ -64,12 +64,14 @@ graph LR
   C_13["C-13 Batch job"]
   C_14["C-14 Reporting"]
   C_15["C-15 Public HTTP API"]
+  C_16["C-16 Document domain"]
   C_4 -->|I-1| C_1
   C_4 -->|I-6| C_6
   C_4 -->|I-9| C_9
   C_4 -->|I-3| C_3
   C_4 -->|I-11| C_11
   C_4 -->|I-5| C_5
+  C_4 -->|I-16| C_16
   C_5 -->|I-2| C_2
   C_5 -->|I-6| C_6
   C_7 -->|I-1| C_1
@@ -85,6 +87,8 @@ graph LR
   C_15 -->|I-7| C_7
   C_15 -->|I-8| C_8
   C_15 -->|I-10| C_10
+  C_15 -->|I-16| C_16
+  C_16 -->|I-1| C_1
 ```
 
 ### C-1 — Store
@@ -116,8 +120,8 @@ graph LR
 - **kind**: module · **path**: `app/core.py`
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
-- **requires**: I-1, I-6, I-9, I-3, I-11, I-5
-- **satisfies**: R-1, R-10, R-2, R-3, R-5, R-11, R-12, R-21, R-22
+- **requires**: I-1, I-6, I-9, I-3, I-11, I-5, I-16
+- **satisfies**: R-2, R-3, R-5, R-11, R-12, R-21, R-22
 
 ### C-5 — Notifier
 
@@ -204,13 +208,21 @@ graph LR
 - **kind**: service · **path**: `app/surface_api.py`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
-- **requires**: I-4, I-6, I-7, I-8, I-10
-- **satisfies**: R-1, R-10, R-8, R-9, R-17, R-20
+- **requires**: I-4, I-6, I-7, I-8, I-10, I-16
+- **satisfies**: R-8, R-9, R-17, R-20
+
+### C-16 — Document domain
+
+- **kind**: module · **path**: `app/domain_document.py`
+- **responsibility**: Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.
+- **provides**: I-16
+- **requires**: I-1
+- **satisfies**: R-1, R-2, R-4, R-6, R-8, R-10
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-11, C-2, C-3, C-6, C-8, C-9
-1. C-10, C-12, C-14, C-5, C-7
+1. C-10, C-12, C-14, C-16, C-5, C-7
 2. C-4
 3. C-13, C-15
 
@@ -398,19 +410,20 @@ graph LR
 | `DELETE /documents/{id}` | `id`: str | 204 | 401 unauthenticated, 404 unknown id | — |
 | | from R-6: Team leads can delete documents; deleted documents disappear from search results within on | | | |
 
+### I-16 — Document domain interface
+
+- **kind**: module · **owner**: C-16 · **stability**: draft
+- Provided by Document domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `create_document` | `document`: Document | Document (id assigned) | ValidationError listing every invalid field | record is durable before return |
+| | creation of the aggregate root | | | |
+| `get_document` | `document_id`: ref | Document \| None | — | — |
+
 ## Entities
 
-### E-1 — Record (owner C-1)
-
-Generic domain record; refine per entity found in the requirements.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-| `updated_at` | timestamp |  |
-
-### E-2 — Principal (owner C-1)
+### E-1 — Principal (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -418,7 +431,7 @@ Generic domain record; refine per entity found in the requirements.
 | `kind` | enum(customer, operator, service) |  |
 | `scopes` | list[str] |  |
 
-### E-3 — File (owner C-3)
+### E-2 — File (owner C-3)
 
 | field | type | constraints |
 |---|---|---|
@@ -427,7 +440,7 @@ Generic domain record; refine per entity found in the requirements.
 | `size` | int | <= configured limit |
 | `owner_id` | uuid |  |
 
-### E-4 — JobRun (owner C-1)
+### E-3 — JobRun (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -438,7 +451,7 @@ Generic domain record; refine per entity found in the requirements.
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-5 — ReportRun (owner C-1)
+### E-4 — ReportRun (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -449,9 +462,28 @@ Generic domain record; refine per entity found in the requirements.
 | `completed_at` | timestamp |  |
 | `rows` | int |  |
 
-### E-6 — Document (owner C-1)
+### E-5 — Document (owner C-16)
 
-Domain entity named in the requirements ('document'); confirm the fields.
+Domain entity read from R-2, R-6. No fields are stated in the text beyond its name; add them.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `created_at` | timestamp |  |
+
+### E-6 — Upload (owner C-1)
+
+Domain entity read from R-9. No fields are stated in the text beyond its name; add them.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `status` | enum(acknowledged) | state machine read from R-9 |
+| `created_at` | timestamp |  |
+
+### E-7 — Passage (owner C-1)
+
+Domain entity read from R-4. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -862,42 +894,46 @@ _Affects:_ C-6
 ```mermaid
 graph LR
   WP_1["WP-1 File storage (S)"]
-  WP_2["WP-2 Store + Observability + Rate limiter (M)"]
+  WP_2["WP-2 Store + Observability + Rate limiter (L)"]
   WP_3["WP-3 Cache (S)"]
   WP_4["WP-4 Model server (S)"]
-  WP_5["WP-5 Authentication + Scheduler (M)"]
-  WP_6["WP-6 Notifier (S)"]
-  WP_7["WP-7 Reporting (S)"]
-  WP_8["WP-8 Search index (S)"]
-  WP_9["WP-9 Domain core (S)"]
-  WP_10["WP-10 Batch job (S)"]
-  WP_11["WP-11 Public HTTP API (S)"]
+  WP_5["WP-5 Document domain (M)"]
+  WP_6["WP-6 Authentication + Scheduler (M)"]
+  WP_7["WP-7 Notifier (S)"]
+  WP_8["WP-8 Reporting (S)"]
+  WP_9["WP-9 Search index (M)"]
+  WP_10["WP-10 Domain core (L)"]
+  WP_11["WP-11 Batch job (S)"]
+  WP_12["WP-12 Public HTTP API (M)"]
   WP_2 --> WP_5
   WP_2 --> WP_6
   WP_2 --> WP_7
   WP_2 --> WP_8
-  WP_1 --> WP_9
   WP_2 --> WP_9
-  WP_3 --> WP_9
-  WP_4 --> WP_9
-  WP_6 --> WP_9
+  WP_1 --> WP_10
   WP_2 --> WP_10
+  WP_3 --> WP_10
+  WP_4 --> WP_10
   WP_5 --> WP_10
-  WP_9 --> WP_10
+  WP_7 --> WP_10
   WP_2 --> WP_11
-  WP_5 --> WP_11
-  WP_8 --> WP_11
-  WP_9 --> WP_11
+  WP_6 --> WP_11
+  WP_10 --> WP_11
+  WP_2 --> WP_12
+  WP_5 --> WP_12
+  WP_6 --> WP_12
+  WP_9 --> WP_12
+  WP_10 --> WP_12
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1, WP-2, WP-3, WP-4
-2. WP-5, WP-6, WP-7, WP-8
-3. WP-9
-4. WP-10, WP-11
+2. WP-5, WP-6, WP-7, WP-8, WP-9
+3. WP-10
+4. WP-11, WP-12
 
-_Critical path (12 person-days):_ WP-2 → WP-5 → WP-11
+_Critical path (30 person-days):_ WP-2 → WP-5 → WP-10 → WP-12
 
 ### WP-1 — File storage (S)
 
@@ -911,7 +947,7 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
   - A-2 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: file_storage
 
-### WP-2 — Store + Observability + Rate limiter (M)
+### WP-2 — Store + Observability + Rate limiter (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints; Rate limiter: Per-principal or per-key request budgets with a sliding window.
 
@@ -948,7 +984,19 @@ Implement Model server: Loads the model, serves predictions with batching and ti
   - A-9 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: ml_inference
 
-### WP-5 — Authentication + Scheduler (M)
+### WP-5 — Document domain (M)
+
+Implement Document domain: Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.
+
+- **components**: C-16 · **implements**: I-16
+- **depends on**: WP-2 · **satisfies**: R-1, R-2, R-4, R-6, R-8, R-10
+- **write scope**: `app/domain_document.py`, `tests/test_domain_document.py`
+- **acceptance**:
+  - A-10 (test) unit tests of Document domain pass — `python -m pytest -q tests/test_domain_document.py`
+  - A-11 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+- **notes**: family: aggregate:domain_document
+
+### WP-6 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -956,10 +1004,10 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2 · **satisfies**: R-7, R-13, R-14, R-15
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-10 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+  - A-12 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
 - **notes**: family: infra
 
-### WP-6 — Notifier (S)
+### WP-7 — Notifier (S)
 
 Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
 
@@ -967,10 +1015,10 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-2 · **satisfies**: R-7
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`
 - **acceptance**:
-  - A-11 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+  - A-13 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
-### WP-7 — Reporting (S)
+### WP-8 — Reporting (S)
 
 Implement Reporting: Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.
 
@@ -978,10 +1026,10 @@ Implement Reporting: Builds read models and aggregates (daily/weekly figures, KP
 - **depends on**: WP-2 · **satisfies**: R-7
 - **write scope**: `app/reporting.py`, `tests/test_reporting.py`
 - **acceptance**:
-  - A-12 (test) unit tests of Reporting pass — `python -m pytest -q tests/test_reporting.py`
+  - A-14 (test) unit tests of Reporting pass — `python -m pytest -q tests/test_reporting.py`
 - **notes**: family: reporting
 
-### WP-8 — Search index (S)
+### WP-9 — Search index (M)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
@@ -989,72 +1037,72 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-3, R-4, R-6, R-7, R-8, R-9
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
-  - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-14 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-15 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
+  - A-15 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
+  - A-16 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-17 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: search
 
-### WP-9 — Domain core (S)
+### WP-10 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-2, R-3, R-5, R-10, R-11, R-12, R-21, R-22
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-5, WP-7 · **satisfies**: R-2, R-3, R-5, R-11, R-12, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-18 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: crud_api
 
-### WP-10 — Batch job (S)
+### WP-11 — Batch job (S)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-2, WP-5, WP-9 · **satisfies**: R-7, R-14
+- **depends on**: WP-2, WP-6, WP-10 · **satisfies**: R-7, R-14
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-17 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-19 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-11 — Public HTTP API (S)
+### WP-12 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-5, WP-8, WP-9 · **satisfies**: R-1, R-8, R-9, R-10, R-17, R-20
+- **depends on**: WP-2, WP-5, WP-6, WP-9, WP-10 · **satisfies**: R-8, R-9, R-17, R-20
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
-  - A-18 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-19 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-20 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
+  - A-20 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-21 (metric) R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-22 (metric) R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target — metric R-9
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20 |
-| R-2 | must | C-3, C-4 | WP-1, WP-9 | A-1, A-2, A-16 |
-| R-3 | must | C-4, C-10, C-11 | WP-4, WP-8, WP-9 | A-8, A-9, A-13, A-14, A-15, A-16 |
-| R-4 | must | C-10 | WP-8 | A-13, A-14, A-15 |
-| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-9 | A-5, A-6, A-7, A-8, A-9, A-16 |
-| R-6 | must | C-10 | WP-8 | A-13, A-14, A-15 |
-| R-7 | must | C-2, C-5, C-10, C-12, C-13, C-14 | WP-5, WP-6, WP-7, WP-8, WP-10 | A-10, A-11, A-12, A-13, A-14, A-15, A-17 |
-| R-8 | must | C-9, C-10, C-15 | WP-3, WP-8, WP-11 | A-5, A-6, A-7, A-13, A-14, A-15, A-18, A-19, A-20 |
-| R-9 | must | C-3, C-9, C-10, C-11, C-15 | WP-1, WP-3, WP-4, WP-8, WP-11 | A-1, A-2, A-5, A-6, A-7, A-8, A-9, A-13, A-14, A-15, A-18, A-19, A-20 |
-| R-10 | must | C-4, C-15 | WP-9, WP-11 | A-16, A-18, A-19, A-20 |
-| R-11 | must | C-1, C-4, C-8 | WP-2, WP-9 | A-3, A-4, A-16 |
-| R-12 | must | C-4 | WP-9 | A-16 |
-| R-13 | must | C-7 | WP-5 | A-10 |
-| R-14 | must | C-12, C-13 | WP-5, WP-10 | A-10, A-17 |
-| R-15 | must | C-7 | WP-5 | A-10 |
+| R-1 | must | C-16 | WP-5 | A-10, A-11 |
+| R-2 | must | C-3, C-4, C-16 | WP-1, WP-5, WP-10 | A-1, A-2, A-10, A-11, A-18 |
+| R-3 | must | C-4, C-10, C-11 | WP-4, WP-9, WP-10 | A-8, A-9, A-15, A-16, A-17, A-18 |
+| R-4 | must | C-10, C-16 | WP-5, WP-9 | A-10, A-11, A-15, A-16, A-17 |
+| R-5 | must | C-4, C-9, C-11 | WP-3, WP-4, WP-10 | A-5, A-6, A-7, A-8, A-9, A-18 |
+| R-6 | must | C-10, C-16 | WP-5, WP-9 | A-10, A-11, A-15, A-16, A-17 |
+| R-7 | must | C-2, C-5, C-10, C-12, C-13, C-14 | WP-6, WP-7, WP-8, WP-9, WP-11 | A-12, A-13, A-14, A-15, A-16, A-17, A-19 |
+| R-8 | must | C-9, C-10, C-15, C-16 | WP-3, WP-5, WP-9, WP-12 | A-5, A-6, A-7, A-10, A-11, A-15, A-16, A-17, A-20, A-21, A-22 |
+| R-9 | must | C-3, C-9, C-10, C-11, C-15 | WP-1, WP-3, WP-4, WP-9, WP-12 | A-1, A-2, A-5, A-6, A-7, A-8, A-9, A-15, A-16, A-17, A-20, A-21, A-22 |
+| R-10 | must | C-16 | WP-5 | A-10, A-11 |
+| R-11 | must | C-1, C-4, C-8 | WP-2, WP-10 | A-3, A-4, A-18 |
+| R-12 | must | C-4 | WP-10 | A-18 |
+| R-13 | must | C-7 | WP-6 | A-12 |
+| R-14 | must | C-12, C-13 | WP-6, WP-11 | A-12, A-19 |
+| R-15 | must | C-7 | WP-6 | A-12 |
 | R-16 | must | C-6 | WP-2 | A-3, A-4 |
-| R-17 | should | C-15 | WP-11 | A-18, A-19, A-20 |
+| R-17 | should | C-15 | WP-12 | A-20, A-21, A-22 |
 | R-18 | should | C-1 | WP-2 | A-3, A-4 |
 | R-19 | must | C-6 | WP-2 | A-3, A-4 |
-| R-20 | must | C-15 | WP-11 | A-18, A-19, A-20 |
-| R-21 | must | C-4 | WP-9 | A-16 |
-| R-22 | must | C-4 | WP-9 | A-16 |
+| R-20 | must | C-15 | WP-12 | A-20, A-21, A-22 |
+| R-21 | must | C-4 | WP-10 | A-18 |
+| R-22 | must | C-4 | WP-10 | A-18 |
 
 ## Conventions
 

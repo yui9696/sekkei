@@ -69,10 +69,12 @@ graph LR
   C_13["C-13 Legacy system adapter"]
   C_14["C-14 Data protection"]
   C_15["C-15 Public HTTP API"]
+  C_16["C-16 Patient domain"]
   C_6 -->|I-1| C_1
   C_6 -->|I-8| C_8
   C_6 -->|I-4| C_4
   C_6 -->|I-7| C_7
+  C_6 -->|I-16| C_16
   C_7 -->|I-2| C_2
   C_7 -->|I-8| C_8
   C_7 -->|I-3| C_3
@@ -91,6 +93,8 @@ graph LR
   C_15 -->|I-8| C_8
   C_15 -->|I-9| C_9
   C_15 -->|I-10| C_10
+  C_15 -->|I-16| C_16
+  C_16 -->|I-1| C_1
 ```
 
 ### C-1 — Store
@@ -138,8 +142,8 @@ graph LR
 - **kind**: module · **path**: `app/core.py`
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-6
-- **requires**: I-1, I-8, I-4, I-7
-- **satisfies**: R-1, R-2, R-7, R-9, R-13, R-21, R-22
+- **requires**: I-1, I-8, I-4, I-7, I-16
+- **satisfies**: R-7, R-9, R-13, R-21, R-22
 
 ### C-7 — Notifier
 
@@ -210,13 +214,21 @@ graph LR
 - **kind**: service · **path**: `app/surface_api.py`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-15
-- **requires**: I-6, I-8, I-9, I-10
-- **satisfies**: R-1, R-2, R-8, R-12, R-13, R-17, R-18
+- **requires**: I-6, I-8, I-9, I-10, I-16
+- **satisfies**: R-8, R-12, R-13, R-17, R-18
+
+### C-16 — Patient domain
+
+- **kind**: module · **path**: `app/domain_patient.py`
+- **responsibility**: Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.
+- **provides**: I-16
+- **requires**: I-1
+- **satisfies**: R-1, R-2, R-3, R-4, R-10
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-2, C-3, C-4, C-5, C-8
-1. C-10, C-11, C-14, C-7, C-9
+1. C-10, C-11, C-14, C-16, C-7, C-9
 2. C-6
 3. C-12, C-13, C-15
 
@@ -298,9 +310,11 @@ graph LR
 | | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 | `generate_departments` | `departments`: Departments \| id | Departments \| None | ValidationError, NotFound | — |
 | | from R-5: The system must generate slots departments each opening hours doctors shifts from weekly. | | | |
-| `update_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `update_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
-| `record_audit` | `audit`: Audit \| id | Audit \| None | ValidationError, NotFound | — |
+| `record_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
+| | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
+| `audit_bookings` | `bookings`: Bookings \| id | Bookings \| None | ValidationError, NotFound | — |
 | | from R-6: The system must change and record audit log bookings cancel who when rows. | | | |
 
 ### I-7 — Notifier interface
@@ -413,19 +427,20 @@ graph LR
 | `GET /informations/{id}` | `id`: str | 200 information | 401 unauthenticated, 404 unknown id | — |
 | | from R-4: Doctors can view basic information (name, date of birth, insurance number) their own appoi | | | |
 
+### I-16 — Patient domain interface
+
+- **kind**: module · **owner**: C-16 · **stability**: draft
+- Provided by Patient domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `create_patient` | `patient`: Patient | Patient (id assigned) | ValidationError listing every invalid field | record is durable before return |
+| | creation of the aggregate root | | | |
+| `get_patient` | `patient_id`: ref | Patient \| None | — | — |
+
 ## Entities
 
-### E-1 — Record (owner C-1)
-
-Generic domain record; refine per entity found in the requirements.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-| `updated_at` | timestamp |  |
-
-### E-2 — Principal (owner C-1)
+### E-1 — Principal (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -433,7 +448,7 @@ Generic domain record; refine per entity found in the requirements.
 | `kind` | enum(customer, operator, service) |  |
 | `scopes` | list[str] |  |
 
-### E-3 — JobRun (owner C-1)
+### E-2 — JobRun (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -444,7 +459,7 @@ Generic domain record; refine per entity found in the requirements.
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-4 — AuditEntry (owner C-4)
+### E-3 — AuditEntry (owner C-4)
 
 | field | type | constraints |
 |---|---|---|
@@ -454,7 +469,7 @@ Generic domain record; refine per entity found in the requirements.
 | `resource` | str | indexed |
 | `at` | timestamp |  |
 
-### E-5 — DeletionRequest (owner C-1)
+### E-4 — DeletionRequest (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -465,18 +480,28 @@ Generic domain record; refine per entity found in the requirements.
 | `completed_at` | timestamp |  |
 | `proof` | json | what was deleted where |
 
-### E-6 — Booking (owner C-1)
+### E-5 — Booking (owner C-1)
 
-Domain entity named in the requirements ('booking'); confirm the fields.
+Domain entity read from R-2. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
 | `created_at` | timestamp |  |
 
-### E-7 — Slot (owner C-1)
+### E-6 — Slot (owner C-1)
 
-Domain entity named in the requirements ('slot'); confirm the fields.
+Domain entity read from R-1. No fields are stated in the text beyond its name; add them.
+
+| field | type | constraints |
+|---|---|---|
+| `id` | uuid | primary key |
+| `status` | enum(cancelled) | state machine read from R-1 |
+| `created_at` | timestamp |  |
+
+### E-7 — Patient (owner C-16)
+
+Domain entity read from R-2. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -485,16 +510,7 @@ Domain entity named in the requirements ('slot'); confirm the fields.
 
 ### E-8 — Department (owner C-1)
 
-Domain entity named in the requirements ('department'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-9 — Appointment (owner C-1)
-
-Domain entity named in the requirements ('appointment'); confirm the fields.
+Domain entity read from R-2. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -925,41 +941,45 @@ _Affects:_ C-8
 ```mermaid
 graph LR
   WP_1["WP-1 Audit log (S)"]
-  WP_2["WP-2 Store + Observability (M)"]
-  WP_3["WP-3 Data protection (S)"]
-  WP_4["WP-4 Authentication + Scheduler (M)"]
-  WP_5["WP-5 Notifier (S)"]
-  WP_6["WP-6 Search index (S)"]
-  WP_7["WP-7 Domain core (S)"]
-  WP_8["WP-8 Batch job (S)"]
-  WP_9["WP-9 Public HTTP API (S)"]
-  WP_10["WP-10 Legacy system adapter (S)"]
-  WP_1 --> WP_3
+  WP_2["WP-2 Store + Observability (L)"]
+  WP_3["WP-3 Patient domain (M)"]
+  WP_4["WP-4 Data protection (S)"]
+  WP_5["WP-5 Authentication + Scheduler (M)"]
+  WP_6["WP-6 Notifier (S)"]
+  WP_7["WP-7 Search index (S)"]
+  WP_8["WP-8 Domain core (L)"]
+  WP_9["WP-9 Batch job (S)"]
+  WP_10["WP-10 Public HTTP API (L)"]
+  WP_11["WP-11 Legacy system adapter (S)"]
   WP_2 --> WP_3
+  WP_1 --> WP_4
   WP_2 --> WP_4
   WP_2 --> WP_5
   WP_2 --> WP_6
-  WP_1 --> WP_7
   WP_2 --> WP_7
-  WP_5 --> WP_7
+  WP_1 --> WP_8
   WP_2 --> WP_8
-  WP_4 --> WP_8
-  WP_7 --> WP_8
+  WP_3 --> WP_8
+  WP_6 --> WP_8
   WP_2 --> WP_9
-  WP_4 --> WP_9
-  WP_6 --> WP_9
-  WP_7 --> WP_9
+  WP_5 --> WP_9
+  WP_8 --> WP_9
+  WP_2 --> WP_10
+  WP_3 --> WP_10
+  WP_5 --> WP_10
   WP_7 --> WP_10
+  WP_8 --> WP_10
+  WP_8 --> WP_11
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1, WP-2
-2. WP-3, WP-4, WP-5, WP-6
-3. WP-7
-4. WP-10, WP-8, WP-9
+2. WP-3, WP-4, WP-5, WP-6, WP-7
+3. WP-8
+4. WP-10, WP-11, WP-9
 
-_Critical path (12 person-days):_ WP-2 → WP-4 → WP-9
+_Critical path (35 person-days):_ WP-2 → WP-3 → WP-8 → WP-10
 
 ### WP-1 — Audit log (S)
 
@@ -973,7 +993,7 @@ Implement Audit log: Append-only record of who did what to which resource, query
   - A-2 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: audit_log
 
-### WP-2 — Store + Observability (M)
+### WP-2 — Store + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -987,7 +1007,19 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-6 (metric) R-11: ratio >= 99.5 % — kill one instance under load; error rate stays within the target — metric R-11
 - **notes**: family: infra
 
-### WP-3 — Data protection (S)
+### WP-3 — Patient domain (M)
+
+Implement Patient domain: Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.
+
+- **components**: C-16 · **implements**: I-16
+- **depends on**: WP-2 · **satisfies**: R-1, R-2, R-3, R-4, R-10
+- **write scope**: `app/domain_patient.py`, `tests/test_domain_patient.py`
+- **acceptance**:
+  - A-7 (test) unit tests of Patient domain pass — `python -m pytest -q tests/test_domain_patient.py`
+  - A-8 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
+- **notes**: family: aggregate:domain_patient
+
+### WP-4 — Data protection (S)
 
 Implement Data protection: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.
 
@@ -995,11 +1027,11 @@ Implement Data protection: Retention schedules, deletion and export requests for
 - **depends on**: WP-1, WP-2 · **satisfies**: R-10
 - **write scope**: `app/data_protection.py`, `tests/test_data_protection.py`
 - **acceptance**:
-  - A-7 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
-  - A-8 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
+  - A-9 (test) unit tests of Data protection pass — `python -m pytest -q tests/test_data_protection.py`
+  - A-10 (metric) R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end — metric R-10
 - **notes**: family: compliance_data
 
-### WP-4 — Authentication + Scheduler (M)
+### WP-5 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -1007,10 +1039,10 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2 · **satisfies**: R-3, R-4, R-5, R-7, R-14, R-15, R-16
 - **write scope**: `app/auth.py`, `tests/test_auth.py`, `app/scheduler.py`, `tests/test_scheduler.py`
 - **acceptance**:
-  - A-9 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
+  - A-11 (test) unit tests of Authentication, Scheduler pass — `python -m pytest -q tests/test_auth.py tests/test_scheduler.py`
 - **notes**: family: infra
 
-### WP-5 — Notifier (S)
+### WP-6 — Notifier (S)
 
 Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
 
@@ -1018,10 +1050,10 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-2 · **satisfies**: R-3
 - **write scope**: `app/notifier.py`, `tests/test_notifier.py`
 - **acceptance**:
-  - A-10 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
+  - A-12 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
-### WP-6 — Search index (S)
+### WP-7 — Search index (S)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
@@ -1029,84 +1061,84 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-8, R-12
 - **write scope**: `app/search.py`, `tests/test_search.py`
 - **acceptance**:
-  - A-11 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
-  - A-12 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-13 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
+  - A-13 (test) unit tests of Search index pass — `python -m pytest -q tests/test_search.py`
+  - A-14 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-15 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: search
 
-### WP-7 — Domain core (S)
+### WP-8 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-6 · **implements**: I-6
-- **depends on**: WP-1, WP-2, WP-5 · **satisfies**: R-1, R-2, R-7, R-9, R-13, R-21, R-22
+- **depends on**: WP-1, WP-2, WP-3, WP-6 · **satisfies**: R-7, R-9, R-13, R-21, R-22
 - **write scope**: `app/core.py`, `tests/test_core.py`
 - **acceptance**:
-  - A-14 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
-  - A-15 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
+  - A-16 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
+  - A-17 (metric) R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-9
 - **notes**: family: crud_api
 
-### WP-8 — Batch job (S)
+### WP-9 — Batch job (S)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-12 · **implements**: I-12
-- **depends on**: WP-2, WP-4, WP-7 · **satisfies**: R-5, R-7, R-15
+- **depends on**: WP-2, WP-5, WP-8 · **satisfies**: R-5, R-7, R-15
 - **write scope**: `app/batch.py`, `tests/test_batch.py`
 - **acceptance**:
-  - A-16 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
+  - A-18 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-9 — Public HTTP API (S)
+### WP-10 — Public HTTP API (L)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-15 · **implements**: I-15
-- **depends on**: WP-2, WP-4, WP-6, WP-7 · **satisfies**: R-1, R-2, R-8, R-12, R-13, R-17, R-18
+- **depends on**: WP-2, WP-3, WP-5, WP-7, WP-8 · **satisfies**: R-8, R-12, R-13, R-17, R-18
 - **write scope**: `app/surface_api.py`, `tests/test_surface_api.py`
 - **acceptance**:
-  - A-17 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
-  - A-18 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
-  - A-19 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
+  - A-19 (test) unit tests of Public HTTP API pass — `python -m pytest -q tests/test_surface_api.py`
+  - A-20 (metric) R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target — metric R-8
+  - A-21 (metric) R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target — metric R-12
 - **notes**: family: crud_api
 
-### WP-10 — Legacy system adapter (S)
+### WP-11 — Legacy system adapter (S)
 
 Implement Legacy system adapter: Anti-corruption layer in front of the existing system: translates its records and calls into our model, isolates its quirks and outages.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-7 · **satisfies**: R-7
+- **depends on**: WP-8 · **satisfies**: R-7
 - **write scope**: `app/legacy_adapter.py`, `tests/test_legacy_adapter.py`
 - **acceptance**:
-  - A-20 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
+  - A-22 (test) unit tests of Legacy system adapter pass — `python -m pytest -q tests/test_legacy_adapter.py`
 - **notes**: family: legacy_integration
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19 |
-| R-2 | must | C-6, C-15 | WP-7, WP-9 | A-14, A-15, A-17, A-18, A-19 |
-| R-3 | must | C-2, C-3, C-7, C-11 | WP-4, WP-5 | A-9, A-10 |
-| R-4 | must | C-11 | WP-4 | A-9 |
-| R-5 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
+| R-1 | must | C-16 | WP-3 | A-7, A-8 |
+| R-2 | must | C-16 | WP-3 | A-7, A-8 |
+| R-3 | must | C-2, C-3, C-7, C-11, C-16 | WP-3, WP-5, WP-6 | A-7, A-8, A-11, A-12 |
+| R-4 | must | C-11, C-16 | WP-3, WP-5 | A-7, A-8, A-11 |
+| R-5 | must | C-11, C-12 | WP-5, WP-9 | A-11, A-18 |
 | R-6 | must | C-4 | WP-1 | A-1, A-2 |
-| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-4, WP-7, WP-8, WP-10 | A-9, A-14, A-15, A-16, A-20 |
-| R-8 | must | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19 |
-| R-9 | must | C-1, C-6 | WP-2, WP-7 | A-3, A-4, A-5, A-6, A-14, A-15 |
-| R-10 | must | C-1, C-4, C-14 | WP-1, WP-2, WP-3 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8 |
+| R-7 | must | C-5, C-6, C-11, C-12, C-13 | WP-5, WP-8, WP-9, WP-11 | A-11, A-16, A-17, A-18, A-22 |
+| R-8 | must | C-10, C-15 | WP-7, WP-10 | A-13, A-14, A-15, A-19, A-20, A-21 |
+| R-9 | must | C-1, C-6 | WP-2, WP-8 | A-3, A-4, A-5, A-6, A-16, A-17 |
+| R-10 | must | C-1, C-4, C-14, C-16 | WP-1, WP-2, WP-3, WP-4 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-8, A-9, A-10 |
 | R-11 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
-| R-12 | must | C-10, C-15 | WP-6, WP-9 | A-11, A-12, A-13, A-17, A-18, A-19 |
-| R-13 | must | C-1, C-6, C-15 | WP-2, WP-7, WP-9 | A-3, A-4, A-5, A-6, A-14, A-15, A-17, A-18, A-19 |
-| R-14 | must | C-9 | WP-4 | A-9 |
-| R-15 | must | C-11, C-12 | WP-4, WP-8 | A-9, A-16 |
-| R-16 | must | C-9 | WP-4 | A-9 |
-| R-17 | must | C-15 | WP-9 | A-17, A-18, A-19 |
-| R-18 | should | C-15 | WP-9 | A-17, A-18, A-19 |
+| R-12 | must | C-10, C-15 | WP-7, WP-10 | A-13, A-14, A-15, A-19, A-20, A-21 |
+| R-13 | must | C-1, C-6, C-15 | WP-2, WP-8, WP-10 | A-3, A-4, A-5, A-6, A-16, A-17, A-19, A-20, A-21 |
+| R-14 | must | C-9 | WP-5 | A-11 |
+| R-15 | must | C-11, C-12 | WP-5, WP-9 | A-11, A-18 |
+| R-16 | must | C-9 | WP-5 | A-11 |
+| R-17 | must | C-15 | WP-10 | A-19, A-20, A-21 |
+| R-18 | should | C-15 | WP-10 | A-19, A-20, A-21 |
 | R-19 | should | C-1 | WP-2 | A-3, A-4, A-5, A-6 |
 | R-20 | must | C-8 | WP-2 | A-3, A-4, A-5, A-6 |
-| R-21 | must | C-6 | WP-7 | A-14, A-15 |
-| R-22 | must | C-6 | WP-7 | A-14, A-15 |
+| R-21 | must | C-6 | WP-8 | A-16, A-17 |
+| R-22 | must | C-6 | WP-8 | A-16, A-17 |
 
 ## Conventions
 

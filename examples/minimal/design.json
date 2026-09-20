@@ -782,6 +782,24 @@
       "kind": "module",
       "operations": [
         {
+          "name": "subscribe_address",
+          "inputs": [
+            {
+              "name": "address",
+              "type": "Address | id",
+              "description": ""
+            }
+          ],
+          "output": "Address | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
+        },
+        {
           "name": "export_subscriber",
           "inputs": [
             {
@@ -1226,6 +1244,25 @@
       "owner": "C-14",
       "kind": "http",
       "operations": [
+        {
+          "name": "POST /address/{id}/subscribe",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 subscribe accepted",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Visitors can subscribe with an email address and confirm through a link sent by email."
+        },
         {
           "name": "GET /subscribers",
           "inputs": [
@@ -2704,7 +2741,7 @@
         "app/observability.py",
         "tests/test_observability.py"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-2",
@@ -2851,7 +2888,7 @@
         "app/core.py",
         "tests/test_core.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-7",
@@ -2890,7 +2927,7 @@
         "app/worker.py",
         "tests/test_worker.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-8",
@@ -3004,7 +3041,7 @@
         "app/surface_api.py",
         "tests/test_surface_api.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-12",

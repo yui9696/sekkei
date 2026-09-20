@@ -553,31 +553,14 @@ graph LR
 | `completed_at` | timestamp |  |
 | `proof` | json | what was deleted where |
 
-### E-7 — Document (owner C-1)
+### E-7 — Loan (owner C-1)
 
-Domain entity named in the requirements ('document'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-8 — Loan (owner C-1)
-
-Domain entity named in the requirements ('loan'); confirm the fields.
+Domain entity read from R-5. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-9 — Status (owner C-1)
-
-Domain entity named in the requirements ('status'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
+| `status` | enum(approved) | state machine read from R-5 |
 | `created_at` | timestamp |  |
 
 ## Flows
@@ -1020,18 +1003,18 @@ _Affects:_ C-9
 graph LR
   WP_1["WP-1 Audit log (S)"]
   WP_2["WP-2 File storage (S)"]
-  WP_3["WP-3 Store + Observability (M)"]
+  WP_3["WP-3 Store + Observability (L)"]
   WP_4["WP-4 Model server (S)"]
   WP_5["WP-5 Data protection (S)"]
   WP_6["WP-6 Authentication + Scheduler (M)"]
   WP_7["WP-7 Identity and credit checks (S)"]
   WP_8["WP-8 Notifier (S)"]
-  WP_9["WP-9 Domain core (S)"]
+  WP_9["WP-9 Domain core (L)"]
   WP_10["WP-10 Workflow engine (S)"]
   WP_11["WP-11 Import/export (S)"]
   WP_12["WP-12 Legacy system adapter (S)"]
   WP_13["WP-13 Batch job (S)"]
-  WP_14["WP-14 Public HTTP API (S)"]
+  WP_14["WP-14 Public HTTP API (M)"]
   WP_1 --> WP_5
   WP_3 --> WP_5
   WP_3 --> WP_6
@@ -1066,7 +1049,7 @@ graph LR
 4. WP-11, WP-12
 5. WP-13, WP-14
 
-_Critical path (13 person-days):_ WP-3 → WP-8 → WP-9 → WP-11 → WP-14
+_Critical path (29 person-days):_ WP-3 → WP-8 → WP-9 → WP-11 → WP-14
 
 ### WP-1 — Audit log (S)
 
@@ -1090,7 +1073,7 @@ Implement File storage: Stores and serves uploaded files/blobs with content-type
   - A-2 (test) unit tests of File storage pass — `python -m pytest -q tests/test_files.py`
 - **notes**: family: file_storage
 
-### WP-3 — Store + Observability (M)
+### WP-3 — Store + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -1158,7 +1141,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
   - A-10 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: workflow
 
-### WP-9 — Domain core (S)
+### WP-9 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
@@ -1214,7 +1197,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
   - A-16 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-14 — Public HTTP API (S)
+### WP-14 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 

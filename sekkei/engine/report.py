@@ -46,6 +46,7 @@ class Notes:
     effort: Effort
     threats_md: str
     analysis_md: str = ""
+    domain_md: str = ""
     normalisation_md: str = ""
     structure_md: str = ""
     text_questions: list[str] = field(default_factory=list)   # TODOs / open questions lifted from the text
@@ -95,6 +96,11 @@ class Notes:
         s.append("## 5. What the engine could not decide\n")
         rv = self.review.to_markdown().split("\n", 3)[3] if self.review.to_markdown().count("\n") > 3 else self.review.to_markdown()
         s.append(rv.replace("\n## ", "\n### ").lstrip("\n"))
+        if self.domain_md:
+            s.append("## 5b. Domain model read from the text\n")
+            s.append("Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); "
+                     "each aggregate is a component. Dispute any row by its requirement ids.\n")
+            s.append(self.domain_md)
         if self.analysis_md:
             s.append("## 6. How the text was read\n")
             s.append(self.analysis_md)
@@ -154,7 +160,10 @@ def analysis_markdown(an: Analysis) -> str:
 def notes(design: Design, an: Analysis, review: Review, answers: list[Answer] | None = None,
           placements: list[Placement] | None = None) -> Notes:
     eff = effort(design, an)
+    from . import domain as DM
+    dents = DM.extract(an, [u for u in an.requirements if u.kind != "constraint"])
     return Notes(review, questions(an), capacity(an), eff, threats_markdown(design), analysis_markdown(an),
+                 domain_md=DM.to_markdown(dents),
                  normalisation_md=an.normalisation.to_markdown() if an.normalisation else "",
                  structure_md=structure_markdown(an, eff), text_questions=list(an.structure.todos) if an.structure else [],
                  answers=list(answers or []), placements_md=placements_markdown(placements, design) if placements else "")

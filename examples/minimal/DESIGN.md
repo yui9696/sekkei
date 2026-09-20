@@ -256,6 +256,8 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
+| `subscribe_address` | `address`: Address \| id | Address \| None | ValidationError, NotFound | — |
+| | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
 | `export_subscriber` | `subscriber`: Subscriber \| id | Subscriber \| None | ValidationError, NotFound | — |
 | | from R-2: Admins can export the subscriber list as CSV. | | | |
 
@@ -350,6 +352,8 @@ graph LR
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
+| `POST /address/{id}/subscribe` | `id`: str | 202 subscribe accepted | 401 unauthenticated, 404 unknown id, 409 not applicable in current state | — |
+| | from R-1: Visitors can subscribe with an email address and confirm through a link sent by email. | | | |
 | `GET /subscribers` | `filter`: query, `page`: cursor | 200 [subscriber], next cursor | 401 unauthenticated | — |
 | | from R-2: Admins can export the subscriber list as CSV. | | | |
 
@@ -917,15 +921,15 @@ _Affects:_ C-8
 ```mermaid
 graph LR
   WP_1["WP-1 Audit log (S)"]
-  WP_2["WP-2 Store + Work queue + Observability (M)"]
+  WP_2["WP-2 Store + Work queue + Observability (L)"]
   WP_3["WP-3 Outbound HTTP client (S)"]
   WP_4["WP-4 Authentication + Scheduler (M)"]
   WP_5["WP-5 Notifier (S)"]
-  WP_6["WP-6 Domain core (S)"]
-  WP_7["WP-7 Worker (S)"]
+  WP_6["WP-6 Domain core (M)"]
+  WP_7["WP-7 Worker (M)"]
   WP_8["WP-8 Import/export (S)"]
   WP_9["WP-9 Batch job (S)"]
-  WP_10["WP-10 Public HTTP API (S)"]
+  WP_10["WP-10 Public HTTP API (M)"]
   WP_2 --> WP_3
   WP_2 --> WP_4
   WP_2 --> WP_5
@@ -955,7 +959,7 @@ graph LR
 4. WP-7, WP-8
 5. WP-10, WP-9
 
-_Critical path (13 person-days):_ WP-2 → WP-5 → WP-6 → WP-8 → WP-9
+_Critical path (24 person-days):_ WP-2 → WP-5 → WP-6 → WP-8 → WP-10
 
 ### WP-1 — Audit log (S)
 
@@ -968,7 +972,7 @@ Implement Audit log: Append-only record of who did what to which resource, query
   - A-1 (test) unit tests of Audit log pass — `python -m pytest -q tests/test_audit.py`
 - **notes**: family: audit_log
 
-### WP-2 — Store + Work queue + Observability (M)
+### WP-2 — Store + Work queue + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -1013,7 +1017,7 @@ Implement Notifier: Sends operator/customer notifications through the configured
   - A-6 (test) unit tests of Notifier pass — `python -m pytest -q tests/test_notifier.py`
 - **notes**: family: notification
 
-### WP-6 — Domain core (S)
+### WP-6 — Domain core (M)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
@@ -1024,7 +1028,7 @@ Implement Domain core: Business rules and validation for the domain entities; th
   - A-7 (test) unit tests of Domain core pass — `python -m pytest -q tests/test_core.py`
 - **notes**: family: async_delivery
 
-### WP-7 — Worker (S)
+### WP-7 — Worker (M)
 
 Implement Worker: Leases work items, performs the outbound action, records the outcome, and decides retry vs. final failure.
 
@@ -1058,7 +1062,7 @@ Implement Batch job: Scheduled processing over stored records: extract, transfor
   - A-11 (test) unit tests of Batch job pass — `python -m pytest -q tests/test_batch.py`
 - **notes**: family: batch_pipeline
 
-### WP-10 — Public HTTP API (S)
+### WP-10 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 

@@ -459,7 +459,8 @@
         "I-14",
         "I-15",
         "I-17",
-        "I-25"
+        "I-25",
+        "I-32"
       ],
       "satisfies": [
         "R-13",
@@ -642,7 +643,8 @@
         "I-21",
         "I-22",
         "I-24",
-        "I-25"
+        "I-25",
+        "I-32"
       ],
       "satisfies": [
         "R-16"
@@ -687,6 +689,22 @@
       ],
       "satisfies": [
         "R-24"
+      ],
+      "tags": []
+    },
+    {
+      "id": "C-32",
+      "name": "Domain model",
+      "responsibility": "Entities with typed fields, relations, state machines and invariants read from the sentences (parenthesised attribute lists, 'with A, B and C', possessives, transactional and state verbs, arrow lists); aggregates by relation.",
+      "kind": "module",
+      "path": "sekkei/engine/domain.py",
+      "requires": [
+        "I-13",
+        "I-15"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
       ],
       "tags": []
     },
@@ -821,6 +839,101 @@
           "inputs": [
             {
               "name": "text",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-32",
+      "name": "Domain model API",
+      "owner": "C-32",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "extract",
+          "inputs": [
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            },
+            {
+              "name": "functional_units",
+              "type": "list[ReqUnit] | None",
+              "description": ""
+            },
+            {
+              "name": "limit",
+              "type": "int",
+              "description": ""
+            }
+          ],
+          "output": "list[DEntity]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "aggregates",
+          "inputs": [
+            {
+              "name": "ents",
+              "type": "list[DEntity]",
+              "description": ""
+            }
+          ],
+          "output": "list[list[DEntity]]",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "to_markdown",
+          "inputs": [
+            {
+              "name": "ents",
+              "type": "list[DEntity]",
+              "description": ""
+            }
+          ],
+          "output": "Markdown",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "singular",
+          "inputs": [
+            {
+              "name": "n",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "str",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "field_type",
+          "inputs": [
+            {
+              "name": "name",
               "type": "str",
               "description": ""
             }
@@ -4282,7 +4395,8 @@
       ],
       "depends_on": [
         "WP-13",
-        "WP-16"
+        "WP-16",
+        "WP-21"
       ],
       "satisfies": [
         "R-16"
@@ -4323,7 +4437,8 @@
         "WP-13",
         "WP-15",
         "WP-16",
-        "WP-20"
+        "WP-20",
+        "WP-21"
       ],
       "satisfies": [
         "R-13",
@@ -4353,6 +4468,40 @@
           "kind": "metric",
           "command": "",
           "metric": "R-14"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-21",
+      "title": "Engine: domain model",
+      "goal": "Read entities with typed fields, relations, state machines and invariants from the sentences; group them into aggregates.",
+      "components": [
+        "C-32"
+      ],
+      "implements": [
+        "I-32"
+      ],
+      "depends_on": [
+        "WP-13",
+        "WP-16"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "files": [
+        "sekkei/engine/domain.py",
+        "tests/test_domain.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-32",
+          "description": "domain tests pass: typed fields, states and invariants from the trading spec; no proper nouns, verbs or adjectives as entities; aggregates as components",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_domain.py",
+          "metric": ""
         }
       ],
       "notes": ""

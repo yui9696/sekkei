@@ -24,8 +24,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-2 | C-16 Readings processor | synthesised | new component Readings processor (processor) from verb 'validate' and object 'readings' |
-| R-3 | C-14 Public HTTP API, C-7 Domain core | surface+core | human actor 'fleet manager': a use case |
+| R-2 | C-16 Reading domain | aggregate | the sentence speaks of reading, owned by Reading domain |
+| R-3 | C-16 Reading domain | aggregate | the sentence speaks of reading, owned by Reading domain |
 
 ## 2. Capacity estimates
 
@@ -42,7 +42,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **24 person-days**; critical path **13 days**; with a team of 5: **about 16 working days** (4 weeks).
+- Total effort: **46 person-days**; critical path **32 days**; with a team of 5: **about 32 working days** (7 weeks).
 - Wave 1: WP-1
 - Wave 2: WP-2, WP-3, WP-4
 - Wave 3: WP-5
@@ -101,6 +101,14 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-15 Assumed answer: security (Q-authz): **owner-scoped + admin role**
 - D-16 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-17 Assumed answer: operations (Q-alerting): **error rate + queue growth**
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Reading | speed (str), fuel_level (int), engine_temperature (str), position (address) | — | published | durability: no reading lost | R-1, R-2 |
 
 ## 6. How the text was read
 

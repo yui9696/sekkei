@@ -39,11 +39,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **32 person-days**; critical path **12 days**; with a team of 3: **about 16 working days** (4 weeks).
+- Total effort: **80 person-days**; critical path **35 days**; with a team of 3: **about 40 working days** (8 weeks).
 - Wave 1: WP-1, WP-2, WP-3
-- Wave 2: WP-4, WP-5, WP-6, WP-7
-- Wave 3: WP-8
-- Wave 4: WP-10, WP-11, WP-12, WP-13, WP-9
+- Wave 2: WP-4, WP-5, WP-6, WP-7, WP-8
+- Wave 3: WP-9
+- Wave 4: WP-10, WP-11, WP-12, WP-13, WP-14
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 3; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -104,9 +104,17 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 
 ### Notes
 
-- 18 components for a team of 3; consider merging adjacent layers.
+- 19 components for a team of 3; consider merging adjacent layers.
 
 Every requirement was recognised and every active quality has a tactic. Review the decisions above; they are the judgement calls.
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Event | status (enum), response_code (ref), timestamps (str) | — | delivered → published | — | R-1, R-3, R-4, R-6 |
 
 ## 6. How the text was read
 

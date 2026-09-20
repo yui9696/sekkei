@@ -102,6 +102,21 @@ VERBS = {
     "expose": ("GET", "expose"), "record": ("", "record"), "track": ("", "track"), "measure": ("", "measure"),
     "aggregate": ("", "aggregate"), "archive": ("", "archive"), "purge": ("DELETE", "purge"),
     "authenticate": ("", "authenticate"), "authorize": ("", "authorize"), "log": ("", "log"),
+    "enter": ("POST", "enter"), "join": ("POST", "join"), "leave": ("DELETE", "leave"), "form": ("", "form"), "place": ("", "place"),
+    "compare": ("", "compare"), "poll": ("GET", "poll"), "subscribe": ("POST", "subscribe"), "decide": ("", "decide"), "select": ("", "select"),
+    "collect": ("", "collect"), "acquire": ("", "acquire"), "detect": ("", "detect"), "raise": ("", "raise"), "buffer": ("", "buffer"),
+    "escalate": ("POST", "escalate"), "define": ("PUT", "define"), "replay": ("POST", "replay"), "book": ("POST", "book"), "halt": ("POST", "halt"),
+    "randomise": ("POST", "randomise"), "randomize": ("POST", "randomize"), "withdraw": ("POST", "withdraw"), "unblind": ("POST", "unblind"),
+    "consent": ("POST", "consent"), "enrol": ("POST", "enrol"), "enroll": ("POST", "enroll"), "quarantine": ("POST", "quarantine"),
+    "acknowledge": ("POST", "acknowledge"), "escalate": ("POST", "escalate"), "settle": ("POST", "settle"), "capture": ("POST", "capture"),
+    "halt": ("POST", "halt"), "amend": ("PATCH", "amend"), "adjudicate": ("POST", "adjudicate"), "reconcile": ("POST", "reconcile"),
+    "allocate": ("POST", "allocate"), "dispatch": ("POST", "dispatch"), "promote": ("POST", "promote"), "provision": ("POST", "provision"),
+    "deprovision": ("DELETE", "deprovision"), "decommission": ("DELETE", "decommission"), "onboard": ("POST", "onboard"), "reimburse": ("POST", "reimburse"),
+    "disburse": ("POST", "disburse"), "ingest": ("POST", "ingest"), "clip": ("POST", "clip"), "trim": ("PUT", "trim"), "transcode": ("", "transcode"),
+    "resupply": ("POST", "resupply"), "unpublish": ("POST", "unpublish"), "quote": ("POST", "quote"), "bill": ("POST", "bill"), "audit": ("", "audit"),
+    "suspend": ("POST", "suspend"), "reinstate": ("POST", "reinstate"), "resume": ("POST", "resume"), "pause": ("POST", "pause"), "flag": ("POST", "flag"),
+    "unlock": ("POST", "unlock"), "lock": ("POST", "lock"), "grant": ("POST", "grant"), "issue": ("POST", "issue"), "redeem": ("POST", "redeem"),
+    "escrow": ("", "escrow"), "reserve": ("POST", "reserve"), "release": ("POST", "release"), "purchase": ("POST", "purchase"), "return": ("POST", "return"),
     "print": ("", "print"), "write": ("", "write"), "process": ("", "process"), "transform": ("", "transform"),
     "define": ("POST", "define"), "materialize": ("", "materialize"), "materialise": ("", "materialise"), "browse": ("GET", "browse"),
     "promote": ("POST", "promote"), "score": ("", "score"), "finish": ("", "finish"), "page": ("", "page"), "resolve": ("POST", "resolve"),
@@ -571,3 +586,16 @@ def title_of(text: str) -> str:
 def slug(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return s or "system"
+
+#: nouns that are never a domain entity (shared by synthesis and the domain model)
+ENTITY_STOP = {"audit", "access", "data", "request", "requests", "log", "logs", "job", "jobs", "process", "end", "start",
+                "system", "api", "app", "apps", "dashboard", "email", "link", "list", "report", "reports", "chart", "charts",
+                "page", "pages", "result", "results", "summary", "summaries", "position", "positions", "history", "text",
+                "service", "services", "batch", "csv", "json", "pdf", "team", "teams", "threshold", "minute", "minutes",
+                "second", "seconds", "time", "day", "days", "card", "call", "calls", "search", "query", "queries", "id",
+                "level", "levels", "statistic", "statistics", "offer", "offers", "provider", "providers", "server", "servers",
+                "broker", "cluster", "region", "role", "roles", "member", "members", "employee", "employees", "user", "users",
+                "cloudfront", "s3", "kafka", "redis", "postgres", "postgresql", "mysql", "kubernetes", "airflow", "snowflake", "bigquery", "gcs",
+                "aws", "gcp", "azure", "docker", "python", "java", "kotlin", "go", "rust", "typescript", "previous", "next", "given", "then",
+                "platform", "platforms", "seller", "sellers", "share", "shares", "fee", "fees", "bps", "input", "inputs", "output", "outputs",
+                "credit", "credits", "account", "accounts", "tech", "player", "players", "hour", "hours", "week", "weeks", "month", "months", "year", "years"}

@@ -22,8 +22,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-1 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'doctor': a use case |
-| R-2 | C-15 Public HTTP API, C-6 Domain core | surface+core | human actor 'patient': a use case |
+| R-1 | C-16 Patient domain | aggregate | the sentence speaks of patient, owned by Patient domain |
+| R-2 | C-16 Patient domain | aggregate | the sentence speaks of patient, owned by Patient domain |
 
 ## 2. Capacity estimates
 
@@ -37,11 +37,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **26 person-days**; critical path **12 days**; with a team of 3: **about 14 working days** (3 weeks).
+- Total effort: **52 person-days**; critical path **35 days**; with a team of 3: **about 36 working days** (8 weeks).
 - Wave 1: WP-1, WP-2
-- Wave 2: WP-3, WP-4, WP-5, WP-6
-- Wave 3: WP-7
-- Wave 4: WP-10, WP-8, WP-9
+- Wave 2: WP-3, WP-4, WP-5, WP-6, WP-7
+- Wave 3: WP-8
+- Wave 4: WP-10, WP-11, WP-9
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 3; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -96,6 +96,21 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-14 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-15 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 - D-16 Assumed answer: cost (Q-budget): **existing only**
+
+### Notes
+
+- 16 components for a team of 3; consider merging adjacent layers.
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Booking | — | — | — | — | R-2 |
+| Slot | — | — | cancelled | — | R-1 |
+| Patient | — | — | — | — | R-2 |
+| Department | — | — | — | — | R-2 |
 
 ## 6. How the text was read
 

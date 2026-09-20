@@ -44,7 +44,7 @@ def test_telemetry_uses_mqtt_sms_sftp_and_a_broker_that_carries_the_rate():
     r = design(load("telemetry"))
     assert r.ok
     names = {c.name for c in r.design.components}
-    assert {"MQTT consumer", "MQTT broker", "SMS provider", "SFTP server", "Readings processor"} <= names
+    assert {"MQTT consumer", "MQTT broker", "SMS provider", "SFTP server", "Reading domain"} <= names
     assert "Ingest API" not in names
     q = {x.title: x for x in r.design.decisions}["Work queue technology"]
     assert q.choice.startswith("Managed broker") and "exceeds" in q.rationale

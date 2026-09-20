@@ -330,11 +330,10 @@
         "I-1",
         "I-8",
         "I-4",
-        "I-7"
+        "I-7",
+        "I-16"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
         "R-7",
         "R-9",
         "R-13",
@@ -506,11 +505,10 @@
         "I-6",
         "I-8",
         "I-9",
-        "I-10"
+        "I-10",
+        "I-16"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
         "R-8",
         "R-12",
         "R-13",
@@ -520,6 +518,28 @@
       "tags": [
         "layer:3",
         "archetype:surface_api"
+      ]
+    },
+    {
+      "id": "C-16",
+      "name": "Patient domain",
+      "responsibility": "Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.",
+      "kind": "module",
+      "path": "app/domain_patient.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-4",
+        "R-10"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:domain_patient",
+        "aggregate"
       ]
     }
   ],
@@ -959,15 +979,15 @@
           "description": "from R-5: The system must generate slots departments each opening hours doctors shifts from weekly."
         },
         {
-          "name": "update_audit",
+          "name": "update_bookings",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "bookings",
+              "type": "Bookings | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Bookings | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -977,15 +997,33 @@
           "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
         },
         {
-          "name": "record_audit",
+          "name": "record_bookings",
           "inputs": [
             {
-              "name": "audit",
-              "type": "Audit | id",
+              "name": "bookings",
+              "type": "Bookings | id",
               "description": ""
             }
           ],
-          "output": "Audit | None",
+          "output": "Bookings | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-6: The system must change and record audit log bookings cancel who when rows."
+        },
+        {
+          "name": "audit_bookings",
+          "inputs": [
+            {
+              "name": "bookings",
+              "type": "Bookings | id",
+              "description": ""
+            }
+          ],
+          "output": "Bookings | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1575,37 +1613,53 @@
       ],
       "stability": "draft",
       "description": "Provided by Public HTTP API. "
+    },
+    {
+      "id": "I-16",
+      "name": "Patient domain interface",
+      "owner": "C-16",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "create_patient",
+          "inputs": [
+            {
+              "name": "patient",
+              "type": "Patient",
+              "description": ""
+            }
+          ],
+          "output": "Patient (id assigned)",
+          "errors": [
+            "ValidationError listing every invalid field"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": "creation of the aggregate root"
+        },
+        {
+          "name": "get_patient",
+          "inputs": [
+            {
+              "name": "patient_id",
+              "type": "ref",
+              "description": ""
+            }
+          ],
+          "output": "Patient | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Patient domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
     {
       "id": "E-1",
-      "name": "Record",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "updated_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Generic domain record; refine per entity found in the requirements."
-    },
-    {
-      "id": "E-2",
       "name": "Principal",
       "owner": "C-1",
       "fields": [
@@ -1631,7 +1685,7 @@
       "description": ""
     },
     {
-      "id": "E-3",
+      "id": "E-2",
       "name": "JobRun",
       "owner": "C-1",
       "fields": [
@@ -1675,7 +1729,7 @@
       "description": ""
     },
     {
-      "id": "E-4",
+      "id": "E-3",
       "name": "AuditEntry",
       "owner": "C-4",
       "fields": [
@@ -1713,7 +1767,7 @@
       "description": ""
     },
     {
-      "id": "E-5",
+      "id": "E-4",
       "name": "DeletionRequest",
       "owner": "C-1",
       "fields": [
@@ -1757,7 +1811,7 @@
       "description": ""
     },
     {
-      "id": "E-6",
+      "id": "E-5",
       "name": "Booking",
       "owner": "C-1",
       "fields": [
@@ -1774,12 +1828,38 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('booking'); confirm the fields."
+      "description": "Domain entity read from R-2. No fields are stated in the text beyond its name; add them."
+    },
+    {
+      "id": "E-6",
+      "name": "Slot",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(cancelled)",
+          "constraints": "state machine read from R-1",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity read from R-1. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-7",
-      "name": "Slot",
-      "owner": "C-1",
+      "name": "Patient",
+      "owner": "C-16",
       "fields": [
         {
           "name": "id",
@@ -1794,7 +1874,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('slot'); confirm the fields."
+      "description": "Domain entity read from R-2. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-8",
@@ -1814,27 +1894,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('department'); confirm the fields."
-    },
-    {
-      "id": "E-9",
-      "name": "Appointment",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('appointment'); confirm the fields."
+      "description": "Domain entity read from R-2. No fields are stated in the text beyond its name; add them."
     }
   ],
   "flows": [
@@ -2867,7 +2927,7 @@
         "app/observability.py",
         "tests/test_observability.py"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-3",
@@ -2902,6 +2962,49 @@
     },
     {
       "id": "WP-3",
+      "title": "Patient domain",
+      "goal": "Implement Patient domain: Owns the Patient aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2.",
+      "components": [
+        "C-16"
+      ],
+      "implements": [
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-4",
+        "R-10"
+      ],
+      "files": [
+        "app/domain_patient.py",
+        "tests/test_domain_patient.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-7",
+          "description": "unit tests of Patient domain pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_domain_patient.py",
+          "metric": ""
+        },
+        {
+          "id": "A-8",
+          "description": "R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        }
+      ],
+      "notes": "family: aggregate:domain_patient"
+    },
+    {
+      "id": "WP-4",
       "title": "Data protection",
       "goal": "Implement Data protection: Retention schedules, deletion and export requests for a person's data, consent records; runs the deletions and proves them.",
       "components": [
@@ -2924,14 +3027,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-9",
           "description": "unit tests of Data protection pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_data_protection.py",
           "metric": ""
         },
         {
-          "id": "A-8",
+          "id": "A-10",
           "description": "R-10: retention/deletion rules exercised = all — data deletion and retention rules are exercised end to end",
           "kind": "metric",
           "command": "",
@@ -2941,7 +3044,7 @@
       "notes": "family: compliance_data"
     },
     {
-      "id": "WP-4",
+      "id": "WP-5",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
@@ -2973,7 +3076,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-11",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
@@ -2983,7 +3086,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-5",
+      "id": "WP-6",
       "title": "Notifier",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
@@ -3005,7 +3108,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-12",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -3015,7 +3118,7 @@
       "notes": "family: notification"
     },
     {
-      "id": "WP-6",
+      "id": "WP-7",
       "title": "Search index",
       "goal": "Implement Search index: Full-text and filtered queries over the indexed entities.",
       "components": [
@@ -3038,21 +3141,21 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-13",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_search.py",
           "metric": ""
         },
         {
-          "id": "A-12",
+          "id": "A-14",
           "description": "R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-13",
+          "id": "A-15",
           "description": "R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -3062,7 +3165,7 @@
       "notes": "family: search"
     },
     {
-      "id": "WP-7",
+      "id": "WP-8",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -3074,11 +3177,10 @@
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-5"
+        "WP-3",
+        "WP-6"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
         "R-7",
         "R-9",
         "R-13",
@@ -3089,17 +3191,17 @@
         "app/core.py",
         "tests/test_core.py"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-14",
+          "id": "A-16",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
           "metric": ""
         },
         {
-          "id": "A-15",
+          "id": "A-17",
           "description": "R-9: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
@@ -3109,7 +3211,7 @@
       "notes": "family: crud_api"
     },
     {
-      "id": "WP-8",
+      "id": "WP-9",
       "title": "Batch job",
       "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
@@ -3120,8 +3222,8 @@
       ],
       "depends_on": [
         "WP-2",
-        "WP-4",
-        "WP-7"
+        "WP-5",
+        "WP-8"
       ],
       "satisfies": [
         "R-5",
@@ -3135,7 +3237,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-18",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_batch.py",
@@ -3145,7 +3247,7 @@
       "notes": "family: batch_pipeline"
     },
     {
-      "id": "WP-9",
+      "id": "WP-10",
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
@@ -3156,13 +3258,12 @@
       ],
       "depends_on": [
         "WP-2",
-        "WP-4",
-        "WP-6",
-        "WP-7"
+        "WP-3",
+        "WP-5",
+        "WP-7",
+        "WP-8"
       ],
       "satisfies": [
-        "R-1",
-        "R-2",
         "R-8",
         "R-12",
         "R-13",
@@ -3173,24 +3274,24 @@
         "app/surface_api.py",
         "tests/test_surface_api.py"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-19",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_surface_api.py",
           "metric": ""
         },
         {
-          "id": "A-18",
+          "id": "A-20",
           "description": "R-8: p95 latency <= 500 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-19",
+          "id": "A-21",
           "description": "R-12: sustained rate at 20 3000 requests /day — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -3200,7 +3301,7 @@
       "notes": "family: crud_api"
     },
     {
-      "id": "WP-10",
+      "id": "WP-11",
       "title": "Legacy system adapter",
       "goal": "Implement Legacy system adapter: Anti-corruption layer in front of the existing system: translates its records and calls into our model, isolates its quirks and outages.",
       "components": [
@@ -3210,7 +3311,7 @@
         "I-13"
       ],
       "depends_on": [
-        "WP-7"
+        "WP-8"
       ],
       "satisfies": [
         "R-7"
@@ -3222,7 +3323,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-20",
+          "id": "A-22",
           "description": "unit tests of Legacy system adapter pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_legacy_adapter.py",

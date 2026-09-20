@@ -32,7 +32,7 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **34 person-days**; critical path **13 days**; with a team of 5: **about 16 working days** (4 weeks).
+- Total effort: **50 person-days**; critical path **29 days**; with a team of 5: **about 32 working days** (7 weeks).
 - Wave 1: WP-1, WP-2, WP-3, WP-4
 - Wave 2: WP-5, WP-6, WP-7, WP-8
 - Wave 3: WP-10, WP-9
@@ -90,6 +90,14 @@ Each row is also a risk in the design, so it reaches the brief of the component 
 - D-14 Assumed answer: cost (Q-budget): **existing only**
 
 Every requirement was recognised and every active quality has a tactic. Review the decisions above; they are the judgement calls.
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Loan | — | — | approved | — | R-5 |
 
 ## 6. How the text was read
 

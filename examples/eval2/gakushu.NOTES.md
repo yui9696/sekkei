@@ -36,12 +36,12 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **26 person-days**; critical path **13 days**; with a team of 4: **about 16 working days** (4 weeks).
+- Total effort: **58 person-days**; critical path **37 days**; with a team of 4: **about 37 working days** (8 weeks).
 - Wave 1: WP-1, WP-2, WP-3, WP-4
-- Wave 2: WP-5, WP-6, WP-7
-- Wave 3: WP-8
-- Wave 4: WP-9
-- Wave 5: WP-10
+- Wave 2: WP-5, WP-6, WP-7, WP-8
+- Wave 3: WP-9
+- Wave 4: WP-10
+- Wave 5: WP-11
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 4; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -92,6 +92,17 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 - D-13 Assumed answer: resilience (Q-external): **10 s / 5 retries / queue**
 - D-14 Assumed answer: operations (Q-alerting): **error rate + queue growth**
 - D-15 Assumed answer: cost (Q-budget): **existing only**
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Course | — | — | unpublished | retention: course | R-1 |
+| Video | — | — | resumed | — | R-2 |
+| Grade | — | — | — | — | R-3 |
+| Progress | — | — | — | — | R-4 |
 
 ## 6. How the text was read
 

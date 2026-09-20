@@ -251,10 +251,10 @@
         "I-4",
         "I-6",
         "I-8",
-        "I-7"
+        "I-7",
+        "I-13"
       ],
       "satisfies": [
-        "R-5",
         "R-6",
         "R-1",
         "R-3",
@@ -398,10 +398,10 @@
       "requires": [
         "I-3",
         "I-4",
-        "I-5"
+        "I-5",
+        "I-13"
       ],
       "satisfies": [
-        "R-5",
         "R-6",
         "R-7",
         "R-9",
@@ -425,7 +425,8 @@
         "I-3",
         "I-4",
         "I-5",
-        "I-8"
+        "I-8",
+        "I-13"
       ],
       "satisfies": [
         "R-3",
@@ -434,6 +435,27 @@
       "tags": [
         "layer:3",
         "archetype:push"
+      ]
+    },
+    {
+      "id": "C-13",
+      "name": "Trip domain",
+      "responsibility": "Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.",
+      "kind": "module",
+      "path": "internal/domain_trip/domain_trip.go",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-4",
+        "R-5",
+        "R-7",
+        "R-8"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:domain_trip",
+        "aggregate"
       ]
     }
   ],
@@ -1303,6 +1325,48 @@
       ],
       "stability": "draft",
       "description": "Provided by Push gateway. "
+    },
+    {
+      "id": "I-13",
+      "name": "Trip domain interface",
+      "owner": "C-13",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "create_trip",
+          "inputs": [
+            {
+              "name": "trip",
+              "type": "Trip",
+              "description": ""
+            }
+          ],
+          "output": "Trip (id assigned)",
+          "errors": [
+            "ValidationError listing every invalid field"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": "creation of the aggregate root"
+        },
+        {
+          "name": "get_trip",
+          "inputs": [
+            {
+              "name": "trip_id",
+              "type": "ref",
+              "description": ""
+            }
+          ],
+          "output": "Trip | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Trip domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
@@ -1379,12 +1443,18 @@
     {
       "id": "E-3",
       "name": "Trip",
-      "owner": "C-1",
+      "owner": "C-13",
       "fields": [
         {
           "name": "id",
           "type": "uuid",
           "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(active)",
+          "constraints": "state machine read from ",
           "description": ""
         },
         {
@@ -1394,7 +1464,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('trip'); confirm the fields."
+      "description": "Domain entity read from R-5. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-4",
@@ -1414,7 +1484,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('ride'); confirm the fields."
+      "description": "Domain entity read from R-1. No fields are stated in the text beyond its name; add them."
     }
   ],
   "flows": [
@@ -2137,7 +2207,7 @@
         "internal/observability/observability.go",
         "internal/observability/observability_test.go"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-1",
@@ -2195,6 +2265,55 @@
     },
     {
       "id": "WP-3",
+      "title": "Trip domain",
+      "goal": "Implement Trip domain: Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.",
+      "components": [
+        "C-13"
+      ],
+      "implements": [
+        "I-13"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-4",
+        "R-5",
+        "R-7",
+        "R-8"
+      ],
+      "files": [
+        "internal/domain_trip/domain_trip.go",
+        "internal/domain_trip/domain_trip_test.go"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-5",
+          "description": "unit tests of Trip domain pass",
+          "kind": "test",
+          "command": "go test ./internal/domain_trip/",
+          "metric": ""
+        },
+        {
+          "id": "A-6",
+          "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-7"
+        },
+        {
+          "id": "A-7",
+          "description": "R-8: occurrences of the forbidden action (request) = 0 occurrences",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        }
+      ],
+      "notes": "family: aggregate:domain_trip"
+    },
+    {
+      "id": "WP-4",
       "title": "Geospatial index",
       "goal": "Implement Geospatial index: Keeps current positions and answers nearest-neighbour queries within a radius.",
       "components": [
@@ -2216,7 +2335,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-5",
+          "id": "A-8",
           "description": "unit tests of Geospatial index pass",
           "kind": "test",
           "command": "go test ./internal/geo/",
@@ -2226,7 +2345,7 @@
       "notes": "family: geo"
     },
     {
-      "id": "WP-4",
+      "id": "WP-5",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
@@ -2254,7 +2373,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-6",
+          "id": "A-9",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "go test ./internal/auth/",
@@ -2264,7 +2383,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-5",
+      "id": "WP-6",
       "title": "Payments",
       "goal": "Implement Payments: Creates charges/invoices through the payment provider and reconciles their webhooks.",
       "components": [
@@ -2286,7 +2405,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-10",
           "description": "unit tests of Payments pass",
           "kind": "test",
           "command": "go test ./internal/payments/",
@@ -2296,7 +2415,7 @@
       "notes": "family: payments"
     },
     {
-      "id": "WP-6",
+      "id": "WP-7",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -2309,12 +2428,12 @@
         "WP-1",
         "WP-2",
         "WP-3",
-        "WP-5"
+        "WP-4",
+        "WP-6"
       ],
       "satisfies": [
         "R-1",
         "R-3",
-        "R-5",
         "R-6",
         "R-10",
         "R-18",
@@ -2324,10 +2443,10 @@
         "internal/core/core.go",
         "internal/core/core_test.go"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-11",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "go test ./internal/core/",
@@ -2337,7 +2456,7 @@
       "notes": "family: geo"
     },
     {
-      "id": "WP-7",
+      "id": "WP-8",
       "title": "Batch job",
       "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
@@ -2348,8 +2467,8 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-4",
-        "WP-6"
+        "WP-5",
+        "WP-7"
       ],
       "satisfies": [
         "R-2",
@@ -2362,7 +2481,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-12",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "go test ./internal/batch/",
@@ -2372,7 +2491,7 @@
       "notes": "family: batch_pipeline"
     },
     {
-      "id": "WP-8",
+      "id": "WP-9",
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
@@ -2383,11 +2502,11 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-4",
-        "WP-6"
+        "WP-3",
+        "WP-5",
+        "WP-7"
       ],
       "satisfies": [
-        "R-5",
         "R-6",
         "R-7",
         "R-9",
@@ -2400,17 +2519,17 @@
         "internal/surface_api/surface_api.go",
         "internal/surface_api/surface_api_test.go"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-13",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "go test ./internal/surface_api/",
           "metric": ""
         },
         {
-          "id": "A-11",
+          "id": "A-14",
           "description": "R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -2420,7 +2539,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-9",
+      "id": "WP-10",
       "title": "Push gateway",
       "goal": "Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.",
       "components": [
@@ -2432,8 +2551,9 @@
       "depends_on": [
         "WP-1",
         "WP-2",
-        "WP-4",
-        "WP-6"
+        "WP-3",
+        "WP-5",
+        "WP-7"
       ],
       "satisfies": [
         "R-3",
@@ -2446,7 +2566,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-15",
           "description": "unit tests of Push gateway pass",
           "kind": "test",
           "command": "go test ./internal/push/",

@@ -132,6 +132,19 @@ def _looks_like_requirement(s: T.Sentence) -> bool:
     if any(q.kind in ("duration", "rate", "percent", "size", "count") for q in s.quantities) and \
             re.search(r"\bretain|\bretention|\bkept\b|\bkeep\b|\bmax\b|\blimit|\bbudget|\bsla\b|\bpeak|\bper (?:day|hour|second)|\bexpir|\bwindow\b|\bat least\b", s.lower):
         return True
+    # "the matcher selects candidate tickets", "Tickets live in Redis", "Formed matches are persisted to PostgreSQL",
+    # "Returns 202 with a ticket id": a component or a thing as subject with a verb, a stated path/status, a technology
+    low = s.lower
+    lead = re.sub(r"^[^,]{0,60},\s*", "", low)          # drop a leading adverbial ("Every 1 second per shard, …")
+    m = re.match(r"^(?:the|a|an|each|every|all|formed|new|existing)?\s*((?:[a-z-]+\s+)?[a-z-]+)\s+(?:[a-z]+s|must|shall|will|is|are|live|lives)\b", lead)
+    if m and s.verbs and not re.match(r"^(?:the|a|an)\s+(?:same|following|first|last|next|previous|other|only|full|whole|entire|rest)\b", lead):
+        head = m.group(1).split()[-1]
+        if (not T.verb_of(head) or head in ("matcher", "extractor", "scheduler", "worker", "orchestrator", "bootloader", "gateway", "bridge", "lock",
+                                              "console", "engine", "service", "platform", "system", "pipeline", "job", "ticket", "tickets", "match", "matches")) \
+                and head not in ("it", "this", "that", "there", "here", "which", "what", "who"):
+            return True
+    if re.search(r"\b(?:GET|POST|PUT|PATCH|DELETE)\s+/|\breturns? (?:a )?`?\d{3}\b|\b(?:persisted|stored|written|kept|held) (?:to|in) (?:postgres|redis|kafka|s3|the (?:database|store|queue|topic))", s.text):
+        return True
     if s.actors and s.verbs:
         words = s.words
         first_verb = next((i for i, w in enumerate(words) if T.verb_of(w) and not (i > 0 and words[i - 1] in T._DETERMINERS)), len(words))

@@ -14,6 +14,7 @@ from ..model import (
     Operation, Option, Param, Requirement, Risk, Step, WorkPackage, metric_text,
 )
 from . import catalog as K
+from . import domain as DM
 from . import text as T
 from .analysis import Analysis, ReqUnit
 from .evaluate import decide
@@ -105,17 +106,7 @@ def _peak_rate(an: Analysis) -> float:
     return max(rates, default=0.0)
 
 
-_ENTITY_STOP = {"audit", "access", "data", "request", "requests", "log", "logs", "job", "jobs", "process", "end", "start",
-                "system", "api", "app", "apps", "dashboard", "email", "link", "list", "report", "reports", "chart", "charts",
-                "page", "pages", "result", "results", "summary", "summaries", "position", "positions", "history", "text",
-                "service", "services", "batch", "csv", "json", "pdf", "team", "teams", "threshold", "minute", "minutes",
-                "second", "seconds", "time", "day", "days", "card", "call", "calls", "search", "query", "queries", "id",
-                "level", "levels", "statistic", "statistics", "offer", "offers", "provider", "providers", "server", "servers",
-                "broker", "cluster", "region", "role", "roles", "member", "members", "employee", "employees", "user", "users",
-                "cloudfront", "s3", "kafka", "redis", "postgres", "postgresql", "mysql", "kubernetes", "airflow", "snowflake", "bigquery", "gcs",
-                "aws", "gcp", "azure", "docker", "python", "java", "kotlin", "go", "rust", "typescript", "previous", "next", "given", "then",
-                "platform", "platforms", "seller", "sellers", "share", "shares", "fee", "fees", "bps", "input", "inputs", "output", "outputs",
-                "credit", "credits", "account", "accounts", "tech", "player", "players", "hour", "hours", "week", "weeks", "month", "months", "year", "years"}
+_ENTITY_STOP = T.ENTITY_STOP
 
 
 def _domain_entities(an: Analysis, functional_units: list[ReqUnit]) -> list[tuple[str, list[str]]]:
@@ -350,9 +341,29 @@ def _actor_is_subject(s: T.Sentence) -> bool:
 _IMPERATIVES = {"email", "notify", "alert", "slack", "page", "text", "message", "ping", "sms", "call", "tell", "inform", "remind", "warn", "escalate", "show", "give", "let", "allow", "ask"}
 
 
-def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
+_ATTRIBUTE_WORDS = {"price", "prices", "notional", "status", "state", "priority", "threshold", "thresholds", "name", "limit", "limits", "quantity",
+                    "amount", "expiry", "date", "dates", "time", "settings", "setting", "level", "levels", "address", "email", "phone", "role",
+                    "roles", "permission", "permissions", "schedule", "schedules", "description", "title", "tag", "tags", "flag", "flags",
+                    "value", "values", "field", "fields", "detail", "details", "point", "points", "score", "rate", "fee", "bps", "window"}
+
+
+def _resource_for(obj: str, sentence: T.Sentence, dents: list) -> str:
+    """The REST resource behind an object word: 'amend the limit price of a working order' → order (price is a field of
+    Order, and the sentence speaks of orders); an attribute word without a known entity in the sentence stays as it is."""
+    if not dents:
+        return obj
+    words = {DM.singular(w) for w in sentence.words}
+    base = DM.singular(obj)
+    for e in dents:
+        if e.name in words and e.name != base and (base in {f[0] for f in e.fields} or base.replace("-", "_") in {f[0] for f in e.fields} or (base in _ATTRIBUTE_WORDS and obj in _ATTRIBUTE_WORDS)):
+            return e.name
+    return obj
+
+
+def _derived_ops(units: list[ReqUnit], surface_kind: str, dents: list | None = None) -> list[Operation]:
     """Operations for a surface/core from the verbs and objects of its functional sentences."""
     seen: dict[str, Operation] = {}
+    dents = dents or []
     for u in units:
         if not u.sentence.actors:
             continue  # behaviour statements ("each event is delivered ...") are contracts, not use cases
@@ -374,6 +385,7 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
             obj = _object_after(v, u.sentence)
             if not obj:
                 continue
+            obj = _resource_for(obj, u.sentence, dents)
             if surface_kind in ("http", "cli") and v in _INTERNAL_VERBS:
                 continue
             if surface_kind == "http" and v in _HTTP_ONLY_INTERNAL:
@@ -413,6 +425,18 @@ def _derived_ops(units: list[ReqUnit], surface_kind: str) -> list[Operation]:
                 seen[name] = Operation(name, [Param(n, t) for n, t in inputs], out, errs, pre=pre,
                                        description=f"from {u.id}: {u.sentence.text[:90].rstrip()}")
     return list(seen.values())
+
+
+def _size_of(comps, d: Design, satisfies: list[str]) -> str:
+    """Package size from what it carries: operations to implement, entities to model, requirements to satisfy."""
+    ops = sum(len(i.operations) for c in comps for i in d.provided_by(c.id))
+    ents = sum(1 for e in d.entities if e.owner in {c.id for c in comps})
+    reqs = len(satisfies)
+    if ops >= 8 or reqs >= 8 or ents >= 3 or (ops >= 5 and reqs >= 5):
+        return "L"
+    if ops <= 3 and reqs <= 3 and ents <= 1:
+        return "S"
+    return "M"
 
 
 def _metric_of(u: ReqUnit) -> Metric | None:
@@ -516,6 +540,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         iid[key] = f"I-{n}"
     surfaces = [a for a in active if a in _ALL_SURFACES]
     functional_units = [u for u in an.requirements if u.kind == "functional"]
+    # the domain model reads every stated sentence: a use case with a latency target is filed as non-functional but still names its things
+    early_dents = DM.extract(an, [u for u in an.requirements if u.kind != "constraint"]) if "store" in active else []
 
     for key in active:
         at = K.ARCHETYPES[key]
@@ -536,7 +562,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                 mine = functional_units
             elif key in _HUMAN_SURFACES and key == next((a for a in active if a in _HUMAN_SURFACES), None):
                 mine = [u for u in functional_units if _human_subject(u) and not u.sentence.assumed] + [u for u in mine if u not in functional_units or not _human_subject(u)]
-            derived = _derived_ops(mine, "http" if key in _HTTP_SURFACES else ("cli" if key == "cli" else "module"))
+            derived = _derived_ops(mine, "http" if key in _HTTP_SURFACES else ("cli" if key == "cli" else "module"), early_dents)
             names = {o.name for o in ops}
             ops += [o for o in derived if o.name not in names]
         if key == "core" and not ops:
@@ -560,6 +586,75 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                     op.pre = (op.pre + "; " if op.pre else "") + "stated values: " + note
                     trace[iface.id]["rules"].append(f"quantities:{pid}")
 
+    # --- domain aggregates: one component per cluster of related entities -------
+    dents = early_dents if "store" in cid else []
+    agg_of_entity: dict[str, str] = {}      # entity name -> archetype key of its aggregate component
+    for group in DM.aggregates(dents):
+        top = group[0]
+        if not top.kept or (top.score < 4 and len(group) < 2):
+            continue
+        key = "domain_" + re.sub(r"[^a-z0-9]+", "_", top.name)
+        if key in cid:
+            continue
+        n = len(d.components) + 1
+        name = f"{top.display} domain"
+        ents_txt = ", ".join(e.display for e in group)
+        bits = []
+        for e in group:
+            if e.states:
+                bits.append(f"{e.display} state machine: " + " → ".join(e.states))
+            for txt, ev in e.invariants:
+                bits.append(f"invariant ({ev}): {txt}")
+        responsibility = (f"Owns the {ents_txt} aggregate: creation, changes and state transitions of these records, and the rules that hold across them. "
+                          + ("; ".join(bits) + ". " if bits else "") + f"Read from {', '.join(list(dict.fromkeys(r for e in group for r in e.evidence))[:8])}.")
+        comp = Component(f"C-{n}", name, responsibility, "module", layout.module.format(key=key, Key="".join(p.capitalize() for p in key.split("_"))),
+                         requires=[iid["store"]] if "store" in iid else [], satisfies=[], tags=["layer:1", f"archetype:{key}", "aggregate"])
+        ops: list[Operation] = []
+        seen_ops: set[str] = set()
+        for e in group:
+            for verb, state, ev in e.transitions:
+                if "→" in verb:
+                    continue
+                opname = f"{verb}_{e.name}"
+                if opname not in seen_ops:
+                    seen_ops.add(opname)
+                    ops.append(Operation(opname, [Param(f"{e.name}_id", "ref")], f"{e.display} (status = {state})",
+                                         ["NotFound", f"InvalidTransition (not allowed from the current status)"], post=f"status = {state}", description=f"from {ev}"))
+            if not any(o.name.startswith(("create_", "register_", "submit_")) and o.name.endswith(e.name) for o in ops):
+                opname = f"create_{e.name}"
+                if opname not in seen_ops:
+                    seen_ops.add(opname)
+                    ops.append(Operation(opname, [Param(e.name, e.display)], e.display + " (id assigned)", ["ValidationError listing every invalid field"],
+                                         post="; ".join(t for t, _ in e.invariants) or "record is durable before return", description="creation of the aggregate root" if e is top else "creation of a member of the aggregate"))
+            opname = f"get_{e.name}"
+            if opname not in seen_ops:
+                seen_ops.add(opname)
+                ops.append(Operation(opname, [Param(f"{e.name}_id", "ref")], f"{e.display} | None"))
+        iface = Interface(f"I-{n}", f"{name} interface", comp.id, "module", ops, "draft",
+                          f"Provided by {name}. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.")
+        d.components.append(comp)
+        d.interfaces.append(iface)
+        cid[key], iid[key] = comp.id, iface.id
+        requires[key] = ["store"] if "store" in cid else []
+        for e in group:
+            agg_of_entity[e.name] = key
+        # the surfaces and the core use the aggregate; the aggregate is the only writer of its records
+        for sk in list(surfaces) + (["core"] if "core" in cid else []):
+            if sk in cid:
+                sc = d.component(cid[sk])
+                if sc is not None and iface.id not in sc.requires:
+                    sc.requires.append(iface.id)
+                    requires.setdefault(sk, []).append(key)
+        # requirements that speak of the aggregate's entities are satisfied by it
+        for u in an.requirements:
+            if u.sentence.assumed or u.kind == "constraint":
+                continue
+            words = {DM.singular(w) for w in u.sentence.words}
+            if any(e.name in words for e in group) and u.id not in comp.satisfies:
+                comp.satisfies.append(u.id)
+        trace[comp.id] = {"sentences": sorted({u.sentence.index for u in functional_units if u.id in comp.satisfies}), "rules": [f"aggregate:{top.name}"]}
+        trace[iface.id] = {"sentences": [], "rules": [f"aggregate:{top.name}"]}
+
     # --- owners for requirements no pattern recognised ------------------------
     placements: list[Placement] = []
     for u in an.unrecognised:
@@ -570,7 +665,12 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         if target is not None:
             p = Placement(u.id, [target.id], "chosen in the interview", f"owner {target.name} named by the human")
         else:
-            p = place(u, d, layout, cid, iid, requires)
+            words = {DM.singular(w) for w in u.sentence.words}
+            agg = next((agg_of_entity[e] for e in agg_of_entity if e in words), None)
+            if agg and agg in cid:
+                p = Placement(u.id, [cid[agg]], "aggregate", f"the sentence speaks of {[e for e in agg_of_entity if e in words][0]}, owned by {d.component(cid[agg]).name}")
+            else:
+                p = place(u, d, layout, cid, iid, requires)
         placements.append(p)
         for owner in p.owners:
             comp = d.component(owner)
@@ -604,22 +704,49 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         d.entities.append(Entity("E-1", _singular(top).capitalize() or "Record", cid["store"],
                                  [FieldDef(n, t, c) for n, t, c in tmpl.fields], f"Generic record named after the most frequent noun ('{top}'); refine the fields."))
         trace["E-1"] = {"sentences": [], "rules": ["fallback:top-noun"]}
+    if dents and "record" in ekeys:
+        ekeys.remove("record")            # the text names its own records; the generic one is noise
     for n, e in enumerate(ekeys, 1):
         tmpl = K.ENTITIES[e]
         owner = cid[ENTITY_OWNER.get(e, "store")]
         d.entities.append(Entity(f"E-{n}", tmpl.name, owner, [FieldDef(nm, tp, c) for nm, tp, c in tmpl.fields], tmpl.description))
         trace[f"E-{n}"] = {"sentences": [], "rules": [f"entity:{e}"]}
-    # domain entities named in the text itself (objects of create/register/... and frequent plural nouns)
+    # domain entities read from the text: typed fields, relations, state machines, invariants (engine/domain.py)
     if "store" in cid:
         existing = {e.name.lower() for e in d.entities}
         n = len(d.entities)
-        for base, fields in _domain_entities(an, functional_units):
-            if base in existing or any(base in x for x in existing):
+        for de in dents:
+            if de.name in existing or de.display.lower() in existing:
+                # a catalogue entity of the same name: enrich it instead of duplicating
+                tgt = next(e for e in d.entities if e.name.lower() in (de.name, de.display.lower()))
+                have = {f.name for f in tgt.fields}
+                for fn, ft, ev in de.fields:
+                    if fn not in have:
+                        tgt.fields.append(FieldDef(fn, ft, f"from {ev}"))
+                if de.states and "status" not in have:
+                    tgt.fields.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "state machine read from " + ", ".join(dict.fromkeys(r for _, _, r in de.transitions))))
+                for txt, ev in de.invariants:
+                    tgt.description = (tgt.description.rstrip(".") + f". Invariant ({ev}): {txt}.").lstrip(". ")
                 continue
             n += 1
-            fds = [FieldDef("id", "uuid", "primary key")] + [FieldDef(re.sub(r"\s+", "_", f), "…", "from the text") for f in fields] + [FieldDef("created_at", "timestamp", "")]
-            d.entities.append(Entity(f"E-{n}", "".join(p.capitalize() for p in base.split("_")), cid["store"], fds, f"Domain entity named in the requirements ('{base}'); confirm the fields."))
-            trace[f"E-{n}"] = {"sentences": [], "rules": ["entity:from-text"]}
+            fds = [FieldDef("id", "uuid", "primary key")]
+            fds += [FieldDef(fn, ft, f"from {ev}") for fn, ft, ev in de.fields]
+            for kind, target, ev in de.relations:
+                if kind == "belongs_to":
+                    fds.append(FieldDef(f"{target}_id", "ref", f"belongs to one {target} ({ev})"))
+            if de.states:
+                fds.append(FieldDef("status", "enum(" + ", ".join(de.states) + ")", "state machine read from " + ", ".join(dict.fromkeys(r for _, _, r in de.transitions))))
+            fds.append(FieldDef("created_at", "timestamp", ""))
+            desc = f"Domain entity read from {', '.join(de.evidence[:6])}."
+            if not de.fields:
+                desc += " No fields are stated in the text beyond its name; add them."
+            for txt, ev in de.invariants:
+                desc += f" Invariant ({ev}): {txt}."
+            has_many = [t for k, t, _ in de.relations if k == "has_many"]
+            if has_many:
+                desc += " Has many: " + ", ".join(has_many) + "."
+            d.entities.append(Entity(f"E-{n}", de.display, cid.get(agg_of_entity.get(de.name, ""), cid["store"]), fds, desc))
+            trace[f"E-{n}"] = {"sentences": [], "rules": ["entity:from-text"] + [f"entity:{ev}" for ev in de.evidence[:6]]}
 
     # synthesised contracts: give parameters the entity type when the name matches an entity
     ent_by_name = {e.name.lower(): e.name for e in d.entities}
@@ -743,6 +870,8 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         key = c.tags[1].split(":")[1]
         if key in _INFRA:
             fam = "infra"
+        elif "aggregate" in c.tags:
+            fam = "aggregate:" + key           # one package per domain aggregate
         elif "synthesised" in c.tags:
             fam = "synthesised:" + key
         else:
@@ -795,7 +924,7 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
         title = " + ".join(c.name for c in comps)
         goal = "Implement " + "; ".join(f"{c.name}: {c.responsibility.rstrip('.')}" for c in comps) + "."
         d.work_packages.append(WorkPackage(wp_id, title, goal, ids, [i.id for c in comps for i in d.provided_by(c.id)],
-                                           deps, satisfies, files, "S" if len(ids) == 1 else "M", acc,
+                                           deps, satisfies, files, _size_of(comps, d, satisfies), acc,
                                            notes=f"family: {family_of[ids[0]]}"))
         trace[wp_id] = {"sentences": [], "rules": [f"package:layer{[i for i, L in enumerate(layers) if ids[0] in L][0]}:{family_of[ids[0]]}"]}
     return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log, placements, close_calls)

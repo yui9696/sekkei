@@ -213,6 +213,7 @@ A solution architect's job, mechanised into five deterministic steps
 |---|---|---|
 | analyse | sentences → requirement units with modality (must/should/could), kind (functional / non-functional / constraint), the numbers as metrics (`p95 latency < 5 s`, `>= 1000 events/s`), actors, verbs, objects | `engine/text.py`, `engine/analysis.py` |
 | recognise | 40 capability patterns (async delivery with retries, request signing, admin API, event ingest, audit log, batch pipeline, CLI tool, …) and 12 quality attributes matched by signals in the text | `engine/catalog.py` |
+| domain | entities with typed fields, relations, state machines and invariants read from the sentences (`items (SKU, quantity, warehouse, bin)`, `amend the limit price of a working order`, `submit / cancel / reject`, `never randomised twice`); related entities form an **aggregate**, and each aggregate becomes a component that owns its records and their transitions | `engine/domain.py` |
 | synthesise | patterns bring archetypes (52), which merge into components with interfaces and operations; entities, flows, requirement-to-component mapping; operations are derived from the verbs and objects of the input sentences | `engine/synthesis.py` |
 | decide | 26 decision points with 76 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
 | package | components are layered, cut into ≤3-component work packages with unique write scopes, ordered by the interfaces they consume; acceptance checks derived from the metrics | `engine/synthesis.py` |
@@ -266,7 +267,7 @@ Measured on this repository (Apple Silicon laptop, CPython 3.14):
 
 | what | value |
 |---|---|
-| tests | 330 (incl. 11 real-world specs, 37 specs written by three independent red teams, and a mutation fuzz) |
+| tests | 336 (incl. 11 real-world specs, 37 specs written by four independent red teams, and a mutation fuzz) |
 | engine fixtures that must lint clean, be deterministic and be faithful (every bullet a verbatim requirement) | 5 (webhooks, inventory, CLI tool, out-of-catalogue greenhouse, multi-tenant expense SaaS) + the two-line minimal spec + a Japanese spec |
 | `sekkei design` on the webhook spec | 0.05–0.3 s |
 | `lint` + `check` on the self design | 0.16–0.32 s |

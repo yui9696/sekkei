@@ -330,7 +330,8 @@
         "I-8",
         "I-3",
         "I-4",
-        "I-7"
+        "I-7",
+        "I-15"
       ],
       "satisfies": [
         "R-3",
@@ -480,7 +481,8 @@
         "I-8",
         "I-9",
         "I-10",
-        "I-11"
+        "I-11",
+        "I-15"
       ],
       "satisfies": [
         "R-3",
@@ -494,6 +496,27 @@
       "tags": [
         "layer:3",
         "archetype:surface_api"
+      ]
+    },
+    {
+      "id": "C-15",
+      "name": "Course domain",
+      "responsibility": "Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.",
+      "kind": "module",
+      "path": "src/domain_course.ts",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-6",
+        "R-10"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:domain_course",
+        "aggregate"
       ]
     }
   ],
@@ -807,6 +830,24 @@
           "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
         },
         {
+          "name": "unpublish_courses",
+          "inputs": [
+            {
+              "name": "courses",
+              "type": "Courses | id",
+              "description": ""
+            }
+          ],
+          "output": "Courses | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
+        },
+        {
           "name": "search_courses",
           "inputs": [
             {
@@ -825,15 +866,33 @@
           "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "save_playback",
+          "name": "save_position",
           "inputs": [
             {
-              "name": "playback",
-              "type": "Playback | id",
+              "name": "position",
+              "type": "Position | id",
               "description": ""
             }
           ],
-          "output": "Playback | None",
+          "output": "Position | None",
+          "errors": [
+            "ValidationError",
+            "NotFound"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
+        },
+        {
+          "name": "resume_position",
+          "inputs": [
+            {
+              "name": "position",
+              "type": "Position | id",
+              "description": ""
+            }
+          ],
+          "output": "Position | None",
           "errors": [
             "ValidationError",
             "NotFound"
@@ -1381,6 +1440,25 @@
           "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
         },
         {
+          "name": "POST /courses/{id}/unpublish",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 unpublish accepted",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-1: Admins can create, publish and unpublish courses (videos, files, tests)."
+        },
+        {
           "name": "GET /courses",
           "inputs": [
             {
@@ -1403,7 +1481,7 @@
           "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
         },
         {
-          "name": "POST /playbacks/{id}/save",
+          "name": "POST /positions/{id}/save",
           "inputs": [
             {
               "name": "id",
@@ -1412,6 +1490,25 @@
             }
           ],
           "output": "202 save accepted",
+          "errors": [
+            "401 unauthenticated",
+            "404 unknown id",
+            "409 not applicable in current state"
+          ],
+          "pre": "",
+          "post": "",
+          "description": "from R-2: Employees can search and take courses. Employees can save and resume playback position vid"
+        },
+        {
+          "name": "POST /positions/{id}/resume",
+          "inputs": [
+            {
+              "name": "id",
+              "type": "str",
+              "description": ""
+            }
+          ],
+          "output": "202 resume accepted",
           "errors": [
             "401 unauthenticated",
             "404 unknown id",
@@ -1468,37 +1565,71 @@
       ],
       "stability": "draft",
       "description": "Provided by Public HTTP API. "
+    },
+    {
+      "id": "I-15",
+      "name": "Course domain interface",
+      "owner": "C-15",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "unpublish_course",
+          "inputs": [
+            {
+              "name": "course_id",
+              "type": "ref",
+              "description": ""
+            }
+          ],
+          "output": "Course (status = unpublished)",
+          "errors": [
+            "NotFound",
+            "InvalidTransition (not allowed from the current status)"
+          ],
+          "pre": "",
+          "post": "status = unpublished",
+          "description": "from R-1"
+        },
+        {
+          "name": "create_course",
+          "inputs": [
+            {
+              "name": "course",
+              "type": "Course",
+              "description": ""
+            }
+          ],
+          "output": "Course (id assigned)",
+          "errors": [
+            "ValidationError listing every invalid field"
+          ],
+          "pre": "",
+          "post": "retention: course",
+          "description": "creation of the aggregate root"
+        },
+        {
+          "name": "get_course",
+          "inputs": [
+            {
+              "name": "course_id",
+              "type": "ref",
+              "description": ""
+            }
+          ],
+          "output": "Course | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Course domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
     {
       "id": "E-1",
-      "name": "Record",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "updated_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Generic domain record; refine per entity found in the requirements."
-    },
-    {
-      "id": "E-2",
       "name": "Principal",
       "owner": "C-1",
       "fields": [
@@ -1524,7 +1655,7 @@
       "description": ""
     },
     {
-      "id": "E-3",
+      "id": "E-2",
       "name": "File",
       "owner": "C-3",
       "fields": [
@@ -1556,7 +1687,7 @@
       "description": ""
     },
     {
-      "id": "E-4",
+      "id": "E-3",
       "name": "AuditEntry",
       "owner": "C-4",
       "fields": [
@@ -1594,9 +1725,9 @@
       "description": ""
     },
     {
-      "id": "E-5",
+      "id": "E-4",
       "name": "Course",
-      "owner": "C-1",
+      "owner": "C-15",
       "fields": [
         {
           "name": "id",
@@ -1605,21 +1736,9 @@
           "description": ""
         },
         {
-          "name": "videos",
-          "type": "…",
-          "constraints": "from the text",
-          "description": ""
-        },
-        {
-          "name": "files",
-          "type": "…",
-          "constraints": "from the text",
-          "description": ""
-        },
-        {
-          "name": "tests",
-          "type": "…",
-          "constraints": "from the text",
+          "name": "status",
+          "type": "enum(unpublished)",
+          "constraints": "state machine read from R-1",
           "description": ""
         },
         {
@@ -1629,7 +1748,33 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('course'); confirm the fields."
+      "description": "Domain entity read from R-1. No fields are stated in the text beyond its name; add them. Invariant (R-6): retention: course."
+    },
+    {
+      "id": "E-5",
+      "name": "Video",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(resumed)",
+          "constraints": "state machine read from R-2",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity read from R-2. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-6",
@@ -1649,11 +1794,11 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('grade'); confirm the fields."
+      "description": "Domain entity read from R-3. No fields are stated in the text beyond its name; add them."
     },
     {
       "id": "E-7",
-      "name": "Test",
+      "name": "Progress",
       "owner": "C-1",
       "fields": [
         {
@@ -1669,27 +1814,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('test'); confirm the fields."
-    },
-    {
-      "id": "E-8",
-      "name": "Video",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('video'); confirm the fields."
+      "description": "Domain entity read from R-4. No fields are stated in the text beyond its name; add them."
     }
   ],
   "flows": [
@@ -2584,7 +2709,7 @@
         "src/files.ts",
         "tests/files.test.ts"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-2",
@@ -2660,7 +2785,7 @@
         "src/observability.ts",
         "tests/observability.test.ts"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-5",
@@ -2688,6 +2813,48 @@
     },
     {
       "id": "WP-5",
+      "title": "Course domain",
+      "goal": "Implement Course domain: Owns the Course aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Course state machine: unpublished; invariant (R-6): retention: course. Read from R-1.",
+      "components": [
+        "C-15"
+      ],
+      "implements": [
+        "I-15"
+      ],
+      "depends_on": [
+        "WP-4"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-6",
+        "R-10"
+      ],
+      "files": [
+        "src/domain_course.ts",
+        "tests/domain_course.test.ts"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-8",
+          "description": "unit tests of Course domain pass",
+          "kind": "test",
+          "command": "npx vitest run tests/domain_course.test.ts",
+          "metric": ""
+        },
+        {
+          "id": "A-9",
+          "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-10"
+        }
+      ],
+      "notes": "family: aggregate:domain_course"
+    },
+    {
+      "id": "WP-6",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
@@ -2715,7 +2882,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-8",
+          "id": "A-10",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "npx vitest run tests/auth.test.ts tests/scheduler.test.ts",
@@ -2725,7 +2892,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-6",
+      "id": "WP-7",
       "title": "Notifier",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
@@ -2748,7 +2915,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-11",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "npx vitest run tests/notifier.test.ts",
@@ -2758,7 +2925,7 @@
       "notes": "family: notification"
     },
     {
-      "id": "WP-7",
+      "id": "WP-8",
       "title": "Search index",
       "goal": "Implement Search index: Full-text and filtered queries over the indexed entities.",
       "components": [
@@ -2780,24 +2947,24 @@
         "src/search.ts",
         "tests/search.test.ts"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-12",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "npx vitest run tests/search.test.ts",
           "metric": ""
         },
         {
-          "id": "A-11",
+          "id": "A-13",
           "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-12",
+          "id": "A-14",
           "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -2807,7 +2974,7 @@
       "notes": "family: search"
     },
     {
-      "id": "WP-8",
+      "id": "WP-9",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -2820,7 +2987,8 @@
         "WP-1",
         "WP-2",
         "WP-4",
-        "WP-6"
+        "WP-5",
+        "WP-7"
       ],
       "satisfies": [
         "R-3",
@@ -2835,17 +3003,17 @@
         "src/core.ts",
         "tests/core.test.ts"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-15",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "npx vitest run tests/core.test.ts",
           "metric": ""
         },
         {
-          "id": "A-14",
+          "id": "A-16",
           "description": "R-11: occurrences of the forbidden action (record) = 0 occurrences",
           "kind": "metric",
           "command": "",
@@ -2855,7 +3023,7 @@
       "notes": "family: crud_api"
     },
     {
-      "id": "WP-9",
+      "id": "WP-10",
       "title": "Import/export",
       "goal": "Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.",
       "components": [
@@ -2865,7 +3033,7 @@
         "I-11"
       ],
       "depends_on": [
-        "WP-8"
+        "WP-9"
       ],
       "satisfies": [
         "R-4",
@@ -2878,14 +3046,14 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-15",
+          "id": "A-17",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "npx vitest run tests/exporter.test.ts",
           "metric": ""
         },
         {
-          "id": "A-16",
+          "id": "A-18",
           "description": "R-12: ratio >= 99.9 % — kill one instance under load; error rate stays within the target",
           "kind": "metric",
           "command": "",
@@ -2895,7 +3063,7 @@
       "notes": "family: import_export"
     },
     {
-      "id": "WP-10",
+      "id": "WP-11",
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
@@ -2907,9 +3075,10 @@
       "depends_on": [
         "WP-4",
         "WP-5",
-        "WP-7",
+        "WP-6",
         "WP-8",
-        "WP-9"
+        "WP-9",
+        "WP-10"
       ],
       "satisfies": [
         "R-3",
@@ -2924,24 +3093,24 @@
         "src/surface_api.ts",
         "tests/surface_api.test.ts"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-19",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "npx vitest run tests/surface_api.test.ts",
           "metric": ""
         },
         {
-          "id": "A-18",
+          "id": "A-20",
           "description": "R-8: latency at 2 GB <= 10 min — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-19",
+          "id": "A-21",
           "description": "R-10: p95 latency <= 300 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

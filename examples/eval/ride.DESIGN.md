@@ -57,11 +57,13 @@ graph LR
   C_10["C-10 Batch job"]
   C_11["C-11 Public HTTP API"]
   C_12["C-12 Push gateway"]
+  C_13["C-13 Trip domain"]
   C_3 -->|I-1| C_1
   C_3 -->|I-4| C_4
   C_3 -->|I-6| C_6
   C_3 -->|I-8| C_8
   C_3 -->|I-7| C_7
+  C_3 -->|I-13| C_13
   C_5 -->|I-1| C_1
   C_6 -->|I-1| C_1
   C_6 -->|I-4| C_4
@@ -75,10 +77,13 @@ graph LR
   C_11 -->|I-3| C_3
   C_11 -->|I-4| C_4
   C_11 -->|I-5| C_5
+  C_11 -->|I-13| C_13
   C_12 -->|I-3| C_3
   C_12 -->|I-4| C_4
   C_12 -->|I-5| C_5
   C_12 -->|I-8| C_8
+  C_12 -->|I-13| C_13
+  C_13 -->|I-1| C_1
 ```
 
 ### C-1 — Store
@@ -102,8 +107,8 @@ graph LR
 - **kind**: module · **path**: `internal/core/core.go`
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-3
-- **requires**: I-1, I-4, I-6, I-8, I-7
-- **satisfies**: R-5, R-6, R-1, R-3, R-10, R-18, R-19
+- **requires**: I-1, I-4, I-6, I-8, I-7, I-13
+- **satisfies**: R-6, R-1, R-3, R-10, R-18, R-19
 
 ### C-4 — Observability
 
@@ -166,21 +171,29 @@ graph LR
 - **kind**: service · **path**: `internal/surface_api/surface_api.go`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-11
-- **requires**: I-3, I-4, I-5
-- **satisfies**: R-5, R-6, R-7, R-9, R-10, R-13, R-14, R-16
+- **requires**: I-3, I-4, I-5, I-13
+- **satisfies**: R-6, R-7, R-9, R-10, R-13, R-14, R-16
 
 ### C-12 — Push gateway
 
 - **kind**: service · **path**: `internal/push/push.go`
 - **responsibility**: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.
 - **provides**: I-12
-- **requires**: I-3, I-4, I-5, I-8
+- **requires**: I-3, I-4, I-5, I-8, I-13
 - **satisfies**: R-3, R-10
+
+### C-13 — Trip domain
+
+- **kind**: module · **path**: `internal/domain_trip/domain_trip.go`
+- **responsibility**: Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.
+- **provides**: I-13
+- **requires**: I-1
+- **satisfies**: R-4, R-5, R-7, R-8
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-2, C-4, C-8
-1. C-5, C-6, C-7, C-9
+1. C-13, C-5, C-6, C-7, C-9
 2. C-3
 3. C-10, C-11, C-12
 
@@ -340,6 +353,17 @@ graph LR
 |---|---|---|---|---|
 | `subscribe` | `topic`: str | stream of events | — | — |
 
+### I-13 — Trip domain interface
+
+- **kind**: module · **owner**: C-13 · **stability**: draft
+- Provided by Trip domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `create_trip` | `trip`: Trip | Trip (id assigned) | ValidationError listing every invalid field | record is durable before return |
+| | creation of the aggregate root | | | |
+| `get_trip` | `trip_id`: ref | Trip \| None | — | — |
+
 ## Entities
 
 ### E-1 — Principal (owner C-1)
@@ -361,18 +385,19 @@ graph LR
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-3 — Trip (owner C-1)
+### E-3 — Trip (owner C-13)
 
-Domain entity named in the requirements ('trip'); confirm the fields.
+Domain entity read from R-5. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
+| `status` | enum(active) | state machine read from  |
 | `created_at` | timestamp |  |
 
 ### E-4 — Ride (owner C-1)
 
-Domain entity named in the requirements ('ride'); confirm the fields.
+Domain entity read from R-1. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -678,44 +703,49 @@ _Affects:_ C-9
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Store + Observability (M)"]
+  WP_1["WP-1 Store + Observability (L)"]
   WP_2["WP-2 Event bus (S)"]
-  WP_3["WP-3 Geospatial index (S)"]
-  WP_4["WP-4 Authentication + Scheduler (M)"]
-  WP_5["WP-5 Payments (S)"]
-  WP_6["WP-6 Domain core (S)"]
-  WP_7["WP-7 Batch job (S)"]
-  WP_8["WP-8 Public HTTP API (S)"]
-  WP_9["WP-9 Push gateway (S)"]
+  WP_3["WP-3 Trip domain (M)"]
+  WP_4["WP-4 Geospatial index (S)"]
+  WP_5["WP-5 Authentication + Scheduler (M)"]
+  WP_6["WP-6 Payments (S)"]
+  WP_7["WP-7 Domain core (L)"]
+  WP_8["WP-8 Batch job (S)"]
+  WP_9["WP-9 Public HTTP API (L)"]
+  WP_10["WP-10 Push gateway (S)"]
   WP_1 --> WP_3
   WP_1 --> WP_4
   WP_1 --> WP_5
   WP_1 --> WP_6
-  WP_2 --> WP_6
-  WP_3 --> WP_6
-  WP_5 --> WP_6
   WP_1 --> WP_7
+  WP_2 --> WP_7
+  WP_3 --> WP_7
   WP_4 --> WP_7
   WP_6 --> WP_7
   WP_1 --> WP_8
-  WP_4 --> WP_8
-  WP_6 --> WP_8
+  WP_5 --> WP_8
+  WP_7 --> WP_8
   WP_1 --> WP_9
-  WP_2 --> WP_9
-  WP_4 --> WP_9
-  WP_6 --> WP_9
+  WP_3 --> WP_9
+  WP_5 --> WP_9
+  WP_7 --> WP_9
+  WP_1 --> WP_10
+  WP_2 --> WP_10
+  WP_3 --> WP_10
+  WP_5 --> WP_10
+  WP_7 --> WP_10
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1, WP-2
-2. WP-3, WP-4, WP-5
-3. WP-6
-4. WP-7, WP-8, WP-9
+2. WP-3, WP-4, WP-5, WP-6
+3. WP-7
+4. WP-10, WP-8, WP-9
 
-_Critical path (12 person-days):_ WP-1 → WP-4 → WP-9
+_Critical path (35 person-days):_ WP-1 → WP-3 → WP-7 → WP-9
 
-### WP-1 — Store + Observability (M)
+### WP-1 — Store + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -739,7 +769,20 @@ Implement Event bus: Publishes domain events to subscribers inside the system.
   - A-4 (test) unit tests of Event bus pass — `go test ./internal/bus/`
 - **notes**: family: realtime
 
-### WP-3 — Geospatial index (S)
+### WP-3 — Trip domain (M)
+
+Implement Trip domain: Owns the Trip aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Trip state machine: active. Read from R-5.
+
+- **components**: C-13 · **implements**: I-13
+- **depends on**: WP-1 · **satisfies**: R-4, R-5, R-7, R-8
+- **write scope**: `internal/domain_trip/domain_trip.go`, `internal/domain_trip/domain_trip_test.go`
+- **acceptance**:
+  - A-5 (test) unit tests of Trip domain pass — `go test ./internal/domain_trip/`
+  - A-6 (metric) R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-7
+  - A-7 (metric) R-8: occurrences of the forbidden action (request) = 0 occurrences — metric R-8
+- **notes**: family: aggregate:domain_trip
+
+### WP-4 — Geospatial index (S)
 
 Implement Geospatial index: Keeps current positions and answers nearest-neighbour queries within a radius.
 
@@ -747,10 +790,10 @@ Implement Geospatial index: Keeps current positions and answers nearest-neighbou
 - **depends on**: WP-1 · **satisfies**: R-1
 - **write scope**: `internal/geo/geo.go`, `internal/geo/geo_test.go`
 - **acceptance**:
-  - A-5 (test) unit tests of Geospatial index pass — `go test ./internal/geo/`
+  - A-8 (test) unit tests of Geospatial index pass — `go test ./internal/geo/`
 - **notes**: family: geo
 
-### WP-4 — Authentication + Scheduler (M)
+### WP-5 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -758,10 +801,10 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-1 · **satisfies**: R-2, R-11, R-12
 - **write scope**: `internal/auth/auth.go`, `internal/auth/auth_test.go`, `internal/scheduler/scheduler.go`, `internal/scheduler/scheduler_test.go`
 - **acceptance**:
-  - A-6 (test) unit tests of Authentication, Scheduler pass — `go test ./internal/auth/`
+  - A-9 (test) unit tests of Authentication, Scheduler pass — `go test ./internal/auth/`
 - **notes**: family: infra
 
-### WP-5 — Payments (S)
+### WP-6 — Payments (S)
 
 Implement Payments: Creates charges/invoices through the payment provider and reconciles their webhooks.
 
@@ -769,77 +812,77 @@ Implement Payments: Creates charges/invoices through the payment provider and re
 - **depends on**: WP-1 · **satisfies**: R-4
 - **write scope**: `internal/payments/payments.go`, `internal/payments/payments_test.go`
 - **acceptance**:
-  - A-7 (test) unit tests of Payments pass — `go test ./internal/payments/`
+  - A-10 (test) unit tests of Payments pass — `go test ./internal/payments/`
 - **notes**: family: payments
 
-### WP-6 — Domain core (S)
+### WP-7 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-3 · **implements**: I-3
-- **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-5, R-6, R-10, R-18, R-19
+- **depends on**: WP-1, WP-2, WP-3, WP-4, WP-6 · **satisfies**: R-1, R-3, R-6, R-10, R-18, R-19
 - **write scope**: `internal/core/core.go`, `internal/core/core_test.go`
 - **acceptance**:
-  - A-8 (test) unit tests of Domain core pass — `go test ./internal/core/`
+  - A-11 (test) unit tests of Domain core pass — `go test ./internal/core/`
 - **notes**: family: geo
 
-### WP-7 — Batch job (S)
+### WP-8 — Batch job (S)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-10 · **implements**: I-10
-- **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-2, R-12
+- **depends on**: WP-1, WP-5, WP-7 · **satisfies**: R-2, R-12
 - **write scope**: `internal/batch/batch.go`, `internal/batch/batch_test.go`
 - **acceptance**:
-  - A-9 (test) unit tests of Batch job pass — `go test ./internal/batch/`
+  - A-12 (test) unit tests of Batch job pass — `go test ./internal/batch/`
 - **notes**: family: batch_pipeline
 
-### WP-8 — Public HTTP API (S)
+### WP-9 — Public HTTP API (L)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-11 · **implements**: I-11
-- **depends on**: WP-1, WP-4, WP-6 · **satisfies**: R-5, R-6, R-7, R-9, R-10, R-13, R-14, R-16
+- **depends on**: WP-1, WP-3, WP-5, WP-7 · **satisfies**: R-6, R-7, R-9, R-10, R-13, R-14, R-16
 - **write scope**: `internal/surface_api/surface_api.go`, `internal/surface_api/surface_api_test.go`
 - **acceptance**:
-  - A-10 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
-  - A-11 (metric) R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-7
+  - A-13 (test) unit tests of Public HTTP API pass — `go test ./internal/surface_api/`
+  - A-14 (metric) R-7: p95 latency at 300, 2,000 <= 2 s — load test at the stated rate; the stated percentile must meet the target — metric R-7
 - **notes**: family: infra
 
-### WP-9 — Push gateway (S)
+### WP-10 — Push gateway (S)
 
 Implement Push gateway: Long-lived connections (WebSocket/SSE) that fan out events to connected clients.
 
 - **components**: C-12 · **implements**: I-12
-- **depends on**: WP-1, WP-2, WP-4, WP-6 · **satisfies**: R-3, R-10
+- **depends on**: WP-1, WP-2, WP-3, WP-5, WP-7 · **satisfies**: R-3, R-10
 - **write scope**: `internal/push/push.go`, `internal/push/push_test.go`
 - **acceptance**:
-  - A-12 (test) unit tests of Push gateway pass — `go test ./internal/push/`
+  - A-15 (test) unit tests of Push gateway pass — `go test ./internal/push/`
 - **notes**: family: realtime
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-3, C-6 | WP-3, WP-6 | A-5, A-8 |
-| R-2 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
-| R-3 | must | C-3, C-8, C-12 | WP-2, WP-6, WP-9 | A-4, A-8, A-12 |
-| R-4 | must | C-2, C-7 | WP-5 | A-7 |
-| R-5 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11 |
-| R-6 | must | C-3, C-11 | WP-6, WP-8 | A-8, A-10, A-11 |
-| R-7 | must | C-11 | WP-8 | A-10, A-11 |
-| R-8 | should | C-1 | WP-1 | A-1, A-2, A-3 |
-| R-9 | should | C-11 | WP-8 | A-10, A-11 |
-| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-6, WP-8, WP-9 | A-1, A-2, A-3, A-8, A-10, A-11, A-12 |
-| R-11 | must | C-5 | WP-4 | A-6 |
-| R-12 | must | C-9, C-10 | WP-4, WP-7 | A-6, A-9 |
-| R-13 | must | C-11 | WP-8 | A-10, A-11 |
-| R-14 | must | C-11 | WP-8 | A-10, A-11 |
+| R-1 | must | C-3, C-6 | WP-4, WP-7 | A-8, A-11 |
+| R-2 | must | C-9, C-10 | WP-5, WP-8 | A-9, A-12 |
+| R-3 | must | C-3, C-8, C-12 | WP-2, WP-7, WP-10 | A-4, A-11, A-15 |
+| R-4 | must | C-2, C-7, C-13 | WP-3, WP-6 | A-5, A-6, A-7, A-10 |
+| R-5 | must | C-13 | WP-3 | A-5, A-6, A-7 |
+| R-6 | must | C-3, C-11 | WP-7, WP-9 | A-11, A-13, A-14 |
+| R-7 | must | C-11, C-13 | WP-3, WP-9 | A-5, A-6, A-7, A-13, A-14 |
+| R-8 | should | C-1, C-13 | WP-1, WP-3 | A-1, A-2, A-3, A-5, A-6, A-7 |
+| R-9 | should | C-11 | WP-9 | A-13, A-14 |
+| R-10 | must | C-1, C-3, C-11, C-12 | WP-1, WP-7, WP-9, WP-10 | A-1, A-2, A-3, A-11, A-13, A-14, A-15 |
+| R-11 | must | C-5 | WP-5 | A-9 |
+| R-12 | must | C-9, C-10 | WP-5, WP-8 | A-9, A-12 |
+| R-13 | must | C-11 | WP-9 | A-13, A-14 |
+| R-14 | must | C-11 | WP-9 | A-13, A-14 |
 | R-15 | must | C-4 | WP-1 | A-1, A-2, A-3 |
-| R-16 | should | C-11 | WP-8 | A-10, A-11 |
+| R-16 | should | C-11 | WP-9 | A-13, A-14 |
 | R-17 | should | C-1 | WP-1 | A-1, A-2, A-3 |
-| R-18 | must | C-3 | WP-6 | A-8 |
-| R-19 | must | C-3 | WP-6 | A-8 |
+| R-18 | must | C-3 | WP-7 | A-11 |
+| R-19 | must | C-3 | WP-7 | A-11 |
 
 ## Conventions
 

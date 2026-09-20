@@ -61,10 +61,12 @@ graph LR
   C_10["C-10 Scheduler"]
   C_11["C-11 Batch job"]
   C_12["C-12 Public HTTP API"]
+  C_13["C-13 Item domain"]
   C_4 -->|I-1| C_1
   C_4 -->|I-6| C_6
   C_4 -->|I-3| C_3
   C_4 -->|I-5| C_5
+  C_4 -->|I-13| C_13
   C_5 -->|I-2| C_2
   C_5 -->|I-6| C_6
   C_7 -->|I-1| C_1
@@ -81,6 +83,8 @@ graph LR
   C_12 -->|I-7| C_7
   C_12 -->|I-8| C_8
   C_12 -->|I-9| C_9
+  C_12 -->|I-13| C_13
+  C_13 -->|I-1| C_1
 ```
 
 ### C-1 — Store
@@ -112,7 +116,7 @@ graph LR
 - **kind**: module · **path**: `src/core.ts`
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-4
-- **requires**: I-1, I-6, I-3, I-5
+- **requires**: I-1, I-6, I-3, I-5, I-13
 - **satisfies**: R-1, R-3, R-6, R-9, R-19, R-21
 
 ### C-5 — Notifier
@@ -176,13 +180,21 @@ graph LR
 - **kind**: service · **path**: `src/surface_api.ts`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-12
-- **requires**: I-4, I-6, I-7, I-8, I-9
+- **requires**: I-4, I-6, I-7, I-8, I-9, I-13
 - **satisfies**: R-1, R-5, R-10, R-14, R-15, R-16
+
+### C-13 — Item domain
+
+- **kind**: module · **path**: `src/domain_item.ts`
+- **responsibility**: Owns the Item aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-1.
+- **provides**: I-13
+- **requires**: I-1
+- **satisfies**: R-1, R-5
 
 **Layers** (each layer depends only on earlier ones):
 
 0. C-1, C-2, C-3, C-6
-1. C-10, C-5, C-7, C-8
+1. C-10, C-13, C-5, C-7, C-8
 2. C-4
 3. C-9
 4. C-11, C-12
@@ -332,19 +344,20 @@ graph LR
 | `GET /skus` | `filter`: query, `page`: cursor | 200 [sku], next cursor | 401 unauthenticated | — |
 | | from R-4: Users can search stock SKU warehouses. | | | |
 
+### I-13 — Item domain interface
+
+- **kind**: module · **owner**: C-13 · **stability**: draft
+- Provided by Item domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
+
+| operation | inputs | output | errors | pre / post |
+|---|---|---|---|---|
+| `create_item` | `item`: Item | Item (id assigned) | ValidationError listing every invalid field | record is durable before return |
+| | creation of the aggregate root | | | |
+| `get_item` | `item_id`: ref | Item \| None | — | — |
+
 ## Entities
 
-### E-1 — Record (owner C-1)
-
-Generic domain record; refine per entity found in the requirements.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-| `updated_at` | timestamp |  |
-
-### E-2 — Principal (owner C-1)
+### E-1 — Principal (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -352,7 +365,7 @@ Generic domain record; refine per entity found in the requirements.
 | `kind` | enum(customer, operator, service) |  |
 | `scopes` | list[str] |  |
 
-### E-3 — JobRun (owner C-1)
+### E-2 — JobRun (owner C-1)
 
 | field | type | constraints |
 |---|---|---|
@@ -363,7 +376,7 @@ Generic domain record; refine per entity found in the requirements.
 | `status` | enum |  |
 | `report` | json |  |
 
-### E-4 — AuditEntry (owner C-3)
+### E-3 — AuditEntry (owner C-3)
 
 | field | type | constraints |
 |---|---|---|
@@ -373,22 +386,22 @@ Generic domain record; refine per entity found in the requirements.
 | `resource` | str | indexed |
 | `at` | timestamp |  |
 
-### E-5 — Item (owner C-1)
+### E-4 — Item (owner C-13)
 
-Domain entity named in the requirements ('item'); confirm the fields.
+Domain entity read from R-1.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `sku` | … | from the text |
-| `quantity` | … | from the text |
-| `warehouses` | … | from the text |
-| `bins` | … | from the text |
+| `sku` | ref | from R-1 |
+| `quantity` | int | from R-1 |
+| `warehouses` | str | from R-1 |
+| `bins` | str | from R-1 |
 | `created_at` | timestamp |  |
 
-### E-6 — Warehouse (owner C-1)
+### E-5 — Warehouse (owner C-1)
 
-Domain entity named in the requirements ('warehouse'); confirm the fields.
+Domain entity read from R-4. No fields are stated in the text beyond its name; add them.
 
 | field | type | constraints |
 |---|---|---|
@@ -776,41 +789,45 @@ _Affects:_ C-10
 ```mermaid
 graph LR
   WP_1["WP-1 Audit log (S)"]
-  WP_2["WP-2 Store + Observability (M)"]
-  WP_3["WP-3 Authentication + Scheduler (M)"]
-  WP_4["WP-4 Notifier (S)"]
-  WP_5["WP-5 Search index (S)"]
-  WP_6["WP-6 Domain core (S)"]
-  WP_7["WP-7 Import/export (S)"]
-  WP_8["WP-8 Batch job (S)"]
-  WP_9["WP-9 Public HTTP API (S)"]
+  WP_2["WP-2 Store + Observability (L)"]
+  WP_3["WP-3 Item domain (S)"]
+  WP_4["WP-4 Authentication + Scheduler (M)"]
+  WP_5["WP-5 Notifier (S)"]
+  WP_6["WP-6 Search index (S)"]
+  WP_7["WP-7 Domain core (L)"]
+  WP_8["WP-8 Import/export (S)"]
+  WP_9["WP-9 Batch job (S)"]
+  WP_10["WP-10 Public HTTP API (L)"]
   WP_2 --> WP_3
   WP_2 --> WP_4
   WP_2 --> WP_5
-  WP_1 --> WP_6
   WP_2 --> WP_6
-  WP_4 --> WP_6
-  WP_6 --> WP_7
-  WP_2 --> WP_8
-  WP_3 --> WP_8
-  WP_6 --> WP_8
+  WP_1 --> WP_7
+  WP_2 --> WP_7
+  WP_3 --> WP_7
+  WP_5 --> WP_7
   WP_7 --> WP_8
   WP_2 --> WP_9
-  WP_3 --> WP_9
-  WP_5 --> WP_9
-  WP_6 --> WP_9
+  WP_4 --> WP_9
   WP_7 --> WP_9
+  WP_8 --> WP_9
+  WP_2 --> WP_10
+  WP_3 --> WP_10
+  WP_4 --> WP_10
+  WP_6 --> WP_10
+  WP_7 --> WP_10
+  WP_8 --> WP_10
 ```
 
 **Waves** (packages in one wave may run in parallel):
 
 1. WP-1, WP-2
-2. WP-3, WP-4, WP-5
-3. WP-6
-4. WP-7
-5. WP-8, WP-9
+2. WP-3, WP-4, WP-5, WP-6
+3. WP-7
+4. WP-8
+5. WP-10, WP-9
 
-_Critical path (13 person-days):_ WP-2 → WP-4 → WP-6 → WP-7 → WP-9
+_Critical path (34 person-days):_ WP-2 → WP-5 → WP-7 → WP-8 → WP-10
 
 ### WP-1 — Audit log (S)
 
@@ -823,7 +840,7 @@ Implement Audit log: Append-only record of who did what to which resource, query
   - A-1 (test) unit tests of Audit log pass — `npx vitest run tests/audit.test.ts`
 - **notes**: family: audit_log
 
-### WP-2 — Store + Observability (M)
+### WP-2 — Store + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -837,7 +854,19 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-5 (metric) R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-8
 - **notes**: family: infra
 
-### WP-3 — Authentication + Scheduler (M)
+### WP-3 — Item domain (S)
+
+Implement Item domain: Owns the Item aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-1.
+
+- **components**: C-13 · **implements**: I-13
+- **depends on**: WP-2 · **satisfies**: R-1, R-5
+- **write scope**: `src/domain_item.ts`, `tests/domain_item.test.ts`
+- **acceptance**:
+  - A-6 (test) unit tests of Item domain pass — `npx vitest run tests/domain_item.test.ts`
+  - A-7 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
+- **notes**: family: aggregate:domain_item
+
+### WP-4 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -845,10 +874,10 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-2 · **satisfies**: R-11, R-13, R-20
 - **write scope**: `src/auth.ts`, `tests/auth.test.ts`, `src/scheduler.ts`, `tests/scheduler.test.ts`
 - **acceptance**:
-  - A-6 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
+  - A-8 (test) unit tests of Authentication, Scheduler pass — `npx vitest run tests/auth.test.ts tests/scheduler.test.ts`
 - **notes**: family: infra
 
-### WP-4 — Notifier (S)
+### WP-5 — Notifier (S)
 
 Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
 
@@ -856,10 +885,10 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-2 · **satisfies**: R-2
 - **write scope**: `src/notifier.ts`, `tests/notifier.test.ts`
 - **acceptance**:
-  - A-7 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
+  - A-9 (test) unit tests of Notifier pass — `npx vitest run tests/notifier.test.ts`
 - **notes**: family: notification
 
-### WP-5 — Search index (S)
+### WP-6 — Search index (S)
 
 Implement Search index: Full-text and filtered queries over the indexed entities.
 
@@ -867,82 +896,82 @@ Implement Search index: Full-text and filtered queries over the indexed entities
 - **depends on**: WP-2 · **satisfies**: R-4, R-5, R-14
 - **write scope**: `src/search.ts`, `tests/search.test.ts`
 - **acceptance**:
-  - A-8 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
-  - A-9 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
+  - A-10 (test) unit tests of Search index pass — `npx vitest run tests/search.test.ts`
+  - A-11 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
 - **notes**: family: search
 
-### WP-6 — Domain core (S)
+### WP-7 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-4 · **implements**: I-4
-- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-1, R-3, R-6, R-9, R-19, R-21
+- **depends on**: WP-1, WP-2, WP-3, WP-5 · **satisfies**: R-1, R-3, R-6, R-9, R-19, R-21
 - **write scope**: `src/core.ts`, `tests/core.test.ts`
 - **acceptance**:
-  - A-10 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
-  - A-11 (metric) R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-6
+  - A-12 (test) unit tests of Domain core pass — `npx vitest run tests/core.test.ts`
+  - A-13 (metric) R-6: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-6
 - **notes**: family: crud_api
 
-### WP-7 — Import/export (S)
+### WP-8 — Import/export (S)
 
 Implement Import/export: Streams records to and from CSV/JSON with validation and partial-failure reporting.
 
 - **components**: C-9 · **implements**: I-9
-- **depends on**: WP-6 · **satisfies**: R-3, R-8
+- **depends on**: WP-7 · **satisfies**: R-3, R-8
 - **write scope**: `src/exporter.ts`, `tests/exporter.test.ts`
 - **acceptance**:
-  - A-12 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
-  - A-13 (metric) R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-8
+  - A-14 (test) unit tests of Import/export pass — `npx vitest run tests/exporter.test.ts`
+  - A-15 (metric) R-8: required metrics exposed = all listed — the listed metrics are exposed and change under a smoke workload — metric R-8
 - **notes**: family: import_export
 
-### WP-8 — Batch job (S)
+### WP-9 — Batch job (S)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-11 · **implements**: I-11
-- **depends on**: WP-2, WP-3, WP-6, WP-7 · **satisfies**: R-11
+- **depends on**: WP-2, WP-4, WP-7, WP-8 · **satisfies**: R-11
 - **write scope**: `src/batch.ts`, `tests/batch.test.ts`
 - **acceptance**:
-  - A-14 (test) unit tests of Batch job pass — `npx vitest run tests/batch.test.ts`
+  - A-16 (test) unit tests of Batch job pass — `npx vitest run tests/batch.test.ts`
 - **notes**: family: batch_pipeline
 
-### WP-9 — Public HTTP API (S)
+### WP-10 — Public HTTP API (L)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-12 · **implements**: I-12
-- **depends on**: WP-2, WP-3, WP-5, WP-6, WP-7 · **satisfies**: R-1, R-5, R-10, R-14, R-15, R-16
+- **depends on**: WP-2, WP-3, WP-4, WP-6, WP-7, WP-8 · **satisfies**: R-1, R-5, R-10, R-14, R-15, R-16
 - **write scope**: `src/surface_api.ts`, `tests/surface_api.test.ts`
 - **acceptance**:
-  - A-15 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
-  - A-16 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
+  - A-17 (test) unit tests of Public HTTP API pass — `npx vitest run tests/surface_api.test.ts`
+  - A-18 (metric) R-5: p95 latency at 200000 <= 300 ms — load test at the stated rate; the stated percentile must meet the target — metric R-5
 - **notes**: family: crud_api
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-4, C-12 | WP-6, WP-9 | A-10, A-11, A-15, A-16 |
-| R-2 | must | C-2, C-5 | WP-4 | A-7 |
-| R-3 | must | C-4, C-9 | WP-6, WP-7 | A-10, A-11, A-12, A-13 |
-| R-4 | must | C-8 | WP-5 | A-8, A-9 |
-| R-5 | must | C-8, C-12 | WP-5, WP-9 | A-8, A-9, A-15, A-16 |
-| R-6 | must | C-1, C-4 | WP-2, WP-6 | A-2, A-3, A-4, A-5, A-10, A-11 |
+| R-1 | must | C-4, C-12, C-13 | WP-3, WP-7, WP-10 | A-6, A-7, A-12, A-13, A-17, A-18 |
+| R-2 | must | C-2, C-5 | WP-5 | A-9 |
+| R-3 | must | C-4, C-9 | WP-7, WP-8 | A-12, A-13, A-14, A-15 |
+| R-4 | must | C-8 | WP-6 | A-10, A-11 |
+| R-5 | must | C-8, C-12, C-13 | WP-3, WP-6, WP-10 | A-6, A-7, A-10, A-11, A-17, A-18 |
+| R-6 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-12, A-13 |
 | R-7 | must | C-6 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-8 | must | C-6, C-9 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-12, A-13 |
-| R-9 | must | C-1, C-4 | WP-2, WP-6 | A-2, A-3, A-4, A-5, A-10, A-11 |
-| R-10 | must | C-12 | WP-9 | A-15, A-16 |
-| R-11 | must | C-10, C-11 | WP-3, WP-8 | A-6, A-14 |
+| R-8 | must | C-6, C-9 | WP-2, WP-8 | A-2, A-3, A-4, A-5, A-14, A-15 |
+| R-9 | must | C-1, C-4 | WP-2, WP-7 | A-2, A-3, A-4, A-5, A-12, A-13 |
+| R-10 | must | C-12 | WP-10 | A-17, A-18 |
+| R-11 | must | C-10, C-11 | WP-4, WP-9 | A-8, A-16 |
 | R-12 | must | C-3 | WP-1 | A-1 |
-| R-13 | must | C-7 | WP-3 | A-6 |
-| R-14 | must | C-8, C-12 | WP-5, WP-9 | A-8, A-9, A-15, A-16 |
-| R-15 | must | C-12 | WP-9 | A-15, A-16 |
-| R-16 | should | C-12 | WP-9 | A-15, A-16 |
+| R-13 | must | C-7 | WP-4 | A-8 |
+| R-14 | must | C-8, C-12 | WP-6, WP-10 | A-10, A-11, A-17, A-18 |
+| R-15 | must | C-12 | WP-10 | A-17, A-18 |
+| R-16 | should | C-12 | WP-10 | A-17, A-18 |
 | R-17 | must | C-6 | WP-2 | A-2, A-3, A-4, A-5 |
 | R-18 | should | C-1 | WP-2 | A-2, A-3, A-4, A-5 |
-| R-19 | must | C-4 | WP-6 | A-10, A-11 |
-| R-20 | must | C-7 | WP-3 | A-6 |
-| R-21 | must | C-4 | WP-6 | A-10, A-11 |
+| R-19 | must | C-4 | WP-7 | A-12, A-13 |
+| R-20 | must | C-7 | WP-4 | A-8 |
+| R-21 | must | C-4 | WP-7 | A-12, A-13 |
 
 ## Conventions
 

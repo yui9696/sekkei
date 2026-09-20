@@ -282,11 +282,10 @@
         "I-9",
         "I-3",
         "I-11",
-        "I-5"
+        "I-5",
+        "I-16"
       ],
       "satisfies": [
-        "R-1",
-        "R-10",
         "R-2",
         "R-3",
         "R-5",
@@ -490,11 +489,10 @@
         "I-6",
         "I-7",
         "I-8",
-        "I-10"
+        "I-10",
+        "I-16"
       ],
       "satisfies": [
-        "R-1",
-        "R-10",
         "R-8",
         "R-9",
         "R-17",
@@ -503,6 +501,29 @@
       "tags": [
         "layer:3",
         "archetype:surface_api"
+      ]
+    },
+    {
+      "id": "C-16",
+      "name": "Document domain",
+      "responsibility": "Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.",
+      "kind": "module",
+      "path": "app/domain_document.py",
+      "requires": [
+        "I-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-4",
+        "R-6",
+        "R-8",
+        "R-10"
+      ],
+      "tags": [
+        "layer:1",
+        "archetype:domain_document",
+        "aggregate"
       ]
     }
   ],
@@ -1494,37 +1515,53 @@
       ],
       "stability": "draft",
       "description": "Provided by Public HTTP API. "
+    },
+    {
+      "id": "I-16",
+      "name": "Document domain interface",
+      "owner": "C-16",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "create_document",
+          "inputs": [
+            {
+              "name": "document",
+              "type": "Document",
+              "description": ""
+            }
+          ],
+          "output": "Document (id assigned)",
+          "errors": [
+            "ValidationError listing every invalid field"
+          ],
+          "pre": "",
+          "post": "record is durable before return",
+          "description": "creation of the aggregate root"
+        },
+        {
+          "name": "get_document",
+          "inputs": [
+            {
+              "name": "document_id",
+              "type": "ref",
+              "description": ""
+            }
+          ],
+          "output": "Document | None",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": "Provided by Document domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
     {
       "id": "E-1",
-      "name": "Record",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        },
-        {
-          "name": "updated_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Generic domain record; refine per entity found in the requirements."
-    },
-    {
-      "id": "E-2",
       "name": "Principal",
       "owner": "C-1",
       "fields": [
@@ -1550,7 +1587,7 @@
       "description": ""
     },
     {
-      "id": "E-3",
+      "id": "E-2",
       "name": "File",
       "owner": "C-3",
       "fields": [
@@ -1582,7 +1619,7 @@
       "description": ""
     },
     {
-      "id": "E-4",
+      "id": "E-3",
       "name": "JobRun",
       "owner": "C-1",
       "fields": [
@@ -1626,7 +1663,7 @@
       "description": ""
     },
     {
-      "id": "E-5",
+      "id": "E-4",
       "name": "ReportRun",
       "owner": "C-1",
       "fields": [
@@ -1670,8 +1707,54 @@
       "description": ""
     },
     {
-      "id": "E-6",
+      "id": "E-5",
       "name": "Document",
+      "owner": "C-16",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity read from R-2, R-6. No fields are stated in the text beyond its name; add them."
+    },
+    {
+      "id": "E-6",
+      "name": "Upload",
+      "owner": "C-1",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "constraints": "primary key",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(acknowledged)",
+          "constraints": "state machine read from R-9",
+          "description": ""
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp",
+          "constraints": "",
+          "description": ""
+        }
+      ],
+      "description": "Domain entity read from R-9. No fields are stated in the text beyond its name; add them."
+    },
+    {
+      "id": "E-7",
+      "name": "Passage",
       "owner": "C-1",
       "fields": [
         {
@@ -1687,7 +1770,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('document'); confirm the fields."
+      "description": "Domain entity read from R-4. No fields are stated in the text beyond its name; add them."
     }
   ],
   "flows": [
@@ -2675,7 +2758,7 @@
         "app/ratelimit.py",
         "tests/test_ratelimit.py"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-3",
@@ -2781,6 +2864,50 @@
     },
     {
       "id": "WP-5",
+      "title": "Document domain",
+      "goal": "Implement Document domain: Owns the Document aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Read from R-2, R-6.",
+      "components": [
+        "C-16"
+      ],
+      "implements": [
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-2"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-4",
+        "R-6",
+        "R-8",
+        "R-10"
+      ],
+      "files": [
+        "app/domain_document.py",
+        "tests/test_domain_document.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-10",
+          "description": "unit tests of Document domain pass",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_domain_document.py",
+          "metric": ""
+        },
+        {
+          "id": "A-11",
+          "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-8"
+        }
+      ],
+      "notes": "family: aggregate:domain_document"
+    },
+    {
+      "id": "WP-6",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
@@ -2809,7 +2936,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-12",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_auth.py tests/test_scheduler.py",
@@ -2819,7 +2946,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-6",
+      "id": "WP-7",
       "title": "Notifier",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
@@ -2841,7 +2968,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-13",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_notifier.py",
@@ -2851,7 +2978,7 @@
       "notes": "family: notification"
     },
     {
-      "id": "WP-7",
+      "id": "WP-8",
       "title": "Reporting",
       "goal": "Implement Reporting: Builds read models and aggregates (daily/weekly figures, KPIs) on a schedule or on demand; serves them to dashboards and exports.",
       "components": [
@@ -2873,7 +3000,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-14",
           "description": "unit tests of Reporting pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_reporting.py",
@@ -2883,7 +3010,7 @@
       "notes": "family: reporting"
     },
     {
-      "id": "WP-8",
+      "id": "WP-9",
       "title": "Search index",
       "goal": "Implement Search index: Full-text and filtered queries over the indexed entities.",
       "components": [
@@ -2907,24 +3034,24 @@
         "app/search.py",
         "tests/test_search.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-13",
+          "id": "A-15",
           "description": "unit tests of Search index pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_search.py",
           "metric": ""
         },
         {
-          "id": "A-14",
+          "id": "A-16",
           "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-15",
+          "id": "A-17",
           "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
@@ -2934,7 +3061,7 @@
       "notes": "family: search"
     },
     {
-      "id": "WP-9",
+      "id": "WP-10",
       "title": "Domain core",
       "goal": "Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.",
       "components": [
@@ -2948,14 +3075,13 @@
         "WP-2",
         "WP-3",
         "WP-4",
-        "WP-6"
+        "WP-5",
+        "WP-7"
       ],
       "satisfies": [
-        "R-1",
         "R-2",
         "R-3",
         "R-5",
-        "R-10",
         "R-11",
         "R-12",
         "R-21",
@@ -2965,10 +3091,10 @@
         "app/core.py",
         "tests/test_core.py"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-16",
+          "id": "A-18",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_core.py",
@@ -2978,7 +3104,7 @@
       "notes": "family: crud_api"
     },
     {
-      "id": "WP-10",
+      "id": "WP-11",
       "title": "Batch job",
       "goal": "Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.",
       "components": [
@@ -2989,8 +3115,8 @@
       ],
       "depends_on": [
         "WP-2",
-        "WP-5",
-        "WP-9"
+        "WP-6",
+        "WP-10"
       ],
       "satisfies": [
         "R-7",
@@ -3003,7 +3129,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-17",
+          "id": "A-19",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_batch.py",
@@ -3013,7 +3139,7 @@
       "notes": "family: batch_pipeline"
     },
     {
-      "id": "WP-11",
+      "id": "WP-12",
       "title": "Public HTTP API",
       "goal": "Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.",
       "components": [
@@ -3025,14 +3151,13 @@
       "depends_on": [
         "WP-2",
         "WP-5",
-        "WP-8",
-        "WP-9"
+        "WP-6",
+        "WP-9",
+        "WP-10"
       ],
       "satisfies": [
-        "R-1",
         "R-8",
         "R-9",
-        "R-10",
         "R-17",
         "R-20"
       ],
@@ -3040,24 +3165,24 @@
         "app/surface_api.py",
         "tests/test_surface_api.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-18",
+          "id": "A-20",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "python -m pytest -q tests/test_surface_api.py",
           "metric": ""
         },
         {
-          "id": "A-19",
+          "id": "A-21",
           "description": "R-8: p95 latency at 50,000 <= 800 ms — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",
           "metric": "R-8"
         },
         {
-          "id": "A-20",
+          "id": "A-22",
           "description": "R-9: latency <= 1 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

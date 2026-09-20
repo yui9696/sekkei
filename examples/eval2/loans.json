@@ -2007,26 +2007,6 @@
     },
     {
       "id": "E-7",
-      "name": "Document",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('document'); confirm the fields."
-    },
-    {
-      "id": "E-8",
       "name": "Loan",
       "owner": "C-1",
       "fields": [
@@ -2037,23 +2017,9 @@
           "description": ""
         },
         {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('loan'); confirm the fields."
-    },
-    {
-      "id": "E-9",
-      "name": "Status",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
+          "name": "status",
+          "type": "enum(approved)",
+          "constraints": "state machine read from R-5",
           "description": ""
         },
         {
@@ -2063,7 +2029,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('status'); confirm the fields."
+      "description": "Domain entity read from R-5. No fields are stated in the text beyond its name; add them."
     }
   ],
   "flows": [
@@ -3183,7 +3149,7 @@
         "app/observability.py",
         "tests/test_observability.py"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-3",
@@ -3411,7 +3377,7 @@
         "app/core.py",
         "tests/test_core.py"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-11",
@@ -3591,7 +3557,7 @@
         "app/surface_api.py",
         "tests/test_surface_api.py"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
           "id": "A-17",

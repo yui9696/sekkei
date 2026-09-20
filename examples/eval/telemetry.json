@@ -321,7 +321,6 @@
         "I-16"
       ],
       "satisfies": [
-        "R-3",
         "R-1",
         "R-5",
         "R-7",
@@ -462,10 +461,10 @@
         "I-7",
         "I-9",
         "I-10",
-        "I-11"
+        "I-11",
+        "I-16"
       ],
       "satisfies": [
-        "R-3",
         "R-6",
         "R-9",
         "R-13",
@@ -498,20 +497,26 @@
     },
     {
       "id": "C-16",
-      "name": "Readings processor",
-      "responsibility": "Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
+      "name": "Reading domain",
+      "responsibility": "Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
       "kind": "module",
-      "path": "src/main/java/app/ReadingsProcessor.java",
+      "path": "src/main/java/app/DomainReading.java",
       "requires": [
-        "I-9"
+        "I-1"
       ],
       "satisfies": [
-        "R-2"
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-5",
+        "R-6",
+        "R-7",
+        "R-8"
       ],
       "tags": [
         "layer:1",
-        "archetype:readings_processor",
-        "synthesised"
+        "archetype:domain_reading",
+        "aggregate"
       ]
     }
   ],
@@ -1397,64 +1402,63 @@
     },
     {
       "id": "I-16",
-      "name": "Readings processor interface",
+      "name": "Reading domain interface",
       "owner": "C-16",
       "kind": "module",
       "operations": [
         {
-          "name": "validate_readings",
+          "name": "publish_reading",
           "inputs": [
             {
-              "name": "readings",
-              "type": "list[Reading]",
+              "name": "reading_id",
+              "type": "ref",
               "description": ""
             }
           ],
-          "output": "list[Reading] (validated)",
+          "output": "Reading (status = published)",
           "errors": [
-            "…"
+            "NotFound",
+            "InvalidTransition (not allowed from the current status)"
           ],
           "pre": "",
-          "post": "",
-          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+          "post": "status = published",
+          "description": "from R-1"
         },
         {
-          "name": "drop_duplicates",
+          "name": "create_reading",
           "inputs": [
             {
-              "name": "duplicates",
-              "type": "list[Duplicate]",
+              "name": "reading",
+              "type": "Reading",
               "description": ""
             }
           ],
-          "output": "…",
+          "output": "Reading (id assigned)",
           "errors": [
-            "…"
+            "ValidationError listing every invalid field"
           ],
           "pre": "",
-          "post": "",
-          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+          "post": "durability: no reading lost",
+          "description": "creation of the aggregate root"
         },
         {
-          "name": "store",
+          "name": "get_reading",
           "inputs": [
             {
-              "name": "input",
-              "type": "…",
+              "name": "reading_id",
+              "type": "ref",
               "description": ""
             }
           ],
-          "output": "…",
-          "errors": [
-            "…"
-          ],
+          "output": "Reading | None",
+          "errors": [],
           "pre": "",
           "post": "",
-          "description": "from R-2: The service validates readings, drops duplicates, and stores them."
+          "description": ""
         }
       ],
       "stability": "draft",
-      "description": "Provided by Readings processor. Contract derived from R-2; fill in the types marked '…'."
+      "description": "Provided by Reading domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them."
     }
   ],
   "entities": [
@@ -1612,28 +1616,8 @@
     },
     {
       "id": "E-5",
-      "name": "Duplicate",
-      "owner": "C-1",
-      "fields": [
-        {
-          "name": "id",
-          "type": "uuid",
-          "constraints": "primary key",
-          "description": ""
-        },
-        {
-          "name": "created_at",
-          "type": "timestamp",
-          "constraints": "",
-          "description": ""
-        }
-      ],
-      "description": "Domain entity named in the requirements ('duplicate'); confirm the fields."
-    },
-    {
-      "id": "E-6",
       "name": "Reading",
-      "owner": "C-1",
+      "owner": "C-16",
       "fields": [
         {
           "name": "id",
@@ -1643,26 +1627,32 @@
         },
         {
           "name": "speed",
-          "type": "…",
-          "constraints": "from the text",
+          "type": "str",
+          "constraints": "from R-1",
           "description": ""
         },
         {
           "name": "fuel_level",
-          "type": "…",
-          "constraints": "from the text",
+          "type": "int",
+          "constraints": "from R-1",
           "description": ""
         },
         {
           "name": "engine_temperature",
-          "type": "…",
-          "constraints": "from the text",
+          "type": "str",
+          "constraints": "from R-1",
           "description": ""
         },
         {
           "name": "position",
-          "type": "…",
-          "constraints": "from the text",
+          "type": "address",
+          "constraints": "from R-1",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "type": "enum(published)",
+          "constraints": "state machine read from R-1",
           "description": ""
         },
         {
@@ -1672,7 +1662,7 @@
           "description": ""
         }
       ],
-      "description": "Domain entity named in the requirements ('reading'); confirm the fields."
+      "description": "Domain entity read from R-1, R-2. Invariant (R-7): durability: no reading lost."
     }
   ],
   "flows": [
@@ -2604,7 +2594,7 @@
         "src/main/java/app/Observability.java",
         "src/test/java/app/ObservabilityTest.java"
       ],
-      "size": "M",
+      "size": "L",
       "acceptance": [
         {
           "id": "A-1",
@@ -2632,6 +2622,58 @@
     },
     {
       "id": "WP-2",
+      "title": "Reading domain",
+      "goal": "Implement Reading domain: Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.",
+      "components": [
+        "C-16"
+      ],
+      "implements": [
+        "I-16"
+      ],
+      "depends_on": [
+        "WP-1"
+      ],
+      "satisfies": [
+        "R-1",
+        "R-2",
+        "R-3",
+        "R-5",
+        "R-6",
+        "R-7",
+        "R-8"
+      ],
+      "files": [
+        "src/main/java/app/DomainReading.java",
+        "src/test/java/app/DomainReadingTest.java"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-4",
+          "description": "unit tests of Reading domain pass",
+          "kind": "test",
+          "command": "./gradlew test --tests app.DomainReadingTest",
+          "metric": ""
+        },
+        {
+          "id": "A-5",
+          "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-6"
+        },
+        {
+          "id": "A-6",
+          "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
+          "kind": "metric",
+          "command": "",
+          "metric": "R-7"
+        }
+      ],
+      "notes": "family: aggregate:domain_reading"
+    },
+    {
+      "id": "WP-3",
       "title": "Authentication + Scheduler",
       "goal": "Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.",
       "components": [
@@ -2662,7 +2704,7 @@
       "size": "M",
       "acceptance": [
         {
-          "id": "A-4",
+          "id": "A-7",
           "description": "unit tests of Authentication, Scheduler pass",
           "kind": "test",
           "command": "./gradlew test --tests app.AuthTest",
@@ -2672,7 +2714,7 @@
       "notes": "family: infra"
     },
     {
-      "id": "WP-3",
+      "id": "WP-4",
       "title": "Notifier",
       "goal": "Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.",
       "components": [
@@ -2694,7 +2736,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-5",
+          "id": "A-8",
           "description": "unit tests of Notifier pass",
           "kind": "test",
           "command": "./gradlew test --tests app.NotifierTest",
@@ -2702,38 +2744,6 @@
         }
       ],
       "notes": "family: notification"
-    },
-    {
-      "id": "WP-4",
-      "title": "Readings processor",
-      "goal": "Implement Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.",
-      "components": [
-        "C-16"
-      ],
-      "implements": [
-        "I-16"
-      ],
-      "depends_on": [
-        "WP-1"
-      ],
-      "satisfies": [
-        "R-2"
-      ],
-      "files": [
-        "src/main/java/app/ReadingsProcessor.java",
-        "src/test/java/app/ReadingsProcessorTest.java"
-      ],
-      "size": "S",
-      "acceptance": [
-        {
-          "id": "A-6",
-          "description": "unit tests of Readings processor pass",
-          "kind": "test",
-          "command": "./gradlew test --tests app.ReadingsProcessorTest",
-          "metric": ""
-        }
-      ],
-      "notes": "family: synthesised:readings_processor"
     },
     {
       "id": "WP-5",
@@ -2747,12 +2757,11 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-3",
+        "WP-2",
         "WP-4"
       ],
       "satisfies": [
         "R-1",
-        "R-3",
         "R-5",
         "R-7",
         "R-9",
@@ -2764,17 +2773,17 @@
         "src/main/java/app/Core.java",
         "src/test/java/app/CoreTest.java"
       ],
-      "size": "S",
+      "size": "L",
       "acceptance": [
         {
-          "id": "A-7",
+          "id": "A-9",
           "description": "unit tests of Domain core pass",
           "kind": "test",
           "command": "./gradlew test --tests app.CoreTest",
           "metric": ""
         },
         {
-          "id": "A-8",
+          "id": "A-10",
           "description": "R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update",
           "kind": "metric",
           "command": "",
@@ -2807,7 +2816,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-9",
+          "id": "A-11",
           "description": "unit tests of MQTT consumer pass",
           "kind": "test",
           "command": "./gradlew test --tests app.MqttConsumerTest",
@@ -2839,7 +2848,7 @@
       "size": "S",
       "acceptance": [
         {
-          "id": "A-10",
+          "id": "A-12",
           "description": "unit tests of Import/export pass",
           "kind": "test",
           "command": "./gradlew test --tests app.ExporterTest",
@@ -2860,7 +2869,7 @@
       ],
       "depends_on": [
         "WP-1",
-        "WP-2",
+        "WP-3",
         "WP-5",
         "WP-7"
       ],
@@ -2874,10 +2883,10 @@
         "src/main/java/app/Batch.java",
         "src/test/java/app/BatchTest.java"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-11",
+          "id": "A-13",
           "description": "unit tests of Batch job pass",
           "kind": "test",
           "command": "./gradlew test --tests app.BatchTest",
@@ -2899,11 +2908,11 @@
       "depends_on": [
         "WP-1",
         "WP-2",
+        "WP-3",
         "WP-5",
         "WP-7"
       ],
       "satisfies": [
-        "R-3",
         "R-6",
         "R-9",
         "R-13",
@@ -2913,17 +2922,17 @@
         "src/main/java/app/SurfaceApi.java",
         "src/test/java/app/SurfaceApiTest.java"
       ],
-      "size": "S",
+      "size": "M",
       "acceptance": [
         {
-          "id": "A-12",
+          "id": "A-14",
           "description": "unit tests of Public HTTP API pass",
           "kind": "test",
           "command": "./gradlew test --tests app.SurfaceApiTest",
           "metric": ""
         },
         {
-          "id": "A-13",
+          "id": "A-15",
           "description": "R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target",
           "kind": "metric",
           "command": "",

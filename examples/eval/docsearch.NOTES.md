@@ -23,8 +23,8 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 | requirement | owner(s) | how | detail |
 |---|---|---|---|
-| R-1 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'employee': a use case |
-| R-10 | C-15 Public HTTP API, C-4 Domain core | surface+core | human actor 'member': a use case |
+| R-1 | C-16 Document domain | aggregate | the sentence speaks of document, owned by Document domain |
+| R-10 | C-16 Document domain | aggregate | the sentence speaks of document, owned by Document domain |
 
 ## 2. Capacity estimates
 
@@ -44,11 +44,11 @@ Each answer is a proposed decision in the design and a bullet in the augmented r
 
 ## 3. Effort and schedule
 
-- Total effort: **28 person-days**; critical path **12 days**; with a team of 3: **about 14 working days** (3 weeks).
+- Total effort: **52 person-days**; critical path **30 days**; with a team of 3: **about 32 working days** (7 weeks).
 - Wave 1: WP-1, WP-2, WP-3, WP-4
-- Wave 2: WP-5, WP-6, WP-7, WP-8
-- Wave 3: WP-9
-- Wave 4: WP-10, WP-11
+- Wave 2: WP-5, WP-6, WP-7, WP-8, WP-9
+- Wave 3: WP-10
+- Wave 4: WP-11, WP-12
 - Assumption: Package sizes S/M/L = 2/5/10 person-days (assumption).
 - Assumption: Team of 3; packages in one wave run in parallel up to the team size; a wave lasts max(longest package, person-days ÷ team) and waves run one after another.
 
@@ -103,7 +103,17 @@ These are kept as requirements and assigned to the generic core/surface; refine 
 
 ### Notes
 
-- 15 components for a team of 3; consider merging adjacent layers.
+- 16 components for a team of 3; consider merging adjacent layers.
+
+## 5b. Domain model read from the text
+
+Entities with the fields, relations, state machines and invariants the sentences state (nothing inferred beyond the text); each aggregate is a component. Dispute any row by its requirement ids.
+
+| entity | fields (type) | relations | states | invariants | from |
+|---|---|---|---|---|---|
+| Document | — | — | — | — | R-2, R-6 |
+| Upload | — | — | acknowledged | — | R-9 |
+| Passage | — | — | — | — | R-4 |
 
 ## 6. How the text was read
 

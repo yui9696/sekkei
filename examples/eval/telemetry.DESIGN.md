@@ -58,7 +58,7 @@ graph LR
   C_13["C-13 Batch job"]
   C_14["C-14 Public HTTP API"]
   C_15["C-15 MQTT consumer"]
-  C_16["C-16 Readings processor"]
+  C_16["C-16 Reading domain"]
   C_7 -->|I-1| C_1
   C_7 -->|I-9| C_9
   C_7 -->|I-8| C_8
@@ -81,11 +81,12 @@ graph LR
   C_14 -->|I-9| C_9
   C_14 -->|I-10| C_10
   C_14 -->|I-11| C_11
+  C_14 -->|I-16| C_16
   C_15 -->|I-7| C_7
   C_15 -->|I-2| C_2
   C_15 -->|I-4| C_4
   C_15 -->|I-9| C_9
-  C_16 -->|I-9| C_9
+  C_16 -->|I-1| C_1
 ```
 
 ### C-1 — Store
@@ -142,7 +143,7 @@ graph LR
 - **responsibility**: Business rules and validation for the domain entities; the only module that changes state through the store.
 - **provides**: I-7
 - **requires**: I-1, I-9, I-8, I-16
-- **satisfies**: R-3, R-1, R-5, R-7, R-9, R-10, R-19, R-20
+- **satisfies**: R-1, R-5, R-7, R-9, R-10, R-19, R-20
 
 ### C-8 — Notifier
 
@@ -197,8 +198,8 @@ graph LR
 - **kind**: service · **path**: `src/main/java/app/SurfaceApi.java`
 - **responsibility**: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 - **provides**: I-14
-- **requires**: I-7, I-9, I-10, I-11
-- **satisfies**: R-3, R-6, R-9, R-13, R-15
+- **requires**: I-7, I-9, I-10, I-11, I-16
+- **satisfies**: R-6, R-9, R-13, R-15
 
 ### C-15 — MQTT consumer
 
@@ -208,13 +209,13 @@ graph LR
 - **requires**: I-7, I-2, I-4, I-9
 - **satisfies**: R-1
 
-### C-16 — Readings processor
+### C-16 — Reading domain
 
-- **kind**: module · **path**: `src/main/java/app/ReadingsProcessor.java`
-- **responsibility**: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.
+- **kind**: module · **path**: `src/main/java/app/DomainReading.java`
+- **responsibility**: Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.
 - **provides**: I-16
-- **requires**: I-9
-- **satisfies**: R-2
+- **requires**: I-1
+- **satisfies**: R-1, R-2, R-3, R-5, R-6, R-7, R-8
 
 **Layers** (each layer depends only on earlier ones):
 
@@ -395,19 +396,18 @@ graph LR
 |---|---|---|---|---|
 | `on_message` | `topic`: str, `payload`: bytes, `message_id`: str | None | ValidationError -> dead-letter topic | reading persisted (idempotent on message_id) before the broker ack |
 
-### I-16 — Readings processor interface
+### I-16 — Reading domain interface
 
 - **kind**: module · **owner**: C-16 · **stability**: draft
-- Provided by Readings processor. Contract derived from R-2; fill in the types marked '…'.
+- Provided by Reading domain. Operations are the state transitions and creations the requirements name; add queries as the surfaces need them.
 
 | operation | inputs | output | errors | pre / post |
 |---|---|---|---|---|
-| `validate_readings` | `readings`: list[Reading] | list[Reading] (validated) | … | — |
-| | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
-| `drop_duplicates` | `duplicates`: list[Duplicate] | … | … | — |
-| | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
-| `store` | `input`: … | … | … | — |
-| | from R-2: The service validates readings, drops duplicates, and stores them. | | | |
+| `publish_reading` | `reading_id`: ref | Reading (status = published) | NotFound, InvalidTransition (not allowed from the current status) | status = published |
+| | from R-1 | | | |
+| `create_reading` | `reading`: Reading | Reading (id assigned) | ValidationError listing every invalid field | durability: no reading lost |
+| | creation of the aggregate root | | | |
+| `get_reading` | `reading_id`: ref | Reading \| None | — | — |
 
 ## Entities
 
@@ -451,26 +451,18 @@ graph LR
 | `not_before` | timestamp | indexed |
 | `leased_until` | timestamp \| null |  |
 
-### E-5 — Duplicate (owner C-1)
+### E-5 — Reading (owner C-16)
 
-Domain entity named in the requirements ('duplicate'); confirm the fields.
-
-| field | type | constraints |
-|---|---|---|
-| `id` | uuid | primary key |
-| `created_at` | timestamp |  |
-
-### E-6 — Reading (owner C-1)
-
-Domain entity named in the requirements ('reading'); confirm the fields.
+Domain entity read from R-1, R-2. Invariant (R-7): durability: no reading lost.
 
 | field | type | constraints |
 |---|---|---|
 | `id` | uuid | primary key |
-| `speed` | … | from the text |
-| `fuel_level` | … | from the text |
-| `engine_temperature` | … | from the text |
-| `position` | … | from the text |
+| `speed` | str | from R-1 |
+| `fuel_level` | int | from R-1 |
+| `engine_temperature` | str | from R-1 |
+| `position` | address | from R-1 |
+| `status` | enum(published) | state machine read from R-1 |
 | `created_at` | timestamp |  |
 
 ## Flows
@@ -857,30 +849,31 @@ _Affects:_ C-9
 
 ```mermaid
 graph LR
-  WP_1["WP-1 Store + Work queue + Observability (M)"]
-  WP_2["WP-2 Authentication + Scheduler (M)"]
-  WP_3["WP-3 Notifier (S)"]
-  WP_4["WP-4 Readings processor (S)"]
-  WP_5["WP-5 Domain core (S)"]
+  WP_1["WP-1 Store + Work queue + Observability (L)"]
+  WP_2["WP-2 Reading domain (M)"]
+  WP_3["WP-3 Authentication + Scheduler (M)"]
+  WP_4["WP-4 Notifier (S)"]
+  WP_5["WP-5 Domain core (L)"]
   WP_6["WP-6 MQTT consumer (S)"]
   WP_7["WP-7 Import/export (S)"]
-  WP_8["WP-8 Batch job (S)"]
-  WP_9["WP-9 Public HTTP API (S)"]
+  WP_8["WP-8 Batch job (M)"]
+  WP_9["WP-9 Public HTTP API (M)"]
   WP_1 --> WP_2
   WP_1 --> WP_3
   WP_1 --> WP_4
   WP_1 --> WP_5
-  WP_3 --> WP_5
+  WP_2 --> WP_5
   WP_4 --> WP_5
   WP_1 --> WP_6
   WP_5 --> WP_6
   WP_5 --> WP_7
   WP_1 --> WP_8
-  WP_2 --> WP_8
+  WP_3 --> WP_8
   WP_5 --> WP_8
   WP_7 --> WP_8
   WP_1 --> WP_9
   WP_2 --> WP_9
+  WP_3 --> WP_9
   WP_5 --> WP_9
   WP_7 --> WP_9
 ```
@@ -893,9 +886,9 @@ graph LR
 4. WP-6, WP-7
 5. WP-8, WP-9
 
-_Critical path (13 person-days):_ WP-1 → WP-4 → WP-5 → WP-7 → WP-9
+_Critical path (32 person-days):_ WP-1 → WP-2 → WP-5 → WP-7 → WP-9
 
-### WP-1 — Store + Work queue + Observability (M)
+### WP-1 — Store + Work queue + Observability (L)
 
 Implement Store: Owns persistence of the domain entities: durable writes, reads, listing, and the schema/migrations; Work queue: Durable, ordered hand-off of work items between the ingest path and the workers, with visibility timeout and dead-letter; Observability: Metrics registry and exposition, structured logging, health/readiness endpoints.
 
@@ -908,7 +901,20 @@ Implement Store: Owns persistence of the domain entities: durable writes, reads,
   - A-3 (metric) R-14: ratio 99.9 % — kill one instance under load; error rate stays within the target — metric R-14
 - **notes**: family: infra
 
-### WP-2 — Authentication + Scheduler (M)
+### WP-2 — Reading domain (M)
+
+Implement Reading domain: Owns the Reading aggregate: creation, changes and state transitions of these records, and the rules that hold across them. Reading state machine: published; invariant (R-7): durability: no reading lost. Read from R-1, R-2.
+
+- **components**: C-16 · **implements**: I-16
+- **depends on**: WP-1 · **satisfies**: R-1, R-2, R-3, R-5, R-6, R-7, R-8
+- **write scope**: `src/main/java/app/DomainReading.java`, `src/test/java/app/DomainReadingTest.java`
+- **acceptance**:
+  - A-4 (test) unit tests of Reading domain pass — `./gradlew test --tests app.DomainReadingTest`
+  - A-5 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
+  - A-6 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+- **notes**: family: aggregate:domain_reading
+
+### WP-3 — Authentication + Scheduler (M)
 
 Implement Authentication: Authenticates callers and resolves them to a principal and scope; enforces authorization for management operations; Scheduler: Computes when deferred work runs next (backoff schedules, periodic jobs) and promotes due work.
 
@@ -916,10 +922,10 @@ Implement Authentication: Authenticates callers and resolves them to a principal
 - **depends on**: WP-1 · **satisfies**: R-1, R-5, R-8, R-11, R-12, R-18
 - **write scope**: `src/main/java/app/Auth.java`, `src/test/java/app/AuthTest.java`, `src/main/java/app/Scheduler.java`, `src/test/java/app/SchedulerTest.java`
 - **acceptance**:
-  - A-4 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
+  - A-7 (test) unit tests of Authentication, Scheduler pass — `./gradlew test --tests app.AuthTest`
 - **notes**: family: infra
 
-### WP-3 — Notifier (S)
+### WP-4 — Notifier (S)
 
 Implement Notifier: Sends operator/customer notifications through the configured channel with templating and rate limiting.
 
@@ -927,30 +933,19 @@ Implement Notifier: Sends operator/customer notifications through the configured
 - **depends on**: WP-1 · **satisfies**: R-4
 - **write scope**: `src/main/java/app/Notifier.java`, `src/test/java/app/NotifierTest.java`
 - **acceptance**:
-  - A-5 (test) unit tests of Notifier pass — `./gradlew test --tests app.NotifierTest`
+  - A-8 (test) unit tests of Notifier pass — `./gradlew test --tests app.NotifierTest`
 - **notes**: family: notification
 
-### WP-4 — Readings processor (S)
-
-Implement Readings processor: Computes over readings on behalf of the core. Synthesised from R-2; no catalogue pattern matched.
-
-- **components**: C-16 · **implements**: I-16
-- **depends on**: WP-1 · **satisfies**: R-2
-- **write scope**: `src/main/java/app/ReadingsProcessor.java`, `src/test/java/app/ReadingsProcessorTest.java`
-- **acceptance**:
-  - A-6 (test) unit tests of Readings processor pass — `./gradlew test --tests app.ReadingsProcessorTest`
-- **notes**: family: synthesised:readings_processor
-
-### WP-5 — Domain core (S)
+### WP-5 — Domain core (L)
 
 Implement Domain core: Business rules and validation for the domain entities; the only module that changes state through the store.
 
 - **components**: C-7 · **implements**: I-7
-- **depends on**: WP-1, WP-3, WP-4 · **satisfies**: R-1, R-3, R-5, R-7, R-9, R-10, R-19, R-20
+- **depends on**: WP-1, WP-2, WP-4 · **satisfies**: R-1, R-5, R-7, R-9, R-10, R-19, R-20
 - **write scope**: `src/main/java/app/Core.java`, `src/test/java/app/CoreTest.java`
 - **acceptance**:
-  - A-7 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
-  - A-8 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
+  - A-9 (test) unit tests of Domain core pass — `./gradlew test --tests app.CoreTest`
+  - A-10 (metric) R-7: lost or duplicate updates under concurrent writes to one record = 0 updates — concurrent-update test: N parallel writers to one record end in the consistent state with no lost update — metric R-7
 - **notes**: family: mqtt_ingest
 
 ### WP-6 — MQTT consumer (S)
@@ -961,7 +956,7 @@ Implement MQTT consumer: Subscribes to the broker's topics, validates and de-dup
 - **depends on**: WP-1, WP-5 · **satisfies**: R-1
 - **write scope**: `src/main/java/app/MqttConsumer.java`, `src/test/java/app/MqttConsumerTest.java`
 - **acceptance**:
-  - A-9 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.MqttConsumerTest`
+  - A-11 (test) unit tests of MQTT consumer pass — `./gradlew test --tests app.MqttConsumerTest`
 - **notes**: family: mqtt_ingest
 
 ### WP-7 — Import/export (S)
@@ -972,56 +967,56 @@ Implement Import/export: Streams records to and from CSV/JSON with validation an
 - **depends on**: WP-5 · **satisfies**: R-5
 - **write scope**: `src/main/java/app/Exporter.java`, `src/test/java/app/ExporterTest.java`
 - **acceptance**:
-  - A-10 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
+  - A-12 (test) unit tests of Import/export pass — `./gradlew test --tests app.ExporterTest`
 - **notes**: family: sftp_export
 
-### WP-8 — Batch job (S)
+### WP-8 — Batch job (M)
 
 Implement Batch job: Scheduled processing over stored records: extract, transform, aggregate, write results.
 
 - **components**: C-13 · **implements**: I-13
-- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-1, R-5, R-8, R-11
+- **depends on**: WP-1, WP-3, WP-5, WP-7 · **satisfies**: R-1, R-5, R-8, R-11
 - **write scope**: `src/main/java/app/Batch.java`, `src/test/java/app/BatchTest.java`
 - **acceptance**:
-  - A-11 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
+  - A-13 (test) unit tests of Batch job pass — `./gradlew test --tests app.BatchTest`
 - **notes**: family: batch_pipeline
 
-### WP-9 — Public HTTP API (S)
+### WP-9 — Public HTTP API (M)
 
 Implement Public HTTP API: Translates HTTP requests into core calls: routing, request validation, error mapping, JSON.
 
 - **components**: C-14 · **implements**: I-14
-- **depends on**: WP-1, WP-2, WP-5, WP-7 · **satisfies**: R-3, R-6, R-9, R-13, R-15
+- **depends on**: WP-1, WP-2, WP-3, WP-5, WP-7 · **satisfies**: R-6, R-9, R-13, R-15
 - **write scope**: `src/main/java/app/SurfaceApi.java`, `src/test/java/app/SurfaceApiTest.java`
 - **acceptance**:
-  - A-12 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.SurfaceApiTest`
-  - A-13 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
+  - A-14 (test) unit tests of Public HTTP API pass — `./gradlew test --tests app.SurfaceApiTest`
+  - A-15 (metric) R-6: p95 latency at 5,000, 20,000 <= 10 s — load test at the stated rate; the stated percentile must meet the target — metric R-6
 - **notes**: family: infra
 
 ## Traceability
 
 | requirement | priority | components | work packages | acceptance |
 |---|---|---|---|---|
-| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15 | WP-1, WP-2, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-7, A-8, A-9, A-11 |
-| R-2 | must | C-16 | WP-4 | A-6 |
-| R-3 | must | C-7, C-14 | WP-5, WP-9 | A-7, A-8, A-12, A-13 |
-| R-4 | must | C-3, C-6, C-8 | WP-3 | A-5 |
-| R-5 | must | C-5, C-7, C-11, C-12, C-13 | WP-2, WP-5, WP-7, WP-8 | A-4, A-7, A-8, A-10, A-11 |
-| R-6 | must | C-14 | WP-9 | A-12, A-13 |
-| R-7 | must | C-1, C-7 | WP-1, WP-5 | A-1, A-2, A-3, A-7, A-8 |
-| R-8 | should | C-12, C-13 | WP-2, WP-8 | A-4, A-11 |
-| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-7, A-8, A-12, A-13 |
-| R-10 | must | C-7 | WP-5 | A-7, A-8 |
-| R-11 | must | C-12, C-13 | WP-2, WP-8 | A-4, A-11 |
-| R-12 | must | C-10 | WP-2 | A-4 |
-| R-13 | must | C-14 | WP-9 | A-12, A-13 |
+| R-1 | must | C-2, C-4, C-7, C-12, C-13, C-15, C-16 | WP-1, WP-2, WP-3, WP-5, WP-6, WP-8 | A-1, A-2, A-3, A-4, A-5, A-6, A-7, A-9, A-10, A-11, A-13 |
+| R-2 | must | C-16 | WP-2 | A-4, A-5, A-6 |
+| R-3 | must | C-16 | WP-2 | A-4, A-5, A-6 |
+| R-4 | must | C-3, C-6, C-8 | WP-4 | A-8 |
+| R-5 | must | C-5, C-7, C-11, C-12, C-13, C-16 | WP-2, WP-3, WP-5, WP-7, WP-8 | A-4, A-5, A-6, A-7, A-9, A-10, A-12, A-13 |
+| R-6 | must | C-14, C-16 | WP-2, WP-9 | A-4, A-5, A-6, A-14, A-15 |
+| R-7 | must | C-1, C-7, C-16 | WP-1, WP-2, WP-5 | A-1, A-2, A-3, A-4, A-5, A-6, A-9, A-10 |
+| R-8 | should | C-12, C-13, C-16 | WP-2, WP-3, WP-8 | A-4, A-5, A-6, A-7, A-13 |
+| R-9 | must | C-1, C-7, C-14 | WP-1, WP-5, WP-9 | A-1, A-2, A-3, A-9, A-10, A-14, A-15 |
+| R-10 | must | C-7 | WP-5 | A-9, A-10 |
+| R-11 | must | C-12, C-13 | WP-3, WP-8 | A-7, A-13 |
+| R-12 | must | C-10 | WP-3 | A-7 |
+| R-13 | must | C-14 | WP-9 | A-14, A-15 |
 | R-14 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
-| R-15 | should | C-14 | WP-9 | A-12, A-13 |
+| R-15 | should | C-14 | WP-9 | A-14, A-15 |
 | R-16 | should | C-1, C-2 | WP-1 | A-1, A-2, A-3 |
 | R-17 | must | C-2, C-9 | WP-1 | A-1, A-2, A-3 |
-| R-18 | must | C-10 | WP-2 | A-4 |
-| R-19 | must | C-7 | WP-5 | A-7, A-8 |
-| R-20 | must | C-7 | WP-5 | A-7, A-8 |
+| R-18 | must | C-10 | WP-3 | A-7 |
+| R-19 | must | C-7 | WP-5 | A-9, A-10 |
+| R-20 | must | C-7 | WP-5 | A-9, A-10 |
 
 ## Conventions
 
