@@ -9,12 +9,13 @@ layer (entities, states, operations, work packages) — **without calling a mode
 holds the line while agents build: lints the design, hands each agent a self-contained
 brief, refuses stale briefs, and checks the code against the design afterwards.
 
-**What it is good at, measured** (six independent red teams, 41 specifications written by
+**What it is good at, measured** (eight independent red teams, 57 specifications written by
 people who wanted it to fail — see [How good is it](#how-good-is-it-measured)): the
 requirement table, the numbers, team size, non-goals, open questions, the generic layer,
 and an honest list of what it dropped and what it assumed. **What it is not**: the
-domain-specific decomposition, the data model, the routes and the work-package cuts are
-drafts that a person rewrites — the sixth review's phrase for the product is "a requirements
+domain-specific decomposition, the data model and the routes are drafts that a person
+rewrites (the work-package cuts and their acceptance checks were rebuilt after the eighth
+review and have not been re-scored) — the sixth review's phrase for the product is "a requirements
 linter with a catalogue behind it", and the `design.json` data model should not be shown to
 a client as if it were read from their text.
 
@@ -130,8 +131,10 @@ file you supply; without one the total is a formula.
 `redteam` attacks the design with the requirements as the oracle and exits 1 on a high
 finding: a sentence whose deletion changes nothing in the design (recorded, not honoured),
 a number that reaches no metric or contract, a `can` and a `must not` on the same verb and
-object, a metric with two targets, more decisions guessed than taken from the text, and
-which decisions flip when every rate is doubled or a constraint is dropped. On the
+object, a metric with two targets, more decisions guessed than taken from the text, an
+engine assumption on a topic the author had already written about (the assumed answer must
+repeat theirs, or both are printed side by side), and which decisions flip when every rate
+is doubled or a constraint is dropped. On the
 document-search evaluation spec it finds the gap the evaluation had found by hand
 (per-team visibility is recorded and ignored) in 19 engine runs.
 
@@ -227,7 +230,7 @@ A solution architect's job, mechanised into five deterministic steps
 | domain | entities with typed fields, relations, state machines and invariants read from the sentences (`items (SKU, quantity, warehouse, bin)`, `amend the limit price of a working order`, `submit / cancel / reject`, `never randomised twice`); related entities form an **aggregate**, and each aggregate becomes a component that owns its records and their transitions | `engine/domain.py` |
 | synthesise | patterns bring archetypes (52), which merge into components with interfaces and operations; entities, flows, requirement-to-component mapping; operations are derived from the verbs and objects of the input sentences | `engine/synthesis.py` |
 | decide | 26 decision points with 76 options (queue technology, store, isolation strategy, retry scheduling, process topology, auth scheme, secret storage, outbound safety, concurrency control, …) scored ATAM-style: `utility = Σ quality weight × fit`, options ruled out or favoured by the stated constraints; the rationale and the trade-off are written into the decision record | `engine/evaluate.py` |
-| package | components are layered, cut into ≤3-component work packages with unique write scopes, ordered by the interfaces they consume; acceptance checks derived from the metrics | `engine/synthesis.py` |
+| package | **one delivering package per requirement** (the component that carries the behaviour; the rest list it as a constraint they must honour), a slice = a capability with its entities and its own router file, foundations first and the application that mounts the routers last, unique write scopes, acceptance written from each requirement's own sentence (the operations it must expose, the values it stated, the transition it must refuse), a size printed with the counts it was computed from | `engine/packaging.py` |
 
 Then the engine does the rest of the architect's job (`--review NOTES.md`): asks the
 questions the text left open (`engine/gaps.py`, 18 gap rules with the default taken
@@ -302,16 +305,20 @@ with KYC and an underwriter workflow): 13/12/13 → 15/15/16 after the fixes the
 Japanese lands two points lower on fidelity and operation naming — the cost of a glossary
 instead of a parser — and the same everywhere else.
 
-Then six independent red teams (same document, later sections). On specifications written
+Then eight independent red teams (same document, later sections). On specifications written
 the way teams write them — Confluence pages, Jira epics, meeting notes, tender annexes,
-post-mortems, a 提案依頼書 — the fresh-eyes median after five rounds of fixes is **6–7 out of
-20**, and the three criteria that matter most to an architect (data model, interfaces, work
-packages) are 0–1 on almost every spec. The sixth review's finding is the important one:
-a domain-model layer written against one round's specs scored 10/20 on those specs and left
+post-mortems, a 提案依頼書 — the fresh-eyes median is **6–7 out of 20**, and the criteria that
+matter most to an architect are the low ones: data model and interfaces 0.1–0.6 on average,
+work packages 0.00 in round seven. The sixth review's finding is the important one: a
+domain-model layer written against one round's specs scored 10/20 on those specs and left
 every other spec where it was — **it was pattern-matching the corpus, not reading text**.
 From round seven on, the reviewers keep their specifications private and report only scores
-and defect classes, so that a fix cannot be written against the test. Use the numbers, not
-the file count, when deciding what to trust.
+and defect classes, so that a fix cannot be written against the test. Round eight (mean 6.4,
+median 7.5) is the second held-out measurement: work packages moved 0.00 → 0.63 and nothing
+else moved outside the noise, which is why the packaging layer was rewritten afterwards —
+one delivering package per requirement, acceptance written from each requirement's own
+sentence, a size printed with its counts. Use the numbers, not the file count, when deciding
+what to trust.
 
 ## Prior art
 

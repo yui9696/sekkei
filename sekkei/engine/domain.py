@@ -463,11 +463,14 @@ def extract(an: Analysis, functional_units: list[ReqUnit] | None = None, limit: 
                 for a, b in zip(seq, seq[1:]):
                     subj.edges.append((a, b, rid))
         # transition sentences and table rows: "From Draft, an author can submit …", "from: draft; trigger: submit; to: review"
-        for m in re.finditer(r"\bfrom\s*[:：]?\s*([a-z][a-z -]{1,20}?)\s*(?:,|;|\s)\s*(?:[^.;]{0,60}?)\b(?:to|→|->|becomes|moves to|goes to|reaches|enters)\s*[:：]?\s*([a-z][a-z -]{1,20}?)(?=[.;,)]|\s+(?:when|on|if|after|and|or|by)\b|$)", low):
+        for m in re.finditer(r"\bfrom\s*[:：]?\s*([a-z][a-z_ -]{1,20}?)\s*(?:,|;|\s)\s*(?:[^.;]{0,60}?)\b(?:to|→|->|becomes|moves to|goes to|reaches|enters)\s*[:：]?\s*([a-z][a-z_ -]{1,20}?)(?=[.;,)]|\s+(?:when|on|if|after|and|or|by)\b|$)", low):
             a, b = m.group(1).strip(), m.group(2).strip()
             if a in ("the", "a", "an") or b in ("the", "a", "an") or len(a.split()) > 2 or len(b.split()) > 2 or a == b or T.verb_of(a) or T.verb_of(b):
                 continue
-            subj = _first_entity_in(low, ents) or _last_entity_before(units, u, ents)
+            # "A visit moves from arrived to in_triage": the determined word before the motion verb is the
+            # thing whose states these are, even when that word is also a verb ("a visit", "an order")
+            sm = re.search(r"\b(?:a|an|the|each|every)\s+([a-z][a-z_]{2,20})\s+(?:moves|goes|changes|transitions|passes|advances)\b", low)
+            subj = (ent(sm.group(1), rid, 2, strong=True) if sm else None) or _first_entity_in(low, ents) or _last_entity_before(units, u, ents)
             if subj is None:
                 continue
             for st in (a, b):

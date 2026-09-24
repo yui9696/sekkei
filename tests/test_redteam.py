@@ -71,3 +71,21 @@ def test_cli_exit_code_follows_high_findings(tmp_path):
     assert r.returncode == 1 and '"rule": "RT05"' in r.stdout and (tmp_path / "r.md").exists()
     r = subprocess.run([sys.executable, "-m", "sekkei.cli", "redteam", str(FIX / "webhooks.md")], capture_output=True, text=True)
     assert r.returncode == 0 and "Red-team report" in r.stdout
+
+
+def test_an_assumed_answer_on_a_topic_the_text_writes_about_is_reported():
+    """RT10: the engine answers its own questions; when the author answered one, the engine's
+    answer must repeat theirs, or the design carries a preference where a statement belongs."""
+    text = ("# Catalogue sync\n\n## Functional\n- Editors can publish a product to the storefront.\n"
+            "- Editors can see the last sync result.\n\n## Constraints\n"
+            "- The team runs MongoDB Atlas today and wants to keep it.\n- Team of 3.\n")
+    rt = RT.run(text)
+    hits = _rules(rt, "RT10")
+    assert hits and "MongoDB" in hits[0].evidence, [str(f) for f in rt.findings]
+
+
+def test_no_finding_when_the_assumed_answer_repeats_what_the_text_says():
+    text = ("# Catalogue sync\n\n## Functional\n- Editors can publish a product to the storefront.\n\n"
+            "## Constraints\n- PostgreSQL is available.\n- Team of 3.\n")
+    rt = RT.run(text)
+    assert not [f for f in _rules(rt, "RT10") if "store" in f.message or "PostgreSQL" in f.message]

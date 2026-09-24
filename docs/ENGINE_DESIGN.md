@@ -45,14 +45,16 @@ sekkei/engine/
   analysis.py   Analysis = requirements + qualities + constraints + capabilities matched
   catalog.py    the knowledge base: patterns, tactics, technology rules, layouts
   synthesis.py  Analysis + catalogue -> Design (components, interfaces, entities, flows,
-                requirement mapping, packages, acceptance)
+                requirement mapping)
+  packaging.py  Design -> work packages: one delivering package per requirement, slices,
+                acceptance from each requirement's sentence, a size with its counts
   evaluate.py   decision scoring (utility per option), coverage review, assumptions
   repair.py     lint -> deterministic fixes -> lint, until clean
   __init__.py   design(text) -> EngineResult(design, analysis, review, trace)
 ```
 
-Dependency direction: `__init__ → repair → {synthesis, evaluate} → {analysis, catalog} →
-text → model`. `repair` uses `rules`. Nothing in the engine imports `llm`.
+Dependency direction: `__init__ → repair → {synthesis, evaluate} → {packaging, analysis,
+catalog} → text → model`. `repair` uses `rules`. Nothing in the engine imports `llm`.
 
 ## 4. The knowledge base (catalog)
 
@@ -94,18 +96,41 @@ qualities that decided it; `consequences` states what the losing options would h
 bought. Ties break by catalogue order (documented default). Rejected options stay in the
 record with their pros and cons. This is the ATAM utility tree, mechanised.
 
-## 6. Packaging
+## 6. Packaging (`engine/packaging.py`)
 
-1. Component layers from the dependency graph (`graph.layers`).
-2. Walk layers bottom-up; group components of the same layer and pattern into packages
-   of at most 4 components; a package's `depends_on` is every package that implements an
-   interface its components require.
-3. Write scope: `layout.module(component)` and `layout.test(component)` per component,
-   so no two packages share files.
-4. Acceptance: one `test` check per package (`layout.test_command` on its test files);
-   one `metric` check per non-functional requirement satisfied by the package;
-   one `command` check for constraints that have a checkable form (e.g. dependency
-   policies are turned into a grep).
+Until 2026-09-24 a package was "the components of one layer that share a pattern, three at a
+time". Every independent review scored the result 0/2 and named the same three faults: a
+package was a catalogue row rather than something a team could finish and show; one
+requirement was claimed by four packages, so nobody delivered it; and the acceptance check of
+a *functional* requirement was "unit tests of <component> pass". The cut now starts from the
+requirements.
+
+1. **One delivering package per requirement.** `delivery_owner` picks the single component
+   that carries the behaviour: for a functional requirement an aggregate, then a synthesised
+   owner, then a capability, then a surface, then infrastructure; for a quality or a
+   constraint the order is reversed (it is platform work) *unless* its own sentence speaks of
+   the things a domain component owns ("a claim decision within 5 minutes" belongs to the
+   claim slice). Ties go to the component that claims fewer requirements — the more specific
+   one. The requirements a package touches but does not deliver are named in its notes with
+   the package that does.
+2. **Slices, not layers.** A capability or aggregate component with the entities it owns, the
+   interfaces it provides, and the routes its requirements produced on a shared surface: the
+   routes go into a router module of the slice's own (`api_<slice>.py`), so two packages never
+   write one file, and the application that mounts the routers is built by the surface package
+   that comes last. Infrastructure is batched into foundation packages, three at a time and
+   only *within one layer* (components of a layer never depend on each other, so a package
+   cycle cannot appear); capabilities no requirement reaches are batched the same way.
+3. **Dependencies** stay what the component graph says: a package depends on the package that
+   builds the owner of every interface its components require.
+4. **Acceptance from the requirement's own sentence.** One check per delivered requirement:
+   the requirement quoted, the operations it must expose, the values it stated, and the
+   transition the domain layer read ("`cancel_order` refuses any source state outside …"),
+   with the layout's test command. Non-functional requirements keep the metric check and the
+   tactic's template — but only in the package that owns the metric. The red team's attacks
+   ignore a check that merely quotes its requirement (`redteam.QUOTED_ACCEPTANCE`): a
+   requirement recorded and not honoured must still come out as inert.
+5. **A size that can be disputed.** `funcs + 0.5·nfrs + 0.5·operations + entities + 0.3·fields
+   + 1.5·externals` → S/M/L, with every count printed in the package's notes.
 
 ## 7. Repair loop
 

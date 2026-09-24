@@ -147,7 +147,7 @@ b.component("C-15", "Requirements analysis", "Turns sentences into requirement u
 b.component("C-16", "Synthesis", "Instantiates and merges archetypes into components and interfaces, derives operations from "
             "verbs and objects, maps requirements to components, builds entities, flows, decisions, risks, conventions and "
             "work packages; records the trace.", path="sekkei/engine/synthesis.py",
-            requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-17", "I-25", "I-32"], satisfies=["R-13", "R-15", "R-18"])
+            requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-17", "I-25", "I-32", "I-33"], satisfies=["R-13", "R-15", "R-18"])
 b.component("C-17", "Evaluation", "Scores decision options against the active qualities and constraints (utility with "
             "availability rules and stated-technology bonus) and writes the engine's review of its own gaps.",
             path="sekkei/engine/evaluate.py", requires=["I-1", "I-14", "I-15"], satisfies=["R-13", "R-15"])
@@ -179,10 +179,13 @@ b.component("C-31", "Exports", "Tracker issues (bodies, gh script, CSV) and an O
             path="sekkei/export.py", requires=["I-1", "I-3"], satisfies=["R-24"])
 b.component("C-32", "Domain model", "Entities with typed fields, relations, state machines and invariants read from the sentences (parenthesised attribute lists, 'with A, B and C', possessives, transactional and state verbs, arrow lists); aggregates by relation.",
             path="sekkei/engine/domain.py", requires=["I-13", "I-15"], satisfies=["R-13", "R-15"])
+b.component("C-33", "Packaging", "Work packages as deliverable slices: one delivering package per requirement, a capability with its entities and "
+            "its routes, foundations first, acceptance written from each requirement's own sentence, and a size computed from what the package carries.",
+            path="sekkei/engine/packaging.py", requires=["I-1", "I-3", "I-13", "I-14", "I-15", "I-32"], satisfies=["R-13", "R-15"])
 b.component("C-28", "Deliverables", "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
             path="sekkei/deliverables.py", requires=["I-1", "I-3", "I-4", "I-13"], satisfies=["R-21"])
 b.component("C-29", "Red team", "Adversarial self-audit: re-runs the engine on perturbed requirements and compares design shapes; contradictions, lost numbers, assumption load, determinism.",
-            path="sekkei/redteam.py", requires=["I-1", "I-13", "I-19"], satisfies=["R-22"])
+            path="sekkei/redteam.py", requires=["I-1", "I-13", "I-19", "I-20"], satisfies=["R-22"])
 
 # --- interfaces (operation names are the real function names; sekkei check verifies them) ---
 b.interface("I-27", "Japanese input API", owner="C-27", kind="module", operations=[
@@ -345,6 +348,12 @@ b.interface("I-25", "Owners API", owner="C-25", kind="module", operations=[
 b.interface("I-20", "Gap questions API", owner="C-20", kind="module", operations=[
     op("questions", [("an", "Analysis")], "list[Question] (id, topic, question, why, assumption, affects)"),
     op("questions_markdown", [("qs", "list[Question]")], "Markdown table"),
+    op("answered_in_text", [("qid", "str"), ("an", "Analysis")], "list[str]: the author's own sentences that speak to that question's topic"),
+])
+b.interface("I-33", "Packaging API", owner="C-33", kind="module", operations=[
+    op("build", [("d", "Design"), ("an", "Analysis"), ("layout", "Layout"), ("trace", "dict"), ("log", "list[str]")], "None: fills design.work_packages"),
+    op("delivery_owner", [("d", "Design"), ("an", "Analysis")], "dict: requirement id -> the one component that delivers it"),
+    op("metric_quality", [("u", "ReqUnit")], "list[str]: the quality a metric measures"),
 ])
 b.interface("I-21", "Sizing API", owner="C-21", kind="module", operations=[
     op("capacity", [("an", "Analysis")], "Capacity: estimates with formula and inputs, assumptions, missing inputs"),
@@ -544,7 +553,7 @@ b.work_package("WP-15", "Engine: architect's notes", goal="Implement the STRIDE-
                files=["sekkei/engine/threats.py", "sekkei/engine/report.py", "tests/test_notes.py"],
                acceptance=[check("A-18", "notes tests pass: a minimal input yields the architect's questions, a complete spec leaves few, answering a question changes only its target, threats become risks", command=T + "tests/test_notes.py")])
 b.work_package("WP-14", "Engine: synthesis, repair and facade", goal="Implement the synthesis of a full design from an analysis, the lint-driven repair loop and the engine facade; prove determinism, fidelity and lint-cleanliness on every fixture.",
-               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16", "WP-20", "WP-21"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",
+               components=["C-16", "C-18", "C-19"], implements=["I-16", "I-18", "I-19"], depends_on=["WP-3", "WP-13", "WP-15", "WP-16", "WP-20", "WP-21", "WP-22"], satisfies=["R-13", "R-14", "R-15", "R-16", "R-17", "R-18"], size="L",
                files=["sekkei/engine/synthesis.py", "sekkei/engine/repair.py", "sekkei/engine/__init__.py"],
                acceptance=[check("A-16", "engine tests pass: every fixture lint-clean, deterministic, faithful; the webhook design has the expected architecture", command=T + "tests/test_engine.py"),
                            check("A-17", "R-14: two runs on the same text produce identical JSON", kind="metric", metric="R-14")])
@@ -552,6 +561,10 @@ b.work_package("WP-21", "Engine: domain model", goal="Read entities with typed f
                components=["C-32"], implements=["I-32"], depends_on=["WP-13", "WP-16"], satisfies=["R-13", "R-15"], size="M",
                files=["sekkei/engine/domain.py", "tests/test_domain.py"],
                acceptance=[check("A-32", "domain tests pass: typed fields, states and invariants from the trading spec; no proper nouns, verbs or adjectives as entities; aggregates as components", command=T + "tests/test_domain.py")])
+b.work_package("WP-22", "Engine: packaging", goal="Cut the design into deliverable slices: choose the one component that delivers each requirement, group a capability with its entities and its routes, order foundations first, write acceptance from each requirement's own sentence and compute the size from what the package carries.",
+               components=["C-33"], implements=["I-33"], depends_on=["WP-13", "WP-21"], satisfies=["R-13", "R-15"], size="M",
+               files=["sekkei/engine/packaging.py", "tests/test_packaging.py"],
+               acceptance=[check("A-33", "packaging tests pass: every requirement is delivered by exactly one package, a functional requirement's acceptance names it, foundations come first, the size states its counts", command=T + "tests/test_packaging.py")])
 b.work_package("WP-11", "Diff", goal="Compare two design versions element by element and map the changes to the work packages whose briefs are stale.",
                components=["C-12"], implements=["I-12"], depends_on=["WP-1"], satisfies=["R-12"], size="S",
                files=["sekkei/diff.py", "tests/test_diff.py"],

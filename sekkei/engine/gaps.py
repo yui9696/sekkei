@@ -25,6 +25,32 @@ def _text(an: Analysis) -> str:
     return " ".join(s.text for s in an.sentences).lower()
 
 
+#: What it looks like when the *text itself* answers one of the engine's questions. These are the
+#: vocabulary of the possible answers, not of the question: a document that says "private VMs, no
+#: public cloud" has answered the deployment question even though it never says the word "deploy".
+#: The red team uses the same table to report an assumed answer on a topic the author wrote about.
+TOPIC_SIGNALS: dict[str, str] = {
+    "Q-deploy": r"\bdeploy|\brun as\b|\bhosted\b|\bbinar(?:y|ies)\b|\bpackage|\bcontainers?\b|\bdocker\b|\bkubernetes\b|\bk8s\b|\becs\b|\bfargate\b|\blambda\b|\bserverless\b|\bvms?\b|\bvirtual machines?\b|\bbare metal\b|\bon[- ]prem|\bdata ?cent(?:re|er)\b|\bpublic cloud\b|\bprivate cloud\b|\bmanaged service|\bapp service\b|\bheroku\b|\bsystemd\b|オンプレ|自社サーバ|データセンタ",
+    "Q-auth": r"\bauthenticat|\bapi keys?\b|\boidc\b|\boauth\b|\blogin\b|\btokens?\b|\bsso\b|\bsingle sign[- ]on\b|\bsaml\b|\bldap\b|\bactive directory\b|\bentra\b|\bokta\b|\bkerberos\b|\bcorporate directory\b|\bmtls\b|\bclient certificates?\b|\bmagic link\b|認証|シングルサインオン",
+    "Q-store": r"\bpostgres|\bmysql\b|\bsqlite\b|\bmariadb\b|\boracle\b|\bsql server\b|\bmongo|\bdynamo|\bcassandra\b|\bredis\b|\bs3\b|\bobject storage\b|\bfiles? on disk\b|\bdatabase\b|\bdata ?store\b|データベース",
+    "Q-lang": r"\bpython\b|\btypescript\b|\bjavascript\b|\bnode(?:\.js| 1\d| 2\d)?\b|\bgo(?:lang| 1\.\d+)\b|\bjava\b|\bkotlin\b|\bc#\b|\b\.net\b|\brust\b|\bruby\b|\belixir\b|\bphp\b|\bscala\b",
+    "Q-retention": r"\bretain|\bretention|\bkeep .{0,30}(?:days|months|years)|\bdelete .{0,20}after|\bpurge|\barchiv|保持|保存期間",
+    "Q-backup": r"\bbackup|\brestore|\bdisaster|\brecover|\brpo\b|\brto\b|バックアップ",
+    "Q-availability": r"\bavailabilit|\buptime\b|\b9\d(?:\.\d+)? ?%|\bsla\b|\bhigh[- ]availab|稼働率",
+    "Q-rate": r"\b(?:requests?|events?|messages?|orders?|transactions?)\s*(?:/|per )\s*(?:s\b|sec|second|minute|hour|day)|\brps\b|\bqps\b|\bthroughput\b|件/",
+    "Q-migration": r"\bmigrat|\bcut[- ]?over\b|\bbackfill\b|\bdual[- ]run\b|\bexisting [\w.]+ ?(?:data|system|database|instance|service|application|platform|tool|server)s?\b|\blegacy\b|移行",
+    "Q-team": r"\bteam of \d|\b\d+[- ]person team\b|\bheadcount\b|\bfte\b|\bengineers?\b|\bdevelopers?\b|チーム|名体制",
+}
+
+
+def answered_in_text(qid: str, an: Analysis) -> list[str]:
+    """The author's own sentences that speak to a question's topic (assumed bullets excluded)."""
+    rx = TOPIC_SIGNALS.get(qid)
+    if not rx:
+        return []
+    return [s.text for s in an.sentences if not s.assumed and re.search(rx, s.text, re.I)]
+
+
 def questions(an: Analysis) -> list[Question]:
     low = _text(an)
     qs: list[Question] = []
@@ -36,10 +62,10 @@ def questions(an: Analysis) -> list[Question]:
     has_count = any(q.kind == "count" for q in quantities)
     has_size = any(q.kind == "size" for q in quantities)
     has_retention = bool(re.search(r"\bretain|\bretention|\bkeep .{0,30}(days|months|years)|\bdelete .{0,20}after|\bpurge|\barchiv", low))
-    has_auth = bool(re.search(r"\bauthenticat|\bapi keys?\b|\boidc\b|\boauth\b|\blogin\b|\btoken|\bsso\b|\bmtls\b", low))
+    has_auth = bool(re.search(TOPIC_SIGNALS["Q-auth"], low, re.I))
     has_authz = bool(re.search(r"\brole|\bpermission|\bauthoriz|\btenant|\bper[- ]customer\b|\bowner", low))
-    has_deploy = bool(an.constraints & {"containers", "serverless", "on_prem", "multi_instance"}) or re.search(r"\bdeploy|\brun as\b|\bhosted\b|\bbinary\b|\bpackage", low)
-    has_backup = bool(re.search(r"\bbackup|\brestore|\bdisaster|\brecover", low))
+    has_deploy = bool(an.constraints & {"containers", "serverless", "on_prem", "multi_instance"}) or re.search(TOPIC_SIGNALS["Q-deploy"], low, re.I)
+    has_backup = bool(re.search(TOPIC_SIGNALS["Q-backup"], low, re.I))
     has_avail = "availability" in quals or re.search(r"\b99\.\d", low)
     external = bool(re.search(r"\bexternal\b|\bthird[- ]party\b|\bprovider\b|\bcustomer(?:'s|s'|-supplied) (?:url|endpoint)|\bwebhook|\bsubscriber", low))
     external_policy = bool(re.search(r"\btimeout|\bretr|\bcircuit|\bfallback|\bdegrade", low))
@@ -47,7 +73,8 @@ def questions(an: Analysis) -> list[Question]:
     compliance = "compliance" in quals or re.search(r"\bgdpr\b|\bhipaa\b|\bpci\b|\bsoc ?2\b|\bconsent\b", low)
     has_budget = bool(re.search(r"\bbudget|\bcost\b|\bper month\b|\$\d", low))
     has_alerting = bool(re.search(r"\balert|\bon[- ]call|\bpager", low))
-    has_migration = bool(re.search(r"\bmigrat|\bexisting (?:data|system)|\blegacy|\breplace(?:s|ing)? (?:the|an?) (?:existing|current)", low))
+    has_migration = bool(re.search(TOPIC_SIGNALS["Q-migration"], low, re.I)
+                         or re.search(r"\breplace(?:s|ing)? (?:the|an?) (?:existing|current)", low))
 
     def q(id_: str, topic: str, question: str, why: str, assumption: str, affects: str = "") -> None:
         qs.append(Question(id_, topic, question, why, assumption, affects))

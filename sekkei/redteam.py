@@ -14,6 +14,7 @@ attacks the design with the requirements text as the oracle:
   RT07 unrecognised          sentences no pattern understood (restated here so they are not forgotten)
   RT08 lost number           a number in a requirement that appears nowhere else in the design
   RT09 deliverable drift     the roadmap total and the notes disagree (the two documents share one formula; this is the check)
+  RT10 assumed over stated   the engine answered a question the author had already answered in the text
 
 Findings carry a severity: high when a must-have is affected or the engine misbehaves, else
 info. The exit code of `sekkei redteam` is 1 when a high finding exists.
@@ -25,6 +26,7 @@ from dataclasses import dataclass, field
 
 from . import model as M
 from .engine import EngineResult, design
+from .engine import gaps
 
 
 @dataclass
@@ -71,6 +73,11 @@ class RedTeam:
 # ---------------------------------------------------------------------------
 
 
+#: an acceptance check that quotes its requirement ("R-3 (must): <the sentence> — exercised through …")
+#: is traceability, not design: the attacks below must not count it as the requirement being honoured
+QUOTED_ACCEPTANCE = re.compile(r"^R-\d+ \((?:must|should|could)\): ")
+
+
 def shape(d: M.Design) -> dict:
     return {
         "components": sorted((c.name, c.kind, tuple(sorted(c.requires))) for c in d.components),
@@ -81,7 +88,8 @@ def shape(d: M.Design) -> dict:
         "flows": sorted((f.name, len(f.steps)) for f in d.flows),
         "decisions": sorted((x.title, x.choice) for x in d.decisions if x.status == "accepted"),
         "packages": sorted(w.title for w in d.work_packages),
-        "acceptance": sorted(re.sub(r"\bR-\d+\b", "R-?", f"{a.kind}:{a.description}:{a.command}") for w in d.work_packages for a in w.acceptance),
+        "acceptance": sorted(re.sub(r"\bR-\d+\b", "R-?", f"{a.kind}:{a.description}:{a.command}")
+                             for w in d.work_packages for a in w.acceptance if not QUOTED_ACCEPTANCE.match(a.description)),
         "metrics": sorted(f"{r.metric.name}:{r.metric.target}" for r in d.requirements if r.metric and not r.rationale.startswith("assumed")),
         "conventions": sorted(d.conventions.rules),
         "risks": sorted(k.description for k in d.risks),
@@ -316,6 +324,7 @@ def _lost_numbers(base: EngineResult, rt: RedTeam) -> None:
                            decisions=d.decisions, risks=d.risks, work_packages=d.work_packages,
                            requirements=[M.Requirement(r.id, "", r.kind, r.priority, r.metric) for r in d.requirements]))
     hay = re.sub(r'"description": "from R-\d+: [^"]*"', '""', hay)   # verbatim quotes of the sentence are traceability, not honouring
+    hay = re.sub(r'"description": "R-\d+ \((?:must|should|could)\): [^"]*"', '""', hay)   # …and so is an acceptance check that quotes it
     hay += base.notes.to_markdown().split("## 6.")[0]   # notes sections before the sentence table
     strong = re.sub(r"stated values: [^\"\n]*", "", hay)      # the engine's catch-all note on operations does not count as a contract
     for u in base.analysis.requirements:
@@ -337,6 +346,39 @@ def _lost_numbers(base: EngineResult, rt: RedTeam) -> None:
                                            u.sentence.text[:160]))
 
 
+#: words too common in an assumed answer to prove that the author's sentence means the same thing
+_ECHO_STOP = {"the", "and", "with", "per", "for", "from", "into", "behind", "several", "instances", "instance", "stated",
+              "engine", "default", "assumed", "system", "systems", "service", "services", "data", "record", "records",
+              "operations", "first", "release", "team", "people", "single", "small", "existing", "available", "each"}
+
+
+def _assumed_over_stated(base: EngineResult, rt: RedTeam) -> None:
+    """An engine assumption on a topic the author wrote about.
+
+    The engine answers its own questions so that a thin text still yields a design. When the
+    author *did* write about the topic, the answer must repeat what they wrote — otherwise the
+    design carries the engine's preference where the customer stated theirs, and downstream
+    (ADRs, briefs, the requirement table) the two are indistinguishable.
+    """
+    for x in base.design.decisions:
+        if x.status != "proposed":
+            continue
+        m = re.search(r"\((Q-[a-z]+)\)", x.title)
+        if not m:
+            continue
+        said = gaps.answered_in_text(m.group(1), base.analysis)
+        if not said:
+            continue
+        keys = [w for w in re.findall(r"[A-Za-z][\w.+#/-]{2,}", x.choice) if w.lower() not in _ECHO_STOP]
+        if any(any(re.search(r"\b" + re.escape(k) + r"\b", t, re.I) for k in keys) for t in said):
+            continue          # the assumed answer repeats what the text says: no conflict
+        topic = x.title.split(":", 1)[1].split("(")[0].strip()
+        strong = [t for t in said if re.search(r"\bno\b|\bnot\b|\bnever\b|\bonly\b|\bmust\b|\bshall\b|\b既存\b|禁止", t, re.I)]
+        rt.findings.append(Finding("RT10", "high" if strong else "medium", x.id,
+                                   f"the engine assumed “{x.choice}” for {topic}, but the text speaks to it; the assumption is appended to the requirements and is not marked as disputed",
+                                   (strong or said)[0][:160]))
+
+
 def _deliverable_drift(base: EngineResult, rt: RedTeam) -> None:
     e = base.notes.effort
     if sum(e.phase_days) != e.calendar_days or e.critical_path_days > e.calendar_days:
@@ -356,6 +398,7 @@ def run(text: str, base: EngineResult | None = None) -> RedTeam:
     _assumption_load(base, rt)
     _unrecognised(base, rt)
     _lost_numbers(base, rt)
+    _assumed_over_stated(base, rt)
     _deliverable_drift(base, rt)
     _inert(text, base, rt)
     _fragile(text, base, rt)

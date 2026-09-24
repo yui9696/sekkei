@@ -112,3 +112,18 @@ def test_cli_flags(tmp_path, monkeypatch, capsys):
     assert "questions answered by the engine" in out and (tmp_path / "a.md").read_text().count("Assumed by the engine") >= 1
     assert main(["design", "r.md", "-o", "d2.json", "--review", "n2.md", "--no-assume"]) == 0
     assert "open questions" in capsys.readouterr().out
+
+
+def test_a_stated_platform_is_not_overwritten_by_the_engines_default():
+    """The deployment, auth and migration questions are answered by the vocabulary of the *answers*:
+    a text that says "private VMs, no public cloud" has answered the deployment question even though
+    it never says "deploy", and the engine must not append a contradicting assumption."""
+    text = ("# Crew swap\n\n## Functional\n- Planners can request a crew swap between two rostered flights.\n\n"
+            "## Constraints\n- Private VMs only, no public cloud, no managed services.\n"
+            "- Sign-in is through the corporate Okta tenant.\n"
+            "- The existing roster system stays; integrate through its REST API.\n- Team of 4.\n")
+    r = design(text)
+    assumed = [x.statement for x in r.design.requirements if "assumed by the engine" in x.statement]
+    assert not any("containers" in s or "ingress" in s for s in assumed), assumed
+    assert not any("API keys" in s for s in assumed), assumed
+    assert not any("no existing data" in s.lower() for s in assumed), assumed

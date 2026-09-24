@@ -124,3 +124,44 @@ def test_fuzz_mutations_never_crash(tmp_path):
         assert M.dumps(r.design) == M.dumps(design(text).design)
         if r.design.requirements:
             assert not [d for d in r.diagnostics if d.severity == "error"], text[:200]
+
+
+# --- a list introduced by a bare "…:" line, and what a reference section swallows -------------
+
+_ACTION_LIST = """Notes from the depot sync
+
+Present: two supervisors, one developer
+
+Agreed actions:
+
+- Drivers can record a failed delivery with a reason code.
+- Supervisors can reassign a stop before the van leaves.
+- The system keeps each delivery photo for 90 days.
+
+DECIDED: we stay on the existing PostgreSQL instance; no new database.
+Not included this time: the customer-facing tracking page.
+"""
+
+
+def test_a_list_introduced_by_a_bare_colon_line_is_read_not_swallowed():
+    r = design(_ACTION_LIST)
+    stated = [x.statement for x in r.design.requirements if "assumed by the engine" not in x.statement]
+    assert any("record a failed delivery" in s for s in stated)
+    assert any("reassign a stop" in s for s in stated)
+    assert any("90 days" in s for s in stated)
+
+
+def test_a_decision_or_an_exclusion_inside_an_action_list_keeps_its_kind():
+    r = design(_ACTION_LIST)
+    decided = next(x for x in r.design.requirements if "no new database" in x.statement)
+    assert decided.kind == "constraint"
+    assert any("tracking page" in g for g in r.design.non_goals), r.design.non_goals
+
+
+def test_what_a_reference_section_swallows_is_listed_not_dropped_in_silence():
+    text = ("# Depot tool\n\n## Functional\n- Drivers can record a failed delivery with a reason code.\n\n"
+            "## Appendix\n\nThe depot ran on paper forms until last year.\nThe forms are archived in the back office.\n\n"
+            "## Constraints\n- Python. Team of 2.\n")
+    r = design(text)
+    dropped = " ".join(t for t, _ in r.analysis.dropped)
+    assert "paper forms" in dropped and "back office" in dropped, r.analysis.dropped

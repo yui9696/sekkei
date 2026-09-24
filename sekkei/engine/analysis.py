@@ -312,13 +312,15 @@ def analyse(text: str, hints: dict[str, list[str]] | None = None, structure: ST.
         assumptions.append("Japanese words the glossary does not know were dropped: " + ", ".join(f"「{w}」" for w in sorted(set(norm.untranslated))) + ".")
     if prose_only:
         assumptions.append("No bullets, headings or modal words: every sentence of the text was taken as a requirement.")
-    if dropped:
-        assumptions.append(f"{len(dropped)} sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.")
+    if dropped or structure.dropped:
+        assumptions.append(f"{len(dropped) + len(structure.dropped)} sentence(s) were read but not taken as requirements (listed in the notes §6b); if one of them is a requirement, make it a bullet.")
     for n in structure.notes:
         if n.startswith(("table with", "user story", "ticket heading", "DECIDED", "inline 'out of scope", "team size", "heading without")):
             assumptions.append("Structure: " + n + ".")
     an = Analysis(T.title_of(text), _summary(sentences), non_goals, sentences, reqs, active, qualities, constraints,
                   languages, team, actors, unrec, assumptions, norm, structure)
-    an.dropped = dropped
+    # what the structure pass removed before a sentence ever existed (reference sections, alternatives):
+    # it belongs in the same list — "read but not taken" must cover the whole path, not only the last step
+    an.dropped = dropped + [(t, w) for t, w in structure.dropped if (t, w) not in dropped]
     an.stated_constraints = stated_constraints | {c for c in constraints if c == "durable_required"}
     return an

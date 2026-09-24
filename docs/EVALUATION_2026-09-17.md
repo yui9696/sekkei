@@ -427,3 +427,78 @@ generic layer with its ADR/runbook/SLO boilerplate; it rewrites the state machin
 entities, all invariants, every route, the component list for the real hot path, the work
 packages, and the schedule.
 
+
+## Eighth red team (2026-09-24): held out, second round
+
+The measurement round seven asked for: same protocol (the reviewer writes its specifications,
+scores them, reports scores and defect *classes*, and deletes the specifications; the engine's
+authors never see them), against the engine as committed at `aabb50a` — that is, *after* round
+seven's fixes and *before* anything in this section. Eight new specifications: a public tender
+annex (port logistics), a PRD with KPI and segment tables (food service), a change request
+against five named systems (airline crew planning), meeting notes with speakers and
+DECIDED/TODO markers (research computing), an RFC with goals/non-goals/alternatives (developer
+infrastructure), a Jira epic of stories with Given/When/Then (micromobility field ops), a
+要件定義書 with a 優先度 table (public-sector catering), and an intranet wiki page written by a
+non-engineer in ordinary business Japanese (property management).
+
+**Mean 6.4 / 20, median 7.5** (round seven: 6.75 and 7). Per criterion, round seven → round
+eight: work packages **0.00 → 0.63**, honesty 0.88 → 1.13, notes 1.00 → 1.13, components 0.38
+→ 0.50, numbers 0.88 → 0.75, interfaces 0.25 → 0.13, data model 0.63 → 0.13, decisions 1.00 →
+0.50, threats 1.00 → 1.00, fidelity 0.50. Different specifications and a different reviewer:
+the honest reading is that one criterion moved (the one round seven attacked head-on) and the
+rest is inside the noise of two eight-spec samples. All eight designs were lint-clean.
+
+What the reviewer would trust: the question/assumption list, the read-and-fold log (§6b), the
+generic layer with its STRIDE table, the deletion attack (it correctly named three safety rules
+and three goal statements as recorded-but-not-honoured), and the harness mechanics. What it
+would rewrite: interfaces, data model, state machines, work packages, and a share of the
+requirement table itself.
+
+### The classes, and what was done
+
+By the standing rule — a class gets a structural fix only when independent rounds report it,
+never a phrasing for one reviewer's sentences:
+
+- **Acceptance criteria are weak and mis-assigned** (8/8; rounds 4–7 scored the criterion 0.00).
+  "Unit tests of <component> pass" for functional work, and the same latency check sprayed
+  across four packages including ones that do not own it. Fixed by the new packaging module —
+  see [ENGINE_DESIGN §6](ENGINE_DESIGN.md#6-packaging-enginepackagingpy): one delivering
+  package per requirement, slices instead of layers, acceptance written from each requirement's
+  own sentence, a size with its counts printed. The red team's attacks were taught to ignore an
+  acceptance check that merely quotes its requirement, so RT01/RT08 still report a requirement
+  that is recorded and not honoured.
+- **Whole requirement blocks lost, some without a trace** (3/8 catastrophic). Reproduced as a
+  class: a bare `…:` line whose section name maps to "reference material" turned the rest of the
+  document into an appendix, and the appendix was dropped *silently*. Two fixes: a colon line
+  followed by a bulleted list is a list intro, so its items are read (a full sentence is a
+  requirement, a question is an open item, a `DECIDED:`/exclusion line keeps its kind); and
+  whatever a reference or alternatives section swallows is now recorded and printed in §6b —
+  "read but not taken" covers the whole path, not only its last step.
+- **Exclusions read as requirements** (3/8, with round 3's class). `Not included:` and
+  `Excluded:` join the exclusion labels, including inside an action list. The round-4 rule
+  stands: "excluded from the export:" is a condition, only an exclusion *of the scope itself*
+  is a non-goal.
+- **Stated platform constraints overridden by engine defaults** (5/8, round 2's class in the
+  other direction). The "is this question already answered?" test used the vocabulary of the
+  *question*; it now uses the vocabulary of the possible *answers*
+  (`gaps.TOPIC_SIGNALS`): "private VMs, no public cloud" answers the deployment question
+  without the word "deploy", Okta and Active Directory answer the auth question, "the existing
+  roster system" answers the migration question.
+- **Assumed answers contradicting stated requirements, undetected** (4/8). New red-team rule
+  **RT10**: for every assumed answer, if the author wrote about that topic, the engine's answer
+  must repeat what they wrote — otherwise the finding names both. It fires on the bundled
+  corpus exactly twice, and both are true (a meeting-notes spec that runs Redis/BigQuery got an
+  assumed PostgreSQL; a hardware spec that states "99 % of commands" got an assumed 99.9 %
+  availability).
+- **State machines not read as state machines** (4/8, with round 6's attack spec). A table whose
+  header names a source state, a target state and usually a trigger is folded into transition
+  sentences of the thing named by the nearest heading ("A visit moves from arrived to in_triage
+  when triage started"), instead of one pseudo-requirement per row. The determined word before a
+  motion verb is that thing even when the word is also a verb ("a visit", "an order").
+
+Not done, on purpose: the data model and the interfaces (0.13 each) need a different mechanism,
+not more phrasings — the same conclusion round 6 reached about the domain layer, and writing
+readers for this reviewer's forms would repeat that mistake. Japanese written by a
+non-engineer stays out of scope and the README says so.
+
+354 → 367 tests.

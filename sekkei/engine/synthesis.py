@@ -15,10 +15,12 @@ from ..model import (
 )
 from . import catalog as K
 from . import domain as DM
+from . import packaging as PKG
 from . import text as T
 from .analysis import Analysis, ReqUnit
 from .evaluate import decide
 from .owners import Placement, _human_subject, place
+from .packaging import metric_quality as _metric_quality
 
 # archetype -> archetypes that call it (in addition to Archetype.needs), applied when both are active
 CONSUMERS: dict[str, list[str]] = {
@@ -474,22 +476,6 @@ def _metric_of(u: ReqUnit) -> Metric | None:
     return Metric(name, target, unit)
 
 
-_METRIC_QUALITY = (("latency", "performance"), ("sustained rate", "performance"), ("duplicate", "consistency"), ("concurrent", "consistency"),
-                   ("lost", "durability"), ("availability", "availability"), ("ratio", "availability"), ("unauthenticated", "security"),
-                   ("cross-tenant", "security"), ("metrics exposed", "operability"), ("retention", "compliance"), ("deletion", "compliance"),
-                   ("instances", "scalability"))
-
-
-def _metric_quality(u: ReqUnit) -> list[str]:
-    """The quality a metric measures, read from the metric's name — the acceptance template must match the metric, not the component family."""
-    if not u.metric:
-        return []
-    name = u.metric[0].lower()
-    if name.startswith("ratio") and not re.search(r"availab|uptime|of (?:requests|payments|days|the time|calls)|successful|error rate|success rate", u.sentence.lower):
-        return []            # "CPU not exceeding 60 %", "400 % zoom": a percentage, not an availability target
-    return [q for k, q in _METRIC_QUALITY if k in name][:1]
-
-
 def _satisfiers(u: ReqUnit, active: list[str], surfaces: list[str]) -> list[str]:
     """Archetype keys that satisfy a requirement unit."""
     out: list[str] = []
@@ -901,73 +887,6 @@ def synthesise(an: Analysis, forced_decisions: dict[str, str] | None = None,
                                 ["Acceptance checks of the package pass.", "No file outside the write scope changed.",
                                  "Every public operation of the implemented interfaces exists with the declared inputs."])
 
-    # --- work packages ------------------------------------------------------------------
-    internal = [c for c in d.components if c.kind != "external"]
-    try:
-        layers = G.layers(d)
-    except ValueError as exc:  # a cycle: fall back to archetype layers (repair/lint will report it)
-        log.append(f"component cycle: {exc}")
-        layers = [[c.id for c in internal]]
-    family_of: dict[str, str] = {}
-    for c in internal:
-        key = c.tags[1].split(":")[1]
-        if key in _INFRA:
-            fam = "infra"
-        elif "aggregate" in c.tags:
-            fam = "aggregate:" + key           # one package per domain aggregate
-        elif "synthesised" in c.tags:
-            fam = "synthesised:" + key
-        else:
-            fam = next((p.id for p in K.PATTERNS if p.id in an.patterns and key in p.archetypes), "infra")
-        family_of[c.id] = fam
-    groups: list[list[str]] = []
-    for layer in layers:
-        ids = [c for c in layer if d.component(c).kind != "external"]
-        by_family: "OrderedDict[str, list[str]]" = OrderedDict()
-        for c in sorted(ids, key=lambda c: (family_of[c], int(c.split("-")[1]))):
-            by_family.setdefault(family_of[c], []).append(c)
-        # infrastructure of one layer may be batched; domain families stay separate
-        for fam, members in by_family.items():
-            for i in range(0, len(members), 3):
-                groups.append(members[i:i + 3])
-    implementer: dict[str, str] = {}
-    for n, ids in enumerate(groups, 1):
-        for c in ids:
-            for i in d.provided_by(c):
-                implementer[i.id] = f"WP-{n}"
-    acc_n = 0
-    for n, ids in enumerate(groups, 1):
-        comps = [d.component(c) for c in ids]
-        wp_id = f"WP-{n}"
-        deps = sorted({implementer[i] for c in comps for i in c.requires if i in implementer and implementer[i] != wp_id},
-                      key=lambda w: int(w.split("-")[1]))
-        satisfies = sorted({r for c in comps for r in c.satisfies}, key=lambda r: int(r.split("-")[1]))
-        keys = [c.tags[1].split(":")[1] for c in comps]
-        files = []
-        for k in keys:
-            files += [_fmt(layout.module, k), _fmt(layout.test, k)]
-        tests = [f for f in files if "test" in f]
-        acc: list[Acceptance] = []
-        acc_n += 1
-        acc.append(Acceptance(f"A-{acc_n}", f"unit tests of {', '.join(c.name for c in comps)} pass",
-                              "test", layout.test_command.format(test=" ".join(tests), key=keys[0], Key="".join(p.capitalize() for p in keys[0].split("_")))))
-        for r in satisfies:
-            req = d.requirement(r)
-            if req is not None and req.kind == "nonfunctional" and req.metric and req.metric.target != "review":
-                unit = next((u for u in an.requirements if u.id == r), None)
-                mq = _metric_quality(unit) if unit else []
-                if req.metric.name.startswith(("value", "number of", "factor", "size", "time")) and not mq:
-                    continue          # a bare number is not an acceptance check
-                if req.rationale.startswith("assumed") and not (mq and mq[0] in ("performance", "availability") and ("latency" in req.metric.name or re.search(r"\b9\d(?:\.\d+)? ?%", req.metric.target))):
-                    continue          # engine assumptions become acceptance checks only for the latency and availability targets
-                acc_n += 1
-                tmpl = next((t.acceptance for t in K.TACTICS if mq and t.quality == mq[0] and t.acceptance), "")
-                acc.append(Acceptance(f"A-{acc_n}", f"{r}: {metric_text(req.metric)}"
-                                      + (f" — {tmpl}" if tmpl else ""), "metric", metric=r))
-        title = " + ".join(c.name for c in comps)
-        goal = "Implement " + "; ".join(f"{c.name}: {c.responsibility.rstrip('.')}" for c in comps) + "."
-        d.work_packages.append(WorkPackage(wp_id, title, goal, ids, [i.id for c in comps for i in d.provided_by(c.id)],
-                                           deps, satisfies, files, _size_of(comps, d, satisfies), acc,
-                                           notes=f"family: {family_of[ids[0]]}"))
-        trace[wp_id] = {"sentences": [], "rules": [f"package:layer{[i for i, L in enumerate(layers) if ids[0] in L][0]}:{family_of[ids[0]]}"]}
+    PKG.build(d, an, layout, trace, log)
+
     return Synthesis(d, trace, [cid[k] for k in generic_keys if k in cid], log, placements, close_calls)

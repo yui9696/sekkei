@@ -460,7 +460,8 @@
         "I-15",
         "I-17",
         "I-25",
-        "I-32"
+        "I-32",
+        "I-33"
       ],
       "satisfies": [
         "R-13",
@@ -709,6 +710,26 @@
       "tags": []
     },
     {
+      "id": "C-33",
+      "name": "Packaging",
+      "responsibility": "Work packages as deliverable slices: one delivering package per requirement, a capability with its entities and its routes, foundations first, acceptance written from each requirement's own sentence, and a size computed from what the package carries.",
+      "kind": "module",
+      "path": "sekkei/engine/packaging.py",
+      "requires": [
+        "I-1",
+        "I-3",
+        "I-13",
+        "I-14",
+        "I-15",
+        "I-32"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "tags": []
+    },
+    {
       "id": "C-28",
       "name": "Deliverables",
       "responsibility": "Executive summary, ADRs, C4, risk register, FMEA, roadmap, RACI, SLOs, cost model and runbooks derived from the design and the notes.",
@@ -734,7 +755,8 @@
       "requires": [
         "I-1",
         "I-13",
-        "I-19"
+        "I-19",
+        "I-20"
       ],
       "satisfies": [
         "R-22"
@@ -2959,6 +2981,106 @@
           "pre": "",
           "post": "",
           "description": ""
+        },
+        {
+          "name": "answered_in_text",
+          "inputs": [
+            {
+              "name": "qid",
+              "type": "str",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "list[str]: the author's own sentences that speak to that question's topic",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        }
+      ],
+      "stability": "draft",
+      "description": ""
+    },
+    {
+      "id": "I-33",
+      "name": "Packaging API",
+      "owner": "C-33",
+      "kind": "module",
+      "operations": [
+        {
+          "name": "build",
+          "inputs": [
+            {
+              "name": "d",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            },
+            {
+              "name": "layout",
+              "type": "Layout",
+              "description": ""
+            },
+            {
+              "name": "trace",
+              "type": "dict",
+              "description": ""
+            },
+            {
+              "name": "log",
+              "type": "list[str]",
+              "description": ""
+            }
+          ],
+          "output": "None: fills design.work_packages",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "delivery_owner",
+          "inputs": [
+            {
+              "name": "d",
+              "type": "Design",
+              "description": ""
+            },
+            {
+              "name": "an",
+              "type": "Analysis",
+              "description": ""
+            }
+          ],
+          "output": "dict: requirement id -> the one component that delivers it",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
+        },
+        {
+          "name": "metric_quality",
+          "inputs": [
+            {
+              "name": "u",
+              "type": "ReqUnit",
+              "description": ""
+            }
+          ],
+          "output": "list[str]: the quality a metric measures",
+          "errors": [],
+          "pre": "",
+          "post": "",
+          "description": ""
         }
       ],
       "stability": "draft",
@@ -4438,7 +4560,8 @@
         "WP-15",
         "WP-16",
         "WP-20",
-        "WP-21"
+        "WP-21",
+        "WP-22"
       ],
       "satisfies": [
         "R-13",
@@ -4501,6 +4624,40 @@
           "description": "domain tests pass: typed fields, states and invariants from the trading spec; no proper nouns, verbs or adjectives as entities; aggregates as components",
           "kind": "test",
           "command": "python -m pytest -q tests/test_domain.py",
+          "metric": ""
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "WP-22",
+      "title": "Engine: packaging",
+      "goal": "Cut the design into deliverable slices: choose the one component that delivers each requirement, group a capability with its entities and its routes, order foundations first, write acceptance from each requirement's own sentence and compute the size from what the package carries.",
+      "components": [
+        "C-33"
+      ],
+      "implements": [
+        "I-33"
+      ],
+      "depends_on": [
+        "WP-13",
+        "WP-21"
+      ],
+      "satisfies": [
+        "R-13",
+        "R-15"
+      ],
+      "files": [
+        "sekkei/engine/packaging.py",
+        "tests/test_packaging.py"
+      ],
+      "size": "M",
+      "acceptance": [
+        {
+          "id": "A-33",
+          "description": "packaging tests pass: every requirement is delivered by exactly one package, a functional requirement's acceptance names it, foundations come first, the size states its counts",
+          "kind": "test",
+          "command": "python -m pytest -q tests/test_packaging.py",
           "metric": ""
         }
       ],

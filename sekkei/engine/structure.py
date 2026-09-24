@@ -52,7 +52,9 @@ _STORY = re.compile(r"^\s*(?:[A-Z][A-Z0-9]+-\d+\s*[—–:-]?\s*)?as an? (?P<act
 _TICKET = re.compile(r"^\s*(?P<key>[A-Z][A-Z0-9]+-\d+)\s*[—–:-]\s*(?P<rest>.+)$")
 _TODO = re.compile(r"^\s*(?:todo|fixme|question|q|open question|要確認|未定|要検討|宿題)\b\s*[:：]?\s*", re.I)
 _TENTATIVE = re.compile(r"\b(?:maybe|later maybe|perhaps|not sure|tbd|tbc|to be decided|to be confirmed)\b|\?\s*$|未定|検討中|かも", re.I)
-_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|not in this(?: release| phase| version| sprint| scope| project)?|we will not(?: do| build)?|won't do|will not do|対象外|スコープ外|やらないこと|やらなくていいこと|今回はやらない|範囲外)[^:：]{0,20}[:：]\s*(?P<body>.+)$", re.I)
+#: an exclusion *label* at the start of a line. "Excluded from the export: …" is a condition inside a
+#: requirement, not an exclusion, so "excluded from" only counts when what follows is the scope itself.
+_OUT_INLINE = re.compile(r"^\s*(?:out of scope|non-goal|non-goals|not in scope|not in this(?: release| phase| version| sprint| scope| project)?|we will not(?: do| build)?|won't do|will not do|not included|excluded(?: from (?:this |the )?(?:scope|contract|release|phase|version|sprint|project))?|対象外|スコープ外|やらないこと|やらなくていいこと|今回はやらない|今回は含めない|今回は含めません|含めない|含めません|範囲外)[^:：]{0,20}[:：]\s*(?P<body>.+)$", re.I)
 _WILL_NOT = re.compile(r"^\s*(?:we|the team|this project|this release|this phase)\s+(?:will|shall|do|does)\s+not\s+(?:build|do|include|cover|support|ship|deliver|provide|implement)\s+(?P<body>.+)$", re.I)
 _DECIDED = re.compile(r"^\s*(?:decided|decision|agreed|決定|確定)\s*[:：]\s*(?P<body>.+)$", re.I)
 _SPEAKER = re.compile(r"^\s*(?P<name>[A-Z][a-z]{1,15})\s*:\s+(?P<body>.+)$")
@@ -85,6 +87,7 @@ class Canonical:
     deadline: str = ""                                    # a stated release date / horizon, verbatim
     rationales: dict[str, str] = field(default_factory=dict)  # sentence -> "so that …" from a user story
     sources: dict[str, str] = field(default_factory=dict)     # folded sentence -> the source line(s) it came from (for the red team's deletion attack)
+    dropped: list[tuple[str, str]] = field(default_factory=list)   # (line, why) removed by the structure pass itself; listed in the notes §6b
 
 
 def _section_of(title: str) -> str | None:
@@ -194,6 +197,41 @@ _META_TABLE_HEADERS = {"field", "value", "key", "item", "property", "attribute",
 _TEAM_COUNT = re.compile(r"\(?(\d+)\)?\s*(?:x\s*)?(?:engineers?|devs?|developers?|sres?|people|persons?|members?|backend|frontend|mobile|platform|full[- ]stack|qa|designers?|ops|contractors?|leads?|architects?|testers?|analysts?|scientists?|validation lead|data scientists?|名|人)", re.I)
 _SYSTEMS_AFFECTED = re.compile(r"^\s*(?:systems? affected|affected systems?|services? affected|existing services?|touches|impacted services?|対象システム|影響システム)\s*[:：]\s*(?P<body>.+)$", re.I)
 _ACTION_SECTION = ("actions", "next steps", "todo", "todos", "open questions", "questions", "open items", "宿題", "アクション", "次のステップ", "検討事項", "未決事項")
+
+
+#: a table whose header names a source state, a target state and (usually) what triggers the move
+_FROM_H = ("from", "from state", "current", "current state", "source", "source state", "遷移元", "現在の状態", "前状態", "変更前")
+_TO_H = ("to", "to state", "next", "next state", "target", "target state", "resulting state", "new state", "遷移先", "次の状態", "後状態", "変更後")
+_TRIGGER_H = ("trigger", "event", "action", "on", "condition", "cause", "契機", "イベント", "操作", "条件")
+
+
+def _transition_rows(rows: list[list[str]]) -> list[tuple[str, str, str]]:
+    """(from, to, trigger) for a state-transition table, else []. Such a table is the lifecycle of a
+    thing, not a list of requirements: read as rows it becomes 'From: x; Trigger: y; To: z' sentences
+    that carry no state machine at all."""
+    head = [c.strip().lower().strip("*: ") for c in rows[0]]
+    fi = next((n for n, h in enumerate(head) if h in _FROM_H), None)
+    ti = next((n for n, h in enumerate(head) if h in _TO_H), None)
+    if fi is None or ti is None or fi == ti:
+        return []
+    gi = next((n for n, h in enumerate(head) if h in _TRIGGER_H), None)
+    out: list[tuple[str, str, str]] = []
+    for r in rows[1:]:
+        if max(fi, ti) >= len(r):
+            continue
+        a, b = r[fi].strip().strip("*`"), r[ti].strip().strip("*`")
+        g = r[gi].strip().strip("*`") if gi is not None and gi < len(r) else ""
+        if a and b and len(a.split()) <= 4 and len(b.split()) <= 4:
+            out.append((a, b, g))
+    return out
+
+
+def _lifecycle_subject(title: str) -> str:
+    """'Visit lifecycle', '注文のステータス遷移' -> the thing whose states these are."""
+    t = re.sub(r"(?:lifecycle|life cycle|state machine|states?|statuses|status|transitions?|workflow|flow|の?状態遷移|ステータス|遷移)", " ", title, flags=re.I)
+    t = re.sub(r"^\d+(?:\.\d+)*[.)]?\s*", "", t.strip())
+    words = [w for w in re.split(r"[^A-Za-z\u3040-\u30ff\u4e00-\u9fff]+", t) if len(w) > 2]
+    return words[-1].lower() if words else ""
 
 
 def _is_meta_table(rows: list[list[str]]) -> bool:
@@ -312,6 +350,16 @@ def canonicalise(text: str) -> Canonical:
     def flush_table() -> None:
         nonlocal table
         rows = _merge_two_line_header(table)
+        trans = _transition_rows(rows) if len(rows) >= 2 else []
+        if trans:
+            subj = _lifecycle_subject(last_heading)
+            for a, b, g in trans:
+                when = f" when {g}" if g else ""
+                out.append(f"- {'A ' + subj + ' moves' if subj else 'The record moves'} from {a} to {b}{when}.")
+            can.notes.append(f"table with a from/to header folded into {len(trans)} state transition(s)"
+                             + (f" of the {subj}" if subj else ""))
+            table = []
+            return
         if _is_meta_table(rows):
             can.notes.append("front matter skipped: key/value table (" + ", ".join(r[0].strip() for r in rows[1:6] if r) + ")")
         elif len(rows) >= 2:
@@ -321,6 +369,7 @@ def canonicalise(text: str) -> Canonical:
         table = []
 
     section_prio = ""
+    last_heading = ""
     while i < len(lines):
         raw = lines[i]
         line = _HTML_TAG.sub(" ", raw).rstrip()
@@ -436,6 +485,7 @@ def canonicalise(text: str) -> Canonical:
         if hm:
             hashes, title = hm.groups()
             title = title.strip()
+            last_heading = title
             st = _STORY.match(title)
             if st:
                 out.append("")
@@ -499,7 +549,10 @@ def canonicalise(text: str) -> Canonical:
             continue
         if re.fullmatch(r"[^。.!?]{2,40}[:：]", stripped) and not _BULLET.match(line):
             canon = _section_of(stripped)
-            if canon == "Aside" and stripped.lower().strip(":：") in _ACTION_SECTION:
+            nxt = next((l for l in lines[i:] if l.strip()), "")
+            if canon == "Aside" and (stripped.lower().strip(":：") in _ACTION_SECTION or _BULLET.match(nxt)):
+                # "Agreed actions:", "Next steps:", "Open items:" introducing a list: the items are read
+                # (a full sentence is a requirement, a question is an open item) — never dropped unseen
                 section, in_actions = "Aside", True
             elif canon in ("Alternatives", "Aside"):
                 section, in_actions = canon, False
@@ -533,11 +586,26 @@ def canonicalise(text: str) -> Canonical:
             bm = _BULLET.match(line)
             if bm:
                 can.alternatives.append(bm.group("body").strip())
+            elif len(stripped.split()) >= 3:
+                can.dropped.append((stripped, "under an 'alternatives considered' heading"))
             continue
         if section == "Aside":
+            if not in_actions and len(stripped.split()) >= 3:
+                can.dropped.append((stripped, "under a reference/appendix heading"))
             if in_actions:
                 bm = _BULLET.match(line)
                 body = (bm.group("body") if bm else stripped).strip()
+                om, dm = _OUT_INLINE.match(body), _DECIDED.match(body)
+                if om or dm:
+                    # an exclusion or a decision written inside an action list is still an exclusion or a decision
+                    emit_section("Out of scope" if om else "Constraints")
+                    for part in (re.split(r"[、,;]\s*", om.group("body")) if om else [dm.group("body")]):
+                        if part.strip():
+                            out.append("- " + part.strip())
+                    out.append("")
+                    out.append("## Requirements")
+                    section, in_actions = "Aside", True
+                    continue
                 if body and (re.match(r"^[A-Z][a-z]+\s*[:：]", body) or len(body.split()) <= 8 or "?" in body or "？" in body
                              or re.match(r"^(?:do|does|is|are|should|can|who|what|which|when|how|why)\b", body, re.I)):
                     can.todos.append(body)

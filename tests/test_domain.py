@@ -108,3 +108,19 @@ def test_arrow_alternatives_keep_every_state():
     claim = e["claim"]
     assert {"submitted", "adjudicating", "approved", "held", "rejected", "paid"} <= set(claim.states)
     assert ("adjudicating", "held") in {(a, b) for a, b, _ in claim.edges}
+
+
+def test_a_from_to_table_is_a_state_machine_not_a_list_of_requirements():
+    """A lifecycle written as a table (From | Trigger | To) is the part of a domain a team most wants
+    written down; read row by row it became 'From: x; Trigger: y; To: z' sentences and no states."""
+    text = ("# Intake\n\n## Functional\n- Nurses can register a patient arrival.\n\n### Visit lifecycle\n\n"
+            "| From | Trigger | To |\n|---|---|---|\n| arrived | triage started | in_triage |\n"
+            "| in_triage | clinician assigned | in_treatment |\n| in_treatment | discharge signed | discharged |\n\n"
+            "## Constraints\n- Python. PostgreSQL available. Team of 3.\n")
+    r = design(text)
+    visit = next((e for e in r.design.entities if e.name.lower() == "visit"), None)
+    assert visit is not None, [e.name for e in r.design.entities]
+    md = r.notes.domain_md
+    assert "arrived→in_triage" in md and "in_treatment→discharged" in md, md
+    assert not any(s.statement.startswith("From:") for s in r.design.requirements)
+    assert any("aggregate" in c.tags and "visit" in c.name.lower() for c in r.design.components)
